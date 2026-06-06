@@ -1,8 +1,13 @@
 # Adna Web Lite Reroll Editor
 
-In-repo web front-end for the blueprint flywheel — a lightweight viewer / reroll /
-patch tool for AI-generated map drafts. Plan: [`docs/WEB_LITE_REROLL_EDITOR.md`](../../docs/WEB_LITE_REROLL_EDITOR.md).
-Scaffolded after `web/tagger/` (Vite + React + TS + Canvas 2D).
+Web front-end for the blueprint flywheel — a lightweight viewer / reroll /
+patch tool for AI-generated map drafts. Plan: [`docs/WEB_LITE_REROLL_EDITOR.md`](https://github.com/zpt0219/tile_map_editor_imgui/blob/main/docs/WEB_LITE_REROLL_EDITOR.md)
+(in the upstream engine repo). Scaffolded after the sibling `../tagger/` (Vite +
+React + TS + Canvas 2D).
+
+> This repo is the home of Adna web development; the **engine, docs, and palette
+> are authoritative in [`tile_map_editor_imgui`](https://github.com/zpt0219/tile_map_editor_imgui)**.
+> Cross-repo `docs/…` and `desktop/…` links below point there.
 
 ## Status — MVP 2 (terrain brush)
 
@@ -42,7 +47,7 @@ brush's tile rect (clipping the cell scan to it, skipping objects that don't
 intersect), so painting stays cheap regardless of map size. Structural edits
 (move / resize / lock / undo) fall back to a full `renderScene`.
 - **Export**: writes a web-owned **`adna-web-lite`** save file (the edited lite
-  TileMap, readable JSON) — spec in [`docs/WEB_LITE_SCHEMA.md`](../../docs/WEB_LITE_SCHEMA.md).
+  TileMap, readable JSON) — spec in [`docs/WEB_LITE_SCHEMA.md`](https://github.com/zpt0219/tile_map_editor_imgui/blob/main/docs/WEB_LITE_SCHEMA.md).
   A desktop-side loader that opens it as a new map is a later pass.
 
 Constraints: **canvas size = blueprint root `width`/`height`** (content-AABB
@@ -67,16 +72,20 @@ drop its cells. (This was an engine bug found while building MVP 1 — fixed in
 The overlay palette has one source of truth, kept bit-identical across the engine
 header, the PIL preview, and the docs (§2.4). This app is the *fourth* consumer,
 so `src/generated/roleColors.ts` is **generated at build time** by
-`scripts/gen-role-colors.mjs`, which parses
-[`desktop/src/blueprint_palette.h`](../../desktop/src/blueprint_palette.h)
-(`blueprint_color_for_role`). The generated file is committed so a standalone
+`scripts/gen-role-colors.mjs`, which parses a **vendored snapshot** of the engine
+header at [`vendor/blueprint_palette.h`](vendor/blueprint_palette.h)
+(`blueprint_color_for_role`) — so this repo builds from a single checkout with no
+dependency on the engine repo. The generated file is committed so a standalone
 checkout still builds; `npm run generate` (wired into `predev`/`prebuild`)
-re-syncs it. **Do not edit `src/generated/` by hand.**
+re-syncs it from `vendor/blueprint_palette.h`. To pull a newer palette: copy the
+upstream `desktop/src/blueprint_palette.h` over `vendor/blueprint_palette.h` (or
+set `$BLUEPRINT_PALETTE_H` to it) and run `npm run generate`. **Do not edit
+`src/generated/` by hand.**
 
 ## Develop
 
 ```bash
-cd web/reroll
+cd reroll
 npm install
 npm run dev       # runs generate, then vite — open http://localhost:5173
 npm run build     # tsc -b && vite build (also regenerates the color table)

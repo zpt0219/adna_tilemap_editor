@@ -1,5 +1,6 @@
 // GENERATED FILE — do not edit by hand.
-// Source of truth: desktop/src/blueprint_palette.h (blueprint_color_for_role).
+// Source: vendor/blueprint_palette.h (blueprint_color_for_role) — a vendored
+//   snapshot of tile_map_editor_imgui · desktop/src/blueprint_palette.h.
 // Regenerate: npm run generate   (scripts/gen-role-colors.mjs)
 //
 // Substring match, FIRST hit wins, ORDER-SENSITIVE — mirrors the engine header

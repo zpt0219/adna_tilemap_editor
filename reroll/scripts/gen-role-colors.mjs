@@ -6,11 +6,22 @@
 //   · scripts/render_overlay.py                (no-engine PIL preview)
 //   · docs/BLUEPRINT_AUTHORING.md §4           (doc color table)
 //
-// The web viewer is the FOURTH consumer. Rather than hand-copying a fourth
-// table that can drift, we parse the engine header at build time and emit a TS
-// constant. The emitted file (src/generated/roleColors.ts) is committed so a
-// standalone checkout can build without the engine source present; running
-// `npm run generate` (wired into predev/prebuild) re-syncs it.
+// This repo is self-contained — it builds from a single checkout with NO
+// dependency on any other repo (it ships as a public website). To make that
+// possible the palette header is VENDORED here at:
+//   vendor/blueprint_palette.h
+// which is a verbatim snapshot of the authoritative original in the engine repo:
+//   tile_map_editor_imgui · desktop/src/blueprint_palette.h
+//   https://github.com/zpt0219/tile_map_editor_imgui
+//
+// This generator is the web viewer's copy of the palette: rather than
+// hand-maintaining a TS table that can drift from the snapshot, it parses the
+// vendored header and emits src/generated/roleColors.ts (committed). Run
+// `npm run generate` (wired into predev/prebuild) to re-emit it.
+//
+// To re-sync after the engine palette changes: copy the upstream header over
+// vendor/blueprint_palette.h (or point $BLUEPRINT_PALETTE_H at it), then
+// `npm run generate`.
 //
 // Matching is substring, FIRST hit wins, ORDER-SENSITIVE — we preserve the
 // header's rule order exactly.
@@ -20,8 +31,13 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const SRC = resolve(here, "../../../desktop/src/blueprint_palette.h");
 const OUT = resolve(here, "../src/generated/roleColors.ts");
+
+// Vendored snapshot by default; $BLUEPRINT_PALETTE_H overrides it for re-syncing
+// straight from an engine-repo checkout.
+const SRC = process.env.BLUEPRINT_PALETTE_H
+  ? resolve(process.env.BLUEPRINT_PALETTE_H)
+  : resolve(here, "../vendor/blueprint_palette.h");
 
 const header = readFileSync(SRC, "utf8");
 
@@ -59,7 +75,8 @@ if (!rules.length || !fallback) {
 }
 
 const ts = `// GENERATED FILE — do not edit by hand.
-// Source of truth: desktop/src/blueprint_palette.h (blueprint_color_for_role).
+// Source: vendor/blueprint_palette.h (blueprint_color_for_role) — a vendored
+//   snapshot of tile_map_editor_imgui · desktop/src/blueprint_palette.h.
 // Regenerate: npm run generate   (scripts/gen-role-colors.mjs)
 //
 // Substring match, FIRST hit wins, ORDER-SENSITIVE — mirrors the engine header
