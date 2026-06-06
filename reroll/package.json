@@ -1,0 +1,26 @@
+{
+  "name": "adna-web-reroll",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Web Lite Reroll Editor — blueprint JSON viewer/reroll tool (docs/WEB_LITE_REROLL_EDITOR.md). MVP 0: Canvas 2D overlay-parity viewer.",
+  "scripts": {
+    "generate": "node scripts/gen-role-colors.mjs",
+    "predev": "npm run generate",
+    "dev": "vite",
+    "prebuild": "npm run generate",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "~5.6.3",
+    "vite": "^6.0.7"
+  }
+}
