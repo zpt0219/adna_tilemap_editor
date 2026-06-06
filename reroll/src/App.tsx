@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { parseBlueprint } from "./blueprint";
 import { blueprintToLite } from "./convert";
-import { cloneTerrain, findObject, isLocked, layerOfObject, roleOf, setTerrainCell, type LiteObject, type LiteTileMap, type Rect } from "./model";
+import { normalizeToCategories } from "./normalize";
+import { cloneTerrain, displayName, findObject, isLocked, layerOfObject, roleOf, setTerrainCell, type LiteObject, type LiteTileMap, type Rect } from "./model";
 import { UndoStack, moveLayerCommand, moveObjectCommand, paintTerrainCommand, resizeObjectCommand, toggleLayerEnabledCommand, type Command, type TerrainSnapshot } from "./commands";
 import { activeLegend } from "./legend";
 import { liteToWebSave } from "./saveFormat";
@@ -20,18 +21,45 @@ export default function App() {
   const [brushErase, setBrushErase] = useState(false);
   // active layer = pure highlight + the reorder target (not undoable, not exported)
   const [activeLayerId, setActiveLayerId] = useState<number | null>(null);
+  // category-layer model on/off (docs/LAYER_MODEL.md); off = raw blueprint layers
+  const [normalize, setNormalize] = useState(true);
+  const [expanded, setExpanded] = useState<Set<number>>(new Set());
   const undo = useRef(new UndoStack());
   const stroke = useRef<{ id: number; before: TerrainSnapshot; dirty: boolean } | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
+  const source = useRef<{ name: string; text: string } | null>(null);
 
-  const load = useCallback((name: string, text: string) => {
-    const lite = blueprintToLite(parseBlueprint(name, text));
+  const build = useCallback((name: string, text: string, norm: boolean) => {
+    let lite = blueprintToLite(parseBlueprint(name, text));
+    if (norm) lite = normalizeToCategories(lite);
     undo.current = new UndoStack();
     setMap(lite);
     setSelected(new Set());
     setActiveLayerId(lite.layers[0]?.id ?? null);
+    setExpanded(new Set());
     setVersion(0);
     setError("");
+  }, []);
+
+  const load = useCallback((name: string, text: string) => {
+    source.current = { name, text };
+    build(name, text, normalize);
+  }, [build, normalize]);
+
+  const onToggleNormalize = useCallback(() => {
+    setNormalize((n) => {
+      const next = !n;
+      if (source.current) build(source.current.name, source.current.text, next);
+      return next;
+    });
+  }, [build]);
+
+  const toggleExpand = useCallback((id: number) => {
+    setExpanded((prev) => {
+      const n = new Set(prev);
+      if (n.has(id)) n.delete(id); else n.add(id);
+      return n;
+    });
   }, []);
 
   const loadFile = useCallback(async (file: File) => {
@@ -130,7 +158,7 @@ export default function App() {
     // selecting an object highlights its owning layer (active = pure highlight)
     if (id != null && map) {
       const ly = layerOfObject(map, id);
-      if (ly) setActiveLayerId(ly.id);
+      if (ly) { setActiveLayerId(ly.id); setExpanded((p) => new Set(p).add(ly.id)); }
     }
     setSelected((prev) => {
       if (id == null) return new Set();
@@ -190,6 +218,10 @@ export default function App() {
             <button disabled={!canUndo} onClick={onUndo} title="撤销 (Cmd/Ctrl+Z)">↶ Undo</button>
             <button disabled={!canRedo} onClick={onRedo} title="重做 (Shift+Cmd/Ctrl+Z)">↷ Redo</button>
             <button onClick={onExport} title="导出 adna-web-lite 存档">⤓ Export</button>
+            <span className="seg" title="大类层模型 / 原始 blueprint 层">
+              <button className={normalize ? "active" : ""} onClick={() => { if (!normalize) onToggleNormalize(); }}>大类</button>
+              <button className={!normalize ? "active" : ""} onClick={() => { if (normalize) onToggleNormalize(); }}>原始</button>
+            </span>
             {selIsTerrain && (
               <>
                 <span className="ts-sep" />
@@ -230,23 +262,48 @@ export default function App() {
               </span>
             </div>
             {/* panel top = front (drawn on top) → render the array reversed */}
-            {[...map.layers].reverse().map((ly) => (
-              <div
-                key={ly.id}
-                className={`layer-row${ly.id === activeLayerId ? " active" : ""}${ly.enabled ? "" : " hidden"}`}
-                onClick={() => setActiveLayerId(ly.id)}
-              >
-                <button
-                  className="eye"
-                  title={ly.enabled ? "隐藏" : "显示"}
-                  onClick={(e) => { e.stopPropagation(); onToggleLayer(ly.id); }}
-                >
-                  {ly.enabled ? "👁" : "🚫"}
-                </button>
-                <span className="layer-name" title={ly.name}>{ly.name}</span>
-                <span className="layer-count">{ly.objects.length}</span>
-              </div>
-            ))}
+            {[...map.layers].reverse().map((ly) => {
+              const open = expanded.has(ly.id);
+              const total: Record<string, number> = {};
+              for (const o of ly.objects) { const n = displayName(o); total[n] = (total[n] ?? 0) + 1; }
+              const seen: Record<string, number> = {};
+              return (
+                <div key={ly.id} className="layer-group">
+                  <div
+                    className={`layer-row${ly.id === activeLayerId ? " active" : ""}${ly.enabled ? "" : " hidden"}`}
+                    onClick={() => { setActiveLayerId(ly.id); toggleExpand(ly.id); }}
+                  >
+                    <button className="caret" onClick={(e) => { e.stopPropagation(); toggleExpand(ly.id); }}>
+                      {open ? "▾" : "▸"}
+                    </button>
+                    <button
+                      className="eye"
+                      title={ly.enabled ? "隐藏" : "显示"}
+                      onClick={(e) => { e.stopPropagation(); onToggleLayer(ly.id); }}
+                    >
+                      {ly.enabled ? "👁" : "🚫"}
+                    </button>
+                    <span className="layer-name" title={ly.name}>{ly.name}</span>
+                    <span className="layer-count">{ly.objects.length}</span>
+                  </div>
+                  {open && ly.objects.map((o) => {
+                    const base = displayName(o);
+                    const occ = (seen[base] = (seen[base] ?? 0) + 1);
+                    const label = total[base] > 1 ? `${base} #${occ}` : base;
+                    return (
+                      <div
+                        key={o.id}
+                        className={`obj-row${selected.has(o.id) ? " selected" : ""}`}
+                        onClick={() => onSelect(o.id, false)}
+                      >
+                        <span className="obj-swatch" style={{ background: rgbaCss(colorForRole(roleOf(o)), 1) }} />
+                        <span className="obj-name" title={label}>{label}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })}
           </aside>
           <CanvasView
             map={map}

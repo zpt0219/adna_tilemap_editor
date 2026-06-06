@@ -97,6 +97,11 @@ export function roleOf(o: LiteObject): string {
   return o.tags["blueprint.role"] ?? "";
 }
 
+/** Label for the layer panel: merged web.name, else blueprint label, else role. */
+export function displayName(o: LiteObject): string {
+  return o.tags["web.name"] || o.tags["blueprint.label"] || roleOf(o) || o.type;
+}
+
 export function isLocked(o: LiteObject): boolean {
   return o.tags["web.lock"] === "true";
 }

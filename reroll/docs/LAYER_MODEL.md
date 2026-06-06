@@ -34,18 +34,25 @@ export.
 
 ## Assignment — `category = f(role, type)`
 
-Evaluate in order, first match wins:
+Role-first, evaluated in order, first match wins. The blueprint already encodes
+shape as the engine type — `TERRAIN_2` for areas, **frg** for scatter/clusters
+(stones, grass tufts, building clusters) — so we use role for *what* and type for
+*area vs scatter*.
 
 1. `role ∈ {ocean, sea}` → **Background** (special-cased to the bottom).
-2. `role ∈ {road, path, corridor, street, bridge, trail, lane}` or
-   `{wall, fence, border, hedge, railing}` (≈ `TERRAIN_2_EDGE`) → **Path**.
-3. vegetation `role ∈ {forest, tree, woods, wood, orchard, grove, jungle, bush,
-   shrub}` → **Terrain Deco**, and **re-typed to frg** — continuous area
-   `forest` is treated as a tree frg too (we don't keep area-forest as terrain).
-4. any other **frg** object → **Terrain Deco**.
-5. **`FIXED_RECT`**: a building role (house/building/barn/shop/tower/…) →
-   **Building**; otherwise → **Building Deco**.
-6. everything left (a `TERRAIN_2_CORNER` area) → **Terrain**.
+2. building `role ∈ {house, building, barn, shop, tower, hut, cabin, cottage,
+   manor, mill, shed, stable}` → **Building** — even when authored as an frg
+   cluster.
+3. `role ∈ {road, path, corridor, street, bridge, trail, lane}` /
+   `{wall, fence, border, hedge, railing}` or type `TERRAIN_2_EDGE` → **Path**.
+4. vegetation `role ∈ {forest, tree, woods, orchard, grove, jungle, bush, shrub}`
+   → **Terrain Deco**, **re-typed to frg** — continuous area `forest` becomes a
+   tree frg too (we don't keep area-forest as terrain).
+5. **frg** scatter: a terrain-vocabulary role (rock/stone, grass, …) →
+   **Terrain Deco** (stones, grass tufts); anything else (props) →
+   **Building Deco**.
+6. **`FIXED_RECT` / `DUNGEON`** → **Building Deco**.
+7. everything left (a `TERRAIN_2` area) → **Terrain**.
 
 ## Merge — one rule
 
@@ -76,15 +83,17 @@ Evaluate in order, first match wins:
 ## Worked example — `beach_village`
 
 ```
-▸ Background      ocean
-▾ Terrain         water (lake+pond) · sand · grass · field land (18 → 1) · mountain (cliff+rock)
-▾ Path            road · brick_road            (no fences in this sample)
-▾ Terrain Deco    trees (forest + 2 trees → 1 frg)
+▸ Background      water (ocean)
+▾ Terrain         mountain (cliff) · sand · field (18 → 1) · water (lake+pond)
+▾ Path            road · brick road            (no fences in this sample)
+▾ Terrain Deco    trees (forest + 2 trees) · grass (tufts) · rocks (stones)
 ▾ Building        house #1 … #13 · building    ← individual
-▾ Building Deco   boat · dock · prop           ← individual
+▾ Building Deco   dock · boat · prop           ← individual
 ```
 
-28-on-one-layer collapses into a few merged areas; the houses stay separate.
+47 objects collapse to a handful of merged areas; the houses (and the building
+cluster) stay separate. Here `grass` and `rock` were authored as frg scatter, so
+they land in Terrain Deco; `cliff` is a `TERRAIN_2` area, so it is Terrain.
 
 ## Implementation plan (keeps the faithful importer intact)
 
