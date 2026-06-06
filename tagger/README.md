@@ -1,16 +1,15 @@
 # Adna Web Asset Tagger
 
 Static, browser-only tool for the **human review** step of palette role/style
-tagging (plan + design live in the upstream engine repo:
-[`docs/WEB_ASSET_TAGGER_PLAN.md`](https://github.com/zpt0219/tile_map_editor_imgui/blob/main/docs/WEB_ASSET_TAGGER_PLAN.md)
-and [`docs/TAG_SYSTEM_DESIGN.md`](https://github.com/zpt0219/tile_map_editor_imgui/blob/main/docs/TAG_SYSTEM_DESIGN.md)).
+tagging (plan + design live in the private engine repo:
+`docs/WEB_ASSET_TAGGER_PLAN.md` and `docs/TAG_SYSTEM_DESIGN.md`).
 It never calls a backend or a model — you
 drop in a `.adnatags` bundle exported by the engine, review/edit tags visually,
 and export `final_tags.json` to feed back via the `import_palette_tags` headless
 command.
 
-> Web dev lives in this repo; the **engine and docs are authoritative in
-> [`tile_map_editor_imgui`](https://github.com/zpt0219/tile_map_editor_imgui)**.
+> Web dev lives in this repo and builds standalone; the **engine and docs are
+> authoritative in the private engine repo**.
 
 ## Run
 

@@ -16,9 +16,7 @@ Each app is a standalone Vite project; see its own README for run/build steps
 This repo builds and runs from a **single checkout** and is meant to ship as a
 public website, so it depends on no other repo at build or runtime.
 
-It was split out of the engine repo
-**[`tile_map_editor_imgui`](https://github.com/zpt0219/tile_map_editor_imgui)**
-(the apps previously lived under its `web/reroll` and `web/tagger`), and web
+It was split out of the Adna engine project (a separate, private repo), and web
 development happens here going forward. The engine repo remains the *origin* of a
 couple of shared assets, but this repo carries its own **vendored snapshots** of
 them rather than reaching across:
@@ -35,6 +33,6 @@ them rather than reaching across:
   `desktop/src/blueprint_palette.h` over `reroll/vendor/blueprint_palette.h` (or
   set `$BLUEPRINT_PALETTE_H` to it), then `npm run generate`.
 
-- **Design docs.** The plan/schema/design docs still live in the engine repo;
-  the sub-app READMEs link to them there for reference only — nothing in the
-  build reads them.
+- **Design docs.** The plan/schema/design docs live in the private engine repo;
+  the sub-app READMEs name them for reference only — nothing in the build reads
+  them, and they aren't linked here.

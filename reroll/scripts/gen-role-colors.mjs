@@ -10,9 +10,8 @@
 // dependency on any other repo (it ships as a public website). To make that
 // possible the palette header is VENDORED here at:
 //   vendor/blueprint_palette.h
-// which is a verbatim snapshot of the authoritative original in the engine repo:
-//   tile_map_editor_imgui · desktop/src/blueprint_palette.h
-//   https://github.com/zpt0219/tile_map_editor_imgui
+// which is a verbatim snapshot of the authoritative original in the (private)
+// Adna engine repo: desktop/src/blueprint_palette.h.
 //
 // This generator is the web viewer's copy of the palette: rather than
 // hand-maintaining a TS table that can drift from the snapshot, it parses the
@@ -76,7 +75,7 @@ if (!rules.length || !fallback) {
 
 const ts = `// GENERATED FILE — do not edit by hand.
 // Source: vendor/blueprint_palette.h (blueprint_color_for_role) — a vendored
-//   snapshot of tile_map_editor_imgui · desktop/src/blueprint_palette.h.
+//   snapshot of the Adna engine's desktop/src/blueprint_palette.h.
 // Regenerate: npm run generate   (scripts/gen-role-colors.mjs)
 //
 // Substring match, FIRST hit wins, ORDER-SENSITIVE — mirrors the engine header

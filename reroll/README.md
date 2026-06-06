@@ -1,13 +1,13 @@
 # Adna Web Lite Reroll Editor
 
 Web front-end for the blueprint flywheel — a lightweight viewer / reroll /
-patch tool for AI-generated map drafts. Plan: [`docs/WEB_LITE_REROLL_EDITOR.md`](https://github.com/zpt0219/tile_map_editor_imgui/blob/main/docs/WEB_LITE_REROLL_EDITOR.md)
-(in the upstream engine repo). Scaffolded after the sibling `../tagger/` (Vite +
+patch tool for AI-generated map drafts. Plan: `docs/WEB_LITE_REROLL_EDITOR.md`
+(in the private engine repo). Scaffolded after the sibling `../tagger/` (Vite +
 React + TS + Canvas 2D).
 
-> This repo is the home of Adna web development; the **engine, docs, and palette
-> are authoritative in [`tile_map_editor_imgui`](https://github.com/zpt0219/tile_map_editor_imgui)**.
-> Cross-repo `docs/…` and `desktop/…` links below point there.
+> This repo is the home of Adna web development and builds standalone. The
+> **engine, docs, and palette are authoritative in the private engine repo**;
+> the `docs/…` and `desktop/…` names below refer to files there (not linked).
 
 ## Status — MVP 2 (terrain brush)
 
@@ -47,7 +47,7 @@ brush's tile rect (clipping the cell scan to it, skipping objects that don't
 intersect), so painting stays cheap regardless of map size. Structural edits
 (move / resize / lock / undo) fall back to a full `renderScene`.
 - **Export**: writes a web-owned **`adna-web-lite`** save file (the edited lite
-  TileMap, readable JSON) — spec in [`docs/WEB_LITE_SCHEMA.md`](https://github.com/zpt0219/tile_map_editor_imgui/blob/main/docs/WEB_LITE_SCHEMA.md).
+  TileMap, readable JSON) — spec in `docs/WEB_LITE_SCHEMA.md` (private engine repo).
   A desktop-side loader that opens it as a new map is a later pass.
 
 Constraints: **canvas size = blueprint root `width`/`height`** (content-AABB
