@@ -35,10 +35,13 @@ export interface BrushPreview {
 export interface DrawOpts {
   hoverTile: [number, number] | null;
   selected: Set<number>;
-  /** snapped destination rect of an in-progress drag, drawn as a ghost */
-  ghost: Rect | null;
+  /** snapped destination rect(s) of an in-progress drag, drawn as ghosts
+   *  (one for a single move/resize, many for a group move) */
+  ghost: Rect[] | null;
   /** N×N brush cursor (terrain tool); null otherwise */
   brush: BrushPreview | null;
+  /** in-progress marquee box in screen px; null otherwise */
+  marquee: { x: number; y: number; w: number; h: number } | null;
 }
 
 export function tileToScreen(v: View, tx: number, ty: number): [number, number] {
@@ -91,13 +94,14 @@ export function drawMap(
 
   drawGrid(ctx, view, ox, oy, map.width, map.height);
   drawSelection(ctx, map, view, opts.selected);
-  drawGhost(ctx, view, opts.ghost);
+  if (opts.ghost) for (const g of opts.ghost) drawGhost(ctx, view, g);
   ctx.restore();
 
   ctx.lineWidth = 3;
   ctx.strokeStyle = BORDER;
   ctx.strokeRect(ox - 1.5, oy - 1.5, mapW + 3, mapH + 3);
 
+  if (opts.marquee) drawMarquee(ctx, opts.marquee);
   if (opts.brush) drawBrushPreview(ctx, view, opts.brush);
   else if (opts.hoverTile) {
     const [tx, ty] = opts.hoverTile;
@@ -274,8 +278,7 @@ function drawSelection(ctx: CanvasRenderingContext2D, map: LiteTileMap, view: Vi
   }
 }
 
-function drawGhost(ctx: CanvasRenderingContext2D, view: View, ghost: Rect | null): void {
-  if (!ghost) return;
+function drawGhost(ctx: CanvasRenderingContext2D, view: View, ghost: Rect): void {
   const s = view.scale;
   const [px, py] = tileToScreen(view, ghost[0], ghost[1]);
   ctx.save();
@@ -285,6 +288,18 @@ function drawGhost(ctx: CanvasRenderingContext2D, view: View, ghost: Rect | null
   ctx.fillStyle = "rgba(90, 220, 255, 0.18)";
   ctx.fillRect(px, py, ghost[2] * s, ghost[3] * s);
   ctx.strokeRect(px, py, ghost[2] * s, ghost[3] * s);
+  ctx.restore();
+}
+
+// Dashed rubber-band box for the marquee tool (screen px, unclipped).
+function drawMarquee(ctx: CanvasRenderingContext2D, box: { x: number; y: number; w: number; h: number }): void {
+  ctx.save();
+  ctx.setLineDash([4, 3]);
+  ctx.lineWidth = 1.5;
+  ctx.strokeStyle = "rgba(80, 200, 120, 0.95)";
+  ctx.fillStyle = "rgba(80, 200, 120, 0.14)";
+  ctx.fillRect(box.x, box.y, box.w, box.h);
+  ctx.strokeRect(box.x, box.y, box.w, box.h);
   ctx.restore();
 }
 

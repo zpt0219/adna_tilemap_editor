@@ -60,6 +60,18 @@ export function moveObjectCommand(
   };
 }
 
+/**
+ * Move several objects together by one (dx,dy) delta (group move). Captures the
+ * id list + delta; do/undo translate every still-present member. One drag = one
+ * undo. The caller is responsible for clamping the delta so the group stays on
+ * the map (see CanvasView).
+ */
+export function moveObjectsCommand(map: LiteTileMap, ids: number[], dx: number, dy: number): Command {
+  const shift = (sx: number, sy: number) =>
+    ids.forEach((id) => { const o = findObject(map, id); if (o) translateObject(o, sx, sy); });
+  return { label: "Move", do: () => shift(dx, dy), undo: () => shift(-dx, -dy) };
+}
+
 /** Resize an object's rect (FIXED_RECT). Captures target by id. */
 export function resizeObjectCommand(map: LiteTileMap, id: number, before: Rect, after: Rect): Command {
   const set = (r: Rect) => {

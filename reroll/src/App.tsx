@@ -2,8 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { parseBlueprint } from "./blueprint";
 import { blueprintToLite } from "./convert";
 import { normalizeToCategories } from "./normalize";
-import { cloneTerrain, displayName, findObject, isLocked, layerOfObject, roleOf, setTerrainCell, type LiteObject, type LiteTileMap, type Rect } from "./model";
-import { UndoStack, moveLayerCommand, moveObjectCommand, paintTerrainCommand, resizeObjectCommand, toggleLayerEnabledCommand, type Command, type TerrainSnapshot } from "./commands";
+import { cloneTerrain, displayName, findLayer, findObject, isLocked, layerOfObject, roleOf, setTerrainCell, type LiteObject, type LiteTileMap, type Rect } from "./model";
+import { UndoStack, moveLayerCommand, moveObjectCommand, moveObjectsCommand, paintTerrainCommand, resizeObjectCommand, toggleLayerEnabledCommand, type Command, type TerrainSnapshot } from "./commands";
 import { activeLegend } from "./legend";
 import { liteToWebSave } from "./saveFormat";
 import { downloadJson } from "./download";
@@ -17,6 +17,10 @@ export default function App() {
   const [error, setError] = useState("");
   const [version, setVersion] = useState(0);
   const [selected, setSelected] = useState<Set<number>>(new Set());
+  // anchor for Shift-range selection (the last plainly-picked / Ctrl-toggled id)
+  const [anchorId, setAnchorId] = useState<number | null>(null);
+  // one-shot Marquee tool armed (docs/SELECTION_MODEL.md); LMB box-selects, then pops back
+  const [marquee, setMarquee] = useState(false);
   const [brushSize, setBrushSize] = useState(3);
   const [brushErase, setBrushErase] = useState(false);
   // active layer = pure highlight + the reorder target (not undoable, not exported)
@@ -35,6 +39,8 @@ export default function App() {
     undo.current = new UndoStack();
     setMap(lite);
     setSelected(new Set());
+    setAnchorId(null);
+    setMarquee(false);
     setActiveLayerId(lite.layers[0]?.id ?? null);
     setExpanded(new Set());
     setVersion(0);
@@ -154,20 +160,77 @@ export default function App() {
     run(paintTerrainCommand(map, s.id, s.before, after));
   }, [map, run]);
 
-  const onSelect = useCallback((id: number | null, additive: boolean) => {
-    // selecting an object highlights its owning layer (active = pure highlight)
-    if (id != null && map) {
-      const ly = layerOfObject(map, id);
-      if (ly) { setActiveLayerId(ly.id); setExpanded((p) => new Set(p).add(ly.id)); }
-    }
+  // --- selection (single-layer; docs/SELECTION_MODEL.md) ---
+  const revealLayer = useCallback((layerId: number) => {
+    setActiveLayerId(layerId);
+    setExpanded((p) => new Set(p).add(layerId));
+  }, []);
+
+  // Replace selection with a single object (switch active layer, set anchor).
+  const selectSingle = useCallback((id: number) => {
+    if (!map) return;
+    const ly = layerOfObject(map, id);
+    if (ly) revealLayer(ly.id);
+    setSelected(new Set([id]));
+    setAnchorId(id);
+  }, [map, revealLayer]);
+
+  // Ctrl-toggle membership; only within the active layer (else switch + single).
+  const toggleSelect = useCallback((id: number) => {
+    if (!map) return;
+    const ly = layerOfObject(map, id);
+    if (!ly) return;
+    if (ly.id !== activeLayerId) { selectSingle(id); return; }
     setSelected((prev) => {
-      if (id == null) return new Set();
-      const next = new Set(additive ? prev : []);
-      if (additive && prev.has(id)) next.delete(id);
-      else next.add(id);
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
       return next;
     });
-  }, [map]);
+    setAnchorId(id);
+    setExpanded((p) => new Set(p).add(ly.id));
+  }, [map, activeLayerId, selectSingle]);
+
+  // Shift-range from anchor to id within one layer's object order (replace).
+  const selectRange = useCallback((id: number) => {
+    if (!map) return;
+    const ly = layerOfObject(map, id);
+    if (!ly || anchorId == null || ly.id !== activeLayerId) { selectSingle(id); return; }
+    const ai = ly.objects.findIndex((o) => o.id === anchorId);
+    const ti = ly.objects.findIndex((o) => o.id === id);
+    if (ai < 0 || ti < 0) { selectSingle(id); return; }
+    const [lo, hi] = ai <= ti ? [ai, ti] : [ti, ai];
+    setSelected(new Set(ly.objects.slice(lo, hi + 1).map((o) => o.id)));
+    revealLayer(ly.id); // anchor unchanged so the range can grow/shrink
+  }, [map, anchorId, activeLayerId, selectSingle, revealLayer]);
+
+  // RMB pick: plain = single, Ctrl = toggle. Empty click is a no-op.
+  const onPick = useCallback((id: number | null, additive: boolean) => {
+    if (id == null) return;
+    if (additive) toggleSelect(id); else selectSingle(id);
+  }, [toggleSelect, selectSingle]);
+
+  // Panel row click with modifiers.
+  const onObjectClick = useCallback((id: number, mods: { ctrl: boolean; shift: boolean }) => {
+    if (mods.shift) selectRange(id);
+    else if (mods.ctrl) toggleSelect(id);
+    else selectSingle(id);
+  }, [selectRange, toggleSelect, selectSingle]);
+
+  // Marquee release: select active-layer objects whose rect intersects the box.
+  const onMarquee = useCallback((loX: number, loY: number, hiX: number, hiY: number, additive: boolean) => {
+    if (!map || activeLayerId == null) return;
+    const ly = findLayer(map, activeLayerId);
+    if (!ly) return;
+    const hits = ly.objects
+      .filter((o) => { const [x, y, w, h] = o.rect; return x <= hiX && x + w - 1 >= loX && y <= hiY && y + h - 1 >= loY; })
+      .map((o) => o.id);
+    setSelected((prev) => (additive ? new Set([...prev, ...hits]) : new Set(hits)));
+    if (hits.length) setAnchorId(hits[0]);
+  }, [map, activeLayerId]);
+
+  const onMoveGroup = useCallback((ids: number[], dx: number, dy: number) => {
+    if (map) run(moveObjectsCommand(map, ids, dx, dy));
+  }, [map, run]);
 
   // --- layer panel actions ---
   const onToggleLayer = useCallback((layerId: number) => {
@@ -184,13 +247,21 @@ export default function App() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== "z") return;
-      e.preventDefault();
-      if (e.shiftKey) onRedo(); else onUndo();
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA") return;
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z") {
+        e.preventDefault();
+        if (e.shiftKey) onRedo(); else onUndo();
+        return;
+      }
+      if (!e.metaKey && !e.ctrlKey && !e.altKey && map) {
+        if (e.key.toLowerCase() === "m") { e.preventDefault(); setMarquee((m) => !m); }
+        else if (e.key === "Escape") setMarquee(false);
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onUndo, onRedo]);
+  }, [onUndo, onRedo, map]);
 
   const legend = useMemo(() => (map ? activeLegend(map) : []), [map, version]);
   const selObj = useMemo(() => (map && selected.size ? findObject(map, [...selected][0]) : null), [map, selected, version]);
@@ -222,6 +293,7 @@ export default function App() {
               <button className={normalize ? "active" : ""} onClick={() => { if (!normalize) onToggleNormalize(); }}>大类</button>
               <button className={!normalize ? "active" : ""} onClick={() => { if (normalize) onToggleNormalize(); }}>原始</button>
             </span>
+            <button className={marquee ? "active" : ""} onClick={() => setMarquee((m) => !m)} title="框选工具(M)：左键拖一次框选,松手自动退回">▭ Marquee</button>
             {selIsTerrain && (
               <>
                 <span className="ts-sep" />
@@ -294,7 +366,7 @@ export default function App() {
                       <div
                         key={o.id}
                         className={`obj-row${selected.has(o.id) ? " selected" : ""}`}
-                        onClick={() => onSelect(o.id, false)}
+                        onClick={(e) => onObjectClick(o.id, { ctrl: e.ctrlKey || e.metaKey, shift: e.shiftKey })}
                       >
                         <span className="obj-swatch" style={{ background: rgbaCss(colorForRole(roleOf(o)), 1) }} />
                         <span className="obj-name" title={label}>{label}</span>
@@ -310,13 +382,17 @@ export default function App() {
             version={version}
             brush={brush}
             selected={selected}
-            onSelect={onSelect}
+            marqueeArmed={marquee}
+            onPick={onPick}
             onMove={onMove}
+            onMoveGroup={onMoveGroup}
             onResize={onResize}
             onToggleLock={onToggleLock}
             onStrokeStart={onStrokeStart}
             onStrokePaint={onStrokePaint}
             onStrokeEnd={onStrokeEnd}
+            onMarquee={onMarquee}
+            onMarqueeDone={() => setMarquee(false)}
           />
           <aside className="legend">
             <div className="legend-title">Legend</div>
