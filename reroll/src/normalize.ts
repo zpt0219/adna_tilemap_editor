@@ -192,7 +192,7 @@ export function normalizeToCategories(map: LiteTileMap): LiteTileMap {
           type: cat.canonical!,
           rect: boundsToRect({ minX: terrain.ox, minY: terrain.oy, maxX: terrain.ox + terrain.w - 1, maxY: terrain.oy + terrain.h - 1 }),
           enabled: group.some((o) => o.enabled),
-          tags: { "blueprint.role": repRole, "web.name": friendlyName(repRole), "web.merged": String(group.length) },
+          tags: { "blueprint.role": repRole, "web.baseName": friendlyName(repRole), "web.merged": String(group.length) },
           terrain,
         } as LiteObject;
       });

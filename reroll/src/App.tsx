@@ -2,8 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent as Re
 import { parseBlueprint } from "./blueprint";
 import { blueprintToLite } from "./convert";
 import { normalizeToCategories } from "./normalize";
-import { cloneTerrain, displayName, findLayer, findObject, isLocked, layerOfObject, roleOf, setTerrainCell, type LiteObject, type LiteTileMap, type Rect } from "./model";
-import { UndoStack, moveObjectCommand, moveObjectsCommand, paintTerrainCommand, reorderLayerObjectsCommand, resizeObjectCommand, toggleLayerEnabledCommand, type Command, type TerrainSnapshot } from "./commands";
+import { assignUniqueObjectNames, cloneTerrain, displayName, findLayer, findObject, isLocked, layerOfObject, roleOf, setTerrainCell, type LiteObject, type LiteTileMap, type Rect } from "./model";
+import { UndoStack, moveObjectCommand, moveObjectsCommand, paintTerrainCommand, reorderLayerObjectsCommand, resizeObjectCommand, toggleLayerEnabledCommand, toggleObjectEnabledCommand, type Command, type TerrainSnapshot } from "./commands";
 import { activeLegend } from "./legend";
 import { liteToWebSave } from "./saveFormat";
 import { downloadJson } from "./download";
@@ -70,6 +70,7 @@ export default function App() {
   const build = useCallback((name: string, text: string, norm: boolean) => {
     let lite = blueprintToLite(parseBlueprint(name, text));
     if (norm) lite = normalizeToCategories(lite);
+    assignUniqueObjectNames(lite);
     undo.current = new UndoStack();
     setMap(lite);
     setSelected(new Set());
@@ -271,6 +272,10 @@ export default function App() {
     if (map) run(toggleLayerEnabledCommand(map, layerId));
   }, [map, run]);
 
+  const onToggleObject = useCallback((objectId: number) => {
+    if (map) run(toggleObjectEnabledCommand(map, objectId));
+  }, [map, run]);
+
   const onObjectDragStart = useCallback((layerId: number, objectId: number) => (e: ReactDragEvent<HTMLDivElement>) => {
     e.dataTransfer.effectAllowed = "move";
     e.dataTransfer.setData("text/plain", `${layerId}:${objectId}`);
@@ -393,9 +398,6 @@ export default function App() {
             </div>
             {map.layers.map((ly) => {
               const open = expanded.has(ly.id);
-              const total: Record<string, number> = {};
-              for (const o of ly.objects) { const n = displayName(o); total[n] = (total[n] ?? 0) + 1; }
-              const seen: Record<string, number> = {};
               return (
                 <div key={ly.id} className="layer-group">
                   <div
@@ -405,24 +407,23 @@ export default function App() {
                     <button className="caret" onClick={(e) => { e.stopPropagation(); toggleExpand(ly.id); }}>
                       {open ? "▾" : "▸"}
                     </button>
-                    <button
-                      className="eye"
-                      title={ly.enabled ? "隐藏" : "显示"}
-                      onClick={(e) => { e.stopPropagation(); onToggleLayer(ly.id); }}
-                    >
-                      {ly.enabled ? "👁" : "🚫"}
-                    </button>
+                    <input
+                      className="row-check"
+                      type="checkbox"
+                      checked={ly.enabled}
+                      title={ly.enabled ? "显示" : "隐藏"}
+                      onChange={() => onToggleLayer(ly.id)}
+                      onClick={(e) => { e.stopPropagation(); }}
+                    />
                     <span className="layer-name" title={ly.name}>{ly.name}</span>
                     <span className="layer-count">{ly.objects.length}</span>
                   </div>
                   {open && ly.objects.map((o) => {
-                    const base = displayName(o);
-                    const occ = (seen[base] = (seen[base] ?? 0) + 1);
-                    const label = total[base] > 1 ? `${base} #${occ}` : base;
+                    const label = displayName(o);
                     return (
                       <div
                         key={o.id}
-                        className={`obj-row${selected.has(o.id) ? " selected" : ""}${dragging?.objectId === o.id ? " dragging" : ""}${dropTarget?.layerId === ly.id && dropTarget.targetId === o.id ? ` drop-${dropTarget.side}` : ""}`}
+                        className={`obj-row${selected.has(o.id) ? " selected" : ""}${o.enabled ? "" : " hidden"}${dragging?.objectId === o.id ? " dragging" : ""}${dropTarget?.layerId === ly.id && dropTarget.targetId === o.id ? ` drop-${dropTarget.side}` : ""}`}
                         draggable
                         onClick={(e) => onObjectClick(o.id, { ctrl: e.ctrlKey || e.metaKey, shift: e.shiftKey })}
                         onDragStart={onObjectDragStart(ly.id, o.id)}
@@ -430,7 +431,14 @@ export default function App() {
                         onDrop={onObjectDrop(ly.id, o.id)}
                         onDragEnd={onObjectDragEnd}
                       >
-                        <span className="obj-swatch" style={{ background: rgbaCss(colorForRole(roleOf(o)), 1) }} />
+                        <input
+                          className="row-check"
+                          type="checkbox"
+                          checked={o.enabled}
+                          title={o.enabled ? "显示" : "隐藏"}
+                          onChange={() => onToggleObject(o.id)}
+                          onClick={(e) => { e.stopPropagation(); }}
+                        />
                         <span className="obj-name" title={label}>{label}</span>
                       </div>
                     );

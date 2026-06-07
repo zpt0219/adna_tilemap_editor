@@ -135,6 +135,13 @@ export function toggleLayerEnabledCommand(map: LiteTileMap, layerId: number): Co
   return { label: "Toggle layer", do: () => set(!before), undo: () => set(before) };
 }
 
+/** Toggle an object's visibility (enabled). Captured by object id. */
+export function toggleObjectEnabledCommand(map: LiteTileMap, objectId: number): Command {
+  const set = (v: boolean) => { const o = findObject(map, objectId); if (o) o.enabled = v; };
+  const before = findObject(map, objectId)?.enabled ?? true;
+  return { label: "Toggle object", do: () => set(!before), undo: () => set(before) };
+}
+
 function setLayerObjectOrder(map: LiteTileMap, layerId: number, order: number[]): void {
   const layer = findLayer(map, layerId);
   if (!layer || order.length !== layer.objects.length) return;

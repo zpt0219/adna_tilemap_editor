@@ -74,7 +74,7 @@ export function* eachObject(map: LiteTileMap): Generator<LiteObject> {
 
 /** Objects on enabled layers only — what render / hit-test / legend should see. */
 export function* eachVisibleObject(map: LiteTileMap): Generator<LiteObject> {
-  for (const layer of map.layers) if (layer.enabled) for (const o of layer.objects) yield o;
+  for (const layer of map.layers) if (layer.enabled) for (const o of layer.objects) if (o.enabled) yield o;
 }
 
 export function findObject(map: LiteTileMap, id: number): LiteObject | null {
@@ -97,7 +97,28 @@ export function roleOf(o: LiteObject): string {
   return o.tags["blueprint.role"] ?? "";
 }
 
-/** Label for the layer panel: merged web.name, else blueprint label, else role. */
+function baseNameOf(o: LiteObject): string {
+  return o.tags["web.baseName"] || o.tags["blueprint.label"] || roleOf(o) || o.tags["web.name"] || o.type;
+}
+
+/** Assign every object a stable unique `web.name` so list labels follow the object. */
+export function assignUniqueObjectNames(map: LiteTileMap): void {
+  const totals = new Map<string, number>();
+  for (const o of eachObject(map)) {
+    const base = baseNameOf(o);
+    totals.set(base, (totals.get(base) ?? 0) + 1);
+  }
+
+  const seen = new Map<string, number>();
+  for (const o of eachObject(map)) {
+    const base = baseNameOf(o);
+    const next = (seen.get(base) ?? 0) + 1;
+    seen.set(base, next);
+    o.tags["web.name"] = (totals.get(base) ?? 0) > 1 ? `${base} #${next}` : base;
+  }
+}
+
+/** Stable label for the layer panel. */
 export function displayName(o: LiteObject): string {
   return o.tags["web.name"] || o.tags["blueprint.label"] || roleOf(o) || o.type;
 }
