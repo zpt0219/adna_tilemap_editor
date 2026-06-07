@@ -1,0 +1,9 @@
+{
+  "name": "adna-web-tools",
+  "private": true,
+  "type": "module",
+  "description": "Dev/test tooling for the web apps (headless browser smoke checks). Not part of any app build or the Pages deploy.",
+  "dependencies": {
+    "playwright": "^1.49.0"
+  }
+}
