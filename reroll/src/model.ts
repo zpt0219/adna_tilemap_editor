@@ -72,7 +72,9 @@ export function* eachObject(map: LiteTileMap): Generator<LiteObject> {
   for (const layer of map.layers) for (const o of layer.objects) yield o;
 }
 
-/** Objects on enabled layers only — what render / hit-test / legend should see. */
+/** Objects on enabled layers AND not individually hidden — what render /
+ *  hit-test / legend should see. A hidden object (enabled=false) still lives in
+ *  its layer's object list (so it stays in the panel and is re-selectable). */
 export function* eachVisibleObject(map: LiteTileMap): Generator<LiteObject> {
   for (const layer of map.layers) if (layer.enabled) for (const o of layer.objects) if (o.enabled) yield o;
 }

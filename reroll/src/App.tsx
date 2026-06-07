@@ -3,12 +3,12 @@ import { parseBlueprint } from "./blueprint";
 import { blueprintToLite } from "./convert";
 import { normalizeToCategories } from "./normalize";
 import { assignUniqueObjectNames, cloneTerrain, displayName, findLayer, findObject, isLocked, layerOfObject, roleOf, setTerrainCell, type LiteObject, type LiteTileMap, type Rect } from "./model";
-import { UndoStack, moveObjectCommand, moveObjectsCommand, paintTerrainCommand, reorderLayerObjectsCommand, resizeObjectCommand, toggleLayerEnabledCommand, toggleObjectEnabledCommand, type Command, type TerrainSnapshot } from "./commands";
-import { activeLegend } from "./legend";
+import { UndoStack, moveObjectCommand, moveObjectsCommand, paintTerrainCommand, renameObjectCommand, reorderLayerObjectsCommand, resizeObjectCommand, setObjectsEnabledCommand, toggleLayerEnabledCommand, toggleObjectEnabledCommand, type Command, type TerrainSnapshot } from "./commands";
 import { liteToWebSave } from "./saveFormat";
 import { downloadJson } from "./download";
-import { colorForRole, rgbaCss } from "./generated/roleColors";
+import { colorForRole } from "./generated/roleColors";
 import { CanvasView, type BrushState } from "./components/CanvasView";
+import { PropsPanel } from "./components/PropsPanel";
 
 const isTerrain = (o: LiteObject | null) => !!o && (o.type === "TERRAIN_2_CORNER" || o.type === "TERRAIN_2_EDGE");
 
@@ -276,6 +276,21 @@ export default function App() {
     if (map) run(toggleObjectEnabledCommand(map, objectId));
   }, [map, run]);
 
+  // --- props panel actions ---
+  const onToggleLayerVisible = useCallback(() => {
+    if (map && activeLayerId != null) run(toggleLayerEnabledCommand(map, activeLayerId));
+  }, [map, activeLayerId, run]);
+
+  const onSetObjectsVisible = useCallback((visible: boolean) => {
+    if (map && selected.size) run(setObjectsEnabledCommand(map, [...selected], visible));
+  }, [map, selected, run]);
+
+  const onRename = useCallback((id: number, name: string) => {
+    if (!map) return;
+    const o = findObject(map, id);
+    if (o) run(renameObjectCommand(map, id, o.tags["web.name"] ?? "", name));
+  }, [map, run]);
+
   const onObjectDragStart = useCallback((layerId: number, objectId: number) => (e: ReactDragEvent<HTMLDivElement>) => {
     e.dataTransfer.effectAllowed = "move";
     e.dataTransfer.setData("text/plain", `${layerId}:${objectId}`);
@@ -330,8 +345,9 @@ export default function App() {
     return () => window.removeEventListener("keydown", onKey);
   }, [onUndo, onRedo, map]);
 
-  const legend = useMemo(() => (map ? activeLegend(map) : []), [map, version]);
-  const selObj = useMemo(() => (map && selected.size ? findObject(map, [...selected][0]) : null), [map, selected, version]);
+  const activeLayer = useMemo(() => (map && activeLayerId != null ? findLayer(map, activeLayerId) : null), [map, activeLayerId, version]);
+  const selObjs = useMemo(() => (map ? ([...selected].map((id) => findObject(map, id)).filter(Boolean) as LiteObject[]) : []), [map, selected, version]);
+  const selObj = selObjs[0] ?? null;
   const selIsTerrain = isTerrain(selObj);
   const selLocked = selObj ? isLocked(selObj) : false;
   const brush: BrushState = {
@@ -464,20 +480,14 @@ export default function App() {
             onMarquee={onMarquee}
             onMarqueeDone={() => setMarquee(false)}
           />
-          <aside className="legend">
-            <div className="legend-title">Legend</div>
-            {legend.map((r) => (
-              <div key={r.label} className="legend-row">
-                <span className="legend-swatch" style={{ background: rgbaCss(r.rgb, 1) }} />
-                {r.label}
-              </div>
-            ))}
-            <div className="legend-help">
-              右键点=选物体 · 右键拖=移动<br />
-              左键(选中地形)=涂/擦 · 左键(选中建筑)=拖边缩放/内部移动<br />
-              中键平移 · 滚轮缩放 · Cmd/Ctrl+Z 撤销
-            </div>
-          </aside>
+          <PropsPanel
+            layer={activeLayer}
+            objects={selObjs}
+            onToggleLayerVisible={onToggleLayerVisible}
+            onSetObjectsVisible={onSetObjectsVisible}
+            onToggleLock={onToggleLock}
+            onRename={onRename}
+          />
         </div>
       )}
     </div>

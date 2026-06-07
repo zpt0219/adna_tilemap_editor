@@ -219,15 +219,7 @@ button.active {
 .obj-toolbar button { padding: 3px 8px; font-size: 12px; }
 .obj-toolbar button.active { border-color: #d8b24a; color: #f3d27a; }
 
-/* --- legend sidebar --- */
-.legend {
-  width: 180px;
-  background: var(--panel);
-  border-left: 1px solid var(--border);
-  padding: 12px;
-  overflow-y: auto;
-  font-size: 12px;
-}
+/* --- shared section title (Layers head + props heads) --- */
 .legend-title {
   font-weight: 600;
   margin-bottom: 8px;
@@ -236,24 +228,85 @@ button.active {
   letter-spacing: 0.05em;
   font-size: 10px;
 }
-.legend-row {
+
+/* --- properties sidebar (right): Layer + Object attrs --- */
+.props {
+  width: 210px;
+  background: var(--panel);
+  border-left: 1px solid var(--border);
+  padding: 12px;
+  overflow-y: auto;
+  font-size: 12px;
+  flex: none;
+}
+.prop-head {
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 10px;
+  margin-bottom: 8px;
+}
+.prop-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 14px 0;
+}
+.prop-empty { color: var(--muted); font-style: italic; }
+.prop-titlerow {
   display: flex;
   align-items: center;
+  gap: 7px;
+  margin-bottom: 8px;
+}
+.prop-swatch {
+  width: 13px;
+  height: 13px;
+  border-radius: 3px;
+  flex: none;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.35);
+}
+.prop-name {
+  flex: 1;
+  min-width: 0;
+  background: var(--panel-2);
+  border: 1px solid transparent;
+  border-radius: 5px;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 3px 6px;
+}
+.prop-name:hover { border-color: var(--border); }
+.prop-name:focus { border-color: var(--accent); outline: none; }
+.prop-name.static { background: none; padding-left: 0; } /* layer name / multi label */
+.prop-row {
+  display: flex;
+  justify-content: space-between;
   gap: 8px;
   padding: 2px 0;
 }
-.legend-swatch {
-  width: 14px;
-  height: 14px;
-  border-radius: 3px;
-  border: 1px solid rgba(0, 0, 0, 0.4);
-  flex: none;
+.prop-label { color: var(--muted); }
+.prop-val { color: var(--text); text-align: right; font-variant-numeric: tabular-nums; }
+.prop-badge {
+  background: var(--panel-2);
+  border-radius: 4px;
+  padding: 0 6px;
+  font-size: 11px;
+  text-transform: capitalize;
 }
-.legend-help {
-  margin-top: 14px;
-  color: var(--muted);
-  line-height: 1.6;
+.prop-checks {
+  display: flex;
+  gap: 14px;
+  margin-top: 10px;
 }
+.prop-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+}
+.prop-check input { cursor: pointer; }
 
 .muted { color: var(--muted); }
 

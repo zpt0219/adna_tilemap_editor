@@ -103,6 +103,31 @@ export function lockedOf(map: LiteTileMap, id: number): boolean {
   return o ? isLocked(o) : false;
 }
 
+/**
+ * Show/hide several objects at once (per-object `enabled`). Captures each id's
+ * prior state so undo restores a mixed selection exactly. Hidden objects drop
+ * out of render + hit-test (eachVisibleObject) but stay in the layer list.
+ */
+export function setObjectsEnabledCommand(map: LiteTileMap, ids: number[], enabled: boolean): Command {
+  const before = ids.map((id) => findObject(map, id)?.enabled ?? true);
+  const set = (id: number, v: boolean) => { const o = findObject(map, id); if (o) o.enabled = v; };
+  return {
+    label: enabled ? "Show" : "Hide",
+    do: () => ids.forEach((id) => set(id, enabled)),
+    undo: () => ids.forEach((id, i) => set(id, before[i])),
+  };
+}
+
+/** Rename an object's display name (the `web.name` tag; empty clears it). */
+export function renameObjectCommand(map: LiteTileMap, id: number, before: string, after: string): Command {
+  const set = (name: string) => {
+    const o = findObject(map, id);
+    if (!o) return;
+    if (name) o.tags["web.name"] = name; else delete o.tags["web.name"];
+  };
+  return { label: "Rename", do: () => set(after), undo: () => set(before) };
+}
+
 export interface TerrainSnapshot {
   terrain: TerrainMatrix;
   rect: Rect;
