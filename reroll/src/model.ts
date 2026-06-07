@@ -46,7 +46,7 @@ export interface LiteObject {
 }
 
 export interface Layer {
-  /** session-stable id; selection/reorder target (not exported) */
+  /** session-stable id; selection/visibility target (not exported) */
   id: number;
   name: string;
   enabled: boolean;

@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent as ReactDragEvent } from "react";
 import { parseBlueprint } from "./blueprint";
 import { blueprintToLite } from "./convert";
 import { normalizeToCategories } from "./normalize";
 import { cloneTerrain, displayName, findLayer, findObject, isLocked, layerOfObject, roleOf, setTerrainCell, type LiteObject, type LiteTileMap, type Rect } from "./model";
-import { UndoStack, moveLayerCommand, moveObjectCommand, moveObjectsCommand, paintTerrainCommand, resizeObjectCommand, toggleLayerEnabledCommand, type Command, type TerrainSnapshot } from "./commands";
+import { UndoStack, moveObjectCommand, moveObjectsCommand, paintTerrainCommand, reorderLayerObjectsCommand, resizeObjectCommand, toggleLayerEnabledCommand, type Command, type TerrainSnapshot } from "./commands";
 import { activeLegend } from "./legend";
 import { liteToWebSave } from "./saveFormat";
 import { downloadJson } from "./download";
@@ -11,6 +11,38 @@ import { colorForRole, rgbaCss } from "./generated/roleColors";
 import { CanvasView, type BrushState } from "./components/CanvasView";
 
 const isTerrain = (o: LiteObject | null) => !!o && (o.type === "TERRAIN_2_CORNER" || o.type === "TERRAIN_2_EDGE");
+
+type DropSide = "before" | "after";
+
+interface DraggedObject {
+  layerId: number;
+  objectId: number;
+}
+
+interface DropTarget {
+  layerId: number;
+  targetId: number;
+  side: DropSide;
+}
+
+function dropSideFromEvent(e: ReactDragEvent<HTMLDivElement>): DropSide {
+  const rect = e.currentTarget.getBoundingClientRect();
+  return e.clientY < rect.top + rect.height / 2 ? "before" : "after";
+}
+
+function reorderWithinLayer(ids: number[], sourceId: number, targetId: number, side: DropSide): number[] {
+  if (sourceId === targetId) return ids;
+  const without = ids.filter((id) => id !== sourceId);
+  const at = without.indexOf(targetId);
+  if (at < 0) return ids;
+  const next = [...without];
+  next.splice(side === "before" ? at : at + 1, 0, sourceId);
+  return next;
+}
+
+function sameOrder(a: number[], b: number[]): boolean {
+  return a.length === b.length && a.every((v, i) => v === b[i]);
+}
 
 export default function App() {
   const [map, setMap] = useState<LiteTileMap | null>(null);
@@ -23,11 +55,13 @@ export default function App() {
   const [marquee, setMarquee] = useState(false);
   const [brushSize, setBrushSize] = useState(3);
   const [brushErase, setBrushErase] = useState(false);
-  // active layer = pure highlight + the reorder target (not undoable, not exported)
+  // active layer = pure highlight + selection scope (not undoable, not exported)
   const [activeLayerId, setActiveLayerId] = useState<number | null>(null);
   // category-layer model on/off (docs/LAYER_MODEL.md); off = raw blueprint layers
   const [normalize, setNormalize] = useState(true);
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
+  const [dragging, setDragging] = useState<DraggedObject | null>(null);
+  const [dropTarget, setDropTarget] = useState<DropTarget | null>(null);
   const undo = useRef(new UndoStack());
   const stroke = useRef<{ id: number; before: TerrainSnapshot; dirty: boolean } | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
@@ -237,13 +271,41 @@ export default function App() {
     if (map) run(toggleLayerEnabledCommand(map, layerId));
   }, [map, run]);
 
-  const onMoveActiveLayer = useCallback((dir: -1 | 1) => {
-    if (!map || activeLayerId == null) return;
-    const from = map.layers.findIndex((l) => l.id === activeLayerId);
-    const to = from + dir;
-    if (from < 0 || to < 0 || to >= map.layers.length) return;
-    run(moveLayerCommand(map, from, to));
-  }, [map, activeLayerId, run]);
+  const onObjectDragStart = useCallback((layerId: number, objectId: number) => (e: ReactDragEvent<HTMLDivElement>) => {
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", `${layerId}:${objectId}`);
+    setDragging({ layerId, objectId });
+    setDropTarget(null);
+  }, []);
+
+  const onObjectDragOver = useCallback((layerId: number, objectId: number) => (e: ReactDragEvent<HTMLDivElement>) => {
+    if (!dragging || dragging.layerId !== layerId || dragging.objectId === objectId) return;
+    e.preventDefault();
+    const side = dropSideFromEvent(e);
+    setDropTarget((prev) => (
+      prev && prev.layerId === layerId && prev.targetId === objectId && prev.side === side
+        ? prev
+        : { layerId, targetId: objectId, side }
+    ));
+    e.dataTransfer.dropEffect = "move";
+  }, [dragging]);
+
+  const onObjectDrop = useCallback((layerId: number, objectId: number) => (e: ReactDragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    if (!map || !dragging || dragging.layerId !== layerId || dragging.objectId === objectId) return;
+    const layer = findLayer(map, layerId);
+    if (!layer) return;
+    const before = layer.objects.map((o) => o.id);
+    const after = reorderWithinLayer(before, dragging.objectId, objectId, dropSideFromEvent(e));
+    if (!sameOrder(before, after)) run(reorderLayerObjectsCommand(map, layerId, before, after));
+    setDragging(null);
+    setDropTarget(null);
+  }, [map, dragging, run]);
+
+  const onObjectDragEnd = useCallback(() => {
+    setDragging(null);
+    setDropTarget(null);
+  }, []);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -328,13 +390,8 @@ export default function App() {
           <aside className="layers">
             <div className="layers-head">
               <span className="legend-title">Layers</span>
-              <span className="seg">
-                <button title="上移(更靠前)" disabled={activeLayerId == null} onClick={() => onMoveActiveLayer(1)}>↑</button>
-                <button title="下移(更靠后)" disabled={activeLayerId == null} onClick={() => onMoveActiveLayer(-1)}>↓</button>
-              </span>
             </div>
-            {/* panel top = front (drawn on top) → render the array reversed */}
-            {[...map.layers].reverse().map((ly) => {
+            {map.layers.map((ly) => {
               const open = expanded.has(ly.id);
               const total: Record<string, number> = {};
               for (const o of ly.objects) { const n = displayName(o); total[n] = (total[n] ?? 0) + 1; }
@@ -365,8 +422,13 @@ export default function App() {
                     return (
                       <div
                         key={o.id}
-                        className={`obj-row${selected.has(o.id) ? " selected" : ""}`}
+                        className={`obj-row${selected.has(o.id) ? " selected" : ""}${dragging?.objectId === o.id ? " dragging" : ""}${dropTarget?.layerId === ly.id && dropTarget.targetId === o.id ? ` drop-${dropTarget.side}` : ""}`}
+                        draggable
                         onClick={(e) => onObjectClick(o.id, { ctrl: e.ctrlKey || e.metaKey, shift: e.shiftKey })}
+                        onDragStart={onObjectDragStart(ly.id, o.id)}
+                        onDragOver={onObjectDragOver(ly.id, o.id)}
+                        onDrop={onObjectDrop(ly.id, o.id)}
+                        onDragEnd={onObjectDragEnd}
                       >
                         <span className="obj-swatch" style={{ background: rgbaCss(colorForRole(roleOf(o)), 1) }} />
                         <span className="obj-name" title={label}>{label}</span>

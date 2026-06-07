@@ -135,13 +135,25 @@ export function toggleLayerEnabledCommand(map: LiteTileMap, layerId: number): Co
   return { label: "Toggle layer", do: () => set(!before), undo: () => set(before) };
 }
 
-/** Move a layer within the flat draw-order list (array index = draw order). */
-export function moveLayerCommand(map: LiteTileMap, from: number, to: number): Command {
-  const move = (a: number, b: number) => {
-    const arr = map.layers;
-    if (a < 0 || a >= arr.length || b < 0 || b >= arr.length) return;
-    const [l] = arr.splice(a, 1);
-    arr.splice(b, 0, l);
+function setLayerObjectOrder(map: LiteTileMap, layerId: number, order: number[]): void {
+  const layer = findLayer(map, layerId);
+  if (!layer || order.length !== layer.objects.length) return;
+  const byId = new Map(layer.objects.map((o) => [o.id, o]));
+  const next = order.map((id) => byId.get(id)).filter((o): o is NonNullable<typeof o> => o != null);
+  if (next.length !== layer.objects.length) return;
+  layer.objects = next;
+}
+
+/** Restore a layer's object order from captured id lists. */
+export function reorderLayerObjectsCommand(
+  map: LiteTileMap,
+  layerId: number,
+  before: number[],
+  after: number[],
+): Command {
+  return {
+    label: "Reorder objects",
+    do: () => setLayerObjectOrder(map, layerId, after),
+    undo: () => setLayerObjectOrder(map, layerId, before),
   };
-  return { label: "Reorder layer", do: () => move(from, to), undo: () => move(to, from) };
 }
