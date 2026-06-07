@@ -57,19 +57,15 @@ export default function App() {
   const [brushErase, setBrushErase] = useState(false);
   // active layer = pure highlight + selection scope (not undoable, not exported)
   const [activeLayerId, setActiveLayerId] = useState<number | null>(null);
-  // category-layer model on/off (docs/LAYER_MODEL.md); off = raw blueprint layers
-  const [normalize, setNormalize] = useState(true);
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
   const [dragging, setDragging] = useState<DraggedObject | null>(null);
   const [dropTarget, setDropTarget] = useState<DropTarget | null>(null);
   const undo = useRef(new UndoStack());
   const stroke = useRef<{ id: number; before: TerrainSnapshot; dirty: boolean } | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
-  const source = useRef<{ name: string; text: string } | null>(null);
 
-  const build = useCallback((name: string, text: string, norm: boolean) => {
-    let lite = blueprintToLite(parseBlueprint(name, text));
-    if (norm) lite = normalizeToCategories(lite);
+  const build = useCallback((name: string, text: string) => {
+    const lite = normalizeToCategories(blueprintToLite(parseBlueprint(name, text)));
     assignUniqueObjectNames(lite);
     undo.current = new UndoStack();
     setMap(lite);
@@ -83,16 +79,7 @@ export default function App() {
   }, []);
 
   const load = useCallback((name: string, text: string) => {
-    source.current = { name, text };
-    build(name, text, normalize);
-  }, [build, normalize]);
-
-  const onToggleNormalize = useCallback(() => {
-    setNormalize((n) => {
-      const next = !n;
-      if (source.current) build(source.current.name, source.current.text, next);
-      return next;
-    });
+    build(name, text);
   }, [build]);
 
   const toggleExpand = useCallback((id: number) => {
@@ -372,10 +359,6 @@ export default function App() {
             <button disabled={!canUndo} onClick={onUndo} title="撤销 (Cmd/Ctrl+Z)">↶ Undo</button>
             <button disabled={!canRedo} onClick={onRedo} title="重做 (Shift+Cmd/Ctrl+Z)">↷ Redo</button>
             <button onClick={onExport} title="导出 adna-web-lite 存档">⤓ Export</button>
-            <span className="seg" title="大类层模型 / 原始 blueprint 层">
-              <button className={normalize ? "active" : ""} onClick={() => { if (!normalize) onToggleNormalize(); }}>大类</button>
-              <button className={!normalize ? "active" : ""} onClick={() => { if (normalize) onToggleNormalize(); }}>原始</button>
-            </span>
             <button className={marquee ? "active" : ""} onClick={() => setMarquee((m) => !m)} title="框选工具(M)：左键拖一次框选,松手自动退回">▭ Marquee</button>
             {selIsTerrain && (
               <>
