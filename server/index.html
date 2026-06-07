@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="zh">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Adna TileMap Editor</title>
+  <style>
+    :root {
+      --bg: #14161a; --panel: #1c1f26; --panel-hi: #232733;
+      --fg: #e6e8ee; --muted: #97a0b0; --line: #2c313c; --accent: #6ea8fe;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh; background: var(--bg); color: var(--fg);
+      font: 15px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
+      display: flex; flex-direction: column; align-items: center;
+      padding: 8vh 24px 6vh;
+    }
+    header { text-align: center; max-width: 640px; margin-bottom: 40px; }
+    h1 { font-size: 34px; margin: 0 0 10px; letter-spacing: .5px; }
+    .tag { color: var(--accent); font-weight: 600; }
+    .sub { color: var(--muted); margin: 0; }
+    .cards { display: grid; gap: 18px; grid-template-columns: 1fr; width: 100%; max-width: 720px; }
+    @media (min-width: 640px) { .cards { grid-template-columns: 1fr 1fr; } }
+    a.card {
+      display: block; text-decoration: none; color: inherit;
+      background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+      padding: 22px 22px 20px; transition: .15s border-color, .15s background, .15s transform;
+    }
+    a.card:hover { border-color: var(--accent); background: var(--panel-hi); transform: translateY(-2px); }
+    .card .ico { font-size: 26px; margin-bottom: 10px; }
+    .card h2 { font-size: 18px; margin: 0 0 6px; }
+    .card p { margin: 0; color: var(--muted); font-size: 13.5px; }
+    .card .go { margin-top: 14px; color: var(--accent); font-size: 13px; font-weight: 600; }
+    footer { margin-top: 44px; display: flex; gap: 14px; align-items: center; flex-wrap: wrap; justify-content: center; }
+    .btn {
+      text-decoration: none; color: var(--fg); border: 1px solid var(--line);
+      background: var(--panel); padding: 9px 16px; border-radius: 10px; font-size: 13.5px;
+      display: inline-flex; align-items: center; gap: 8px; transition: .15s border-color, .15s background;
+    }
+    .btn:hover { border-color: var(--accent); background: var(--panel-hi); }
+    .dim { color: var(--muted); font-size: 12.5px; margin-top: 26px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1><span class="tag">Adna</span> TileMap Editor</h1>
+    <p class="sub">AI 生成地图草稿的 Web 工具链 — 查看 · reroll · 地形笔刷 · 资源标注</p>
+  </header>
+
+  <main class="cards">
+    <a class="card" href="/reroll/">
+      <div class="ico">🗺️</div>
+      <h2>Reroll Editor</h2>
+      <p>载入 blueprint JSON，按大类层渲染、地形笔刷编辑，导出 desktop 可读存档。</p>
+      <div class="go">打开应用 →</div>
+    </a>
+    <a class="card" href="/tagger/">
+      <div class="ico">🏷️</div>
+      <h2>Asset Tagger</h2>
+      <p>纯浏览器的人工审核工具，给调色板做 role / style 标注，导出 final_tags.json。</p>
+      <div class="go">打开应用 →</div>
+    </a>
+  </main>
+
+  <footer>
+    <a class="btn" href="https://github.com/zpt0219/adna_tilemap_editor" target="_blank" rel="noopener">
+      <span>⌥</span> GitHub 仓库
+    </a>
+    <a class="btn" href="https://zpt0219.github.io/adna_tilemap_editor/" target="_blank" rel="noopener">
+      <span>🌐</span> GitHub Pages 镜像
+    </a>
+  </footer>
+
+  <p class="dim">self-hosted · nginx · 东京</p>
+</body>
+</html>

@@ -1,0 +1,20 @@
+# Root .gitignore — repo-wide safety net. Each Vite app (reroll/, tagger/) also
+# has its own .gitignore for node_modules/ and dist/; these entries back them up
+# and catch any future app dir.
+
+# Dependencies / build output
+node_modules/
+dist/
+*.tsbuildinfo
+
+# OS / editor junk
+.DS_Store
+Thumbs.db
+*.swp
+*.local
+.idea/
+.vscode/
+
+# Logs
+*.log
+npm-debug.log*
