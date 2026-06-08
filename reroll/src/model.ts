@@ -51,6 +51,10 @@ export interface Layer {
   name: string;
   enabled: boolean;
   color?: string;
+  /** desktop "Vertical" stratum: upright objects (deco / buildings) that
+   *  y-sort together across these layers, drawn above the flat ground layers.
+   *  false/undefined = Ground (flat terrain, drawn in z-order). */
+  vertical?: boolean;
   tags: Record<string, string>;
   objects: LiteObject[];
 }
@@ -77,6 +81,33 @@ export function* eachObject(map: LiteTileMap): Generator<LiteObject> {
  *  its layer's object list (so it stays in the panel and is re-selectable). */
 export function* eachVisibleObject(map: LiteTileMap): Generator<LiteObject> {
   for (const layer of map.layers) if (layer.enabled) for (const o of layer.objects) if (o.enabled) yield o;
+}
+
+/** Bottom-edge Y — the y-sort depth key (an object whose base sits lower on the
+ *  map draws in front). */
+export function ySortKey(o: LiteObject): number { return o.rect[1] + o.rect[3]; }
+
+/**
+ * Visible objects in final composite order: flat **ground** layers first in
+ * z-order, then every **vertical**-layer object merged into one group and
+ * y-sorted by bottom edge — across categories — so a lower tree can draw in
+ * front of a higher building. Mirrors desktop's Ground vs Vertical stratum
+ * (the vertical objects are the Godot y-sorted Decoration bucket).
+ *
+ * Render AND hit-test both iterate this, so clicking picks whatever is drawn on
+ * top. (`sort` is stable, so same-Y objects keep category + array order.)
+ */
+export function* eachVisibleDrawOrder(map: LiteTileMap): Generator<LiteObject> {
+  const vertical: LiteObject[] = [];
+  for (const layer of map.layers) {
+    if (!layer.enabled) continue;
+    for (const o of layer.objects) {
+      if (!o.enabled) continue;
+      if (layer.vertical) vertical.push(o); else yield o;
+    }
+  }
+  vertical.sort((a, b) => ySortKey(a) - ySortKey(b));
+  yield* vertical;
 }
 
 export function findObject(map: LiteTileMap, id: number): LiteObject | null {

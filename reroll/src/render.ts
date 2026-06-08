@@ -3,7 +3,7 @@
 // plus editor overlays (selection, lock badge, drag ghost). No React / DOM state.
 
 import type { LiteObject, LiteTileMap, Rect } from "./model";
-import { eachVisibleObject, isLocked, roleOf } from "./model";
+import { eachVisibleDrawOrder, eachVisibleObject, isLocked, roleOf } from "./model";
 import { colorForRole, rgbaCss, type RGB } from "./generated/roleColors";
 
 // --- constants mirrored from render_overlay.py ---
@@ -158,7 +158,7 @@ export function renderScene(cv: HTMLCanvasElement, map: LiteTileMap, s: number):
   ctx.imageSmoothingEnabled = false;
   ctx.fillStyle = KRAFT;
   ctx.fillRect(0, 0, cv.width, cv.height);
-  for (const o of eachVisibleObject(map)) drawObjectToScene(ctx, o, s, null);
+  for (const o of eachVisibleDrawOrder(map)) drawObjectToScene(ctx, o, s, null);
 }
 
 /**
@@ -178,7 +178,7 @@ export function renderSceneRegion(cv: HTMLCanvasElement, map: LiteTileMap, s: nu
   ctx.clip();
   ctx.fillStyle = KRAFT;
   ctx.fillRect(dirty[0] * s, dirty[1] * s, dirty[2] * s, dirty[3] * s);
-  for (const o of eachVisibleObject(map)) if (rectsOverlap(o.rect, dirty)) drawObjectToScene(ctx, o, s, dirty);
+  for (const o of eachVisibleDrawOrder(map)) if (rectsOverlap(o.rect, dirty)) drawObjectToScene(ctx, o, s, dirty);
   ctx.restore();
 }
 
@@ -358,7 +358,7 @@ export function buildHitGrid(map: LiteTileMap): HitGrid {
   const set = (tx: number, ty: number, idx: number) => {
     if (tx >= 0 && ty >= 0 && tx < width && ty < height) owner[ty * width + tx] = idx;
   };
-  for (const o of eachVisibleObject(map)) {
+  for (const o of eachVisibleDrawOrder(map)) {
     const idx = objects.length;
     objects.push(o);
     if (o.terrain) {

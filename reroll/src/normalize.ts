@@ -22,16 +22,20 @@ interface CategoryDef {
   /** canonical engine type for merged areas; null = keep objects as-is (primitives) */
   canonical: LiteType | null;
   merge: boolean;
+  /** desktop "Vertical" stratum — upright objects that y-sort together across
+   *  these layers (deco / buildings). false = flat ground, drawn in z-order. */
+  vertical: boolean;
 }
 
-// Array order IS the z-order: index 0 draws at the bottom.
+// Array order IS the z-order: index 0 draws at the bottom. The bottom three are
+// flat Ground; the top three are Vertical (y-sorted together — see eachVisibleDrawOrder).
 const CATEGORIES: CategoryDef[] = [
-  { key: "background", name: "Background", canonical: "TERRAIN_2_CORNER", merge: true },
-  { key: "terrain", name: "Terrain", canonical: "TERRAIN_2_CORNER", merge: true },
-  { key: "path", name: "Path", canonical: "TERRAIN_2_EDGE", merge: true },
-  { key: "terrain_deco", name: "Terrain Deco", canonical: "FIXED_RECT_GROUP", merge: true },
-  { key: "building", name: "Building", canonical: null, merge: false },
-  { key: "building_deco", name: "Building Deco", canonical: null, merge: false },
+  { key: "background", name: "Background", canonical: "TERRAIN_2_CORNER", merge: true, vertical: false },
+  { key: "terrain", name: "Terrain", canonical: "TERRAIN_2_CORNER", merge: true, vertical: false },
+  { key: "path", name: "Path", canonical: "TERRAIN_2_EDGE", merge: true, vertical: false },
+  { key: "terrain_deco", name: "Terrain Deco", canonical: "FIXED_RECT_GROUP", merge: true, vertical: true },
+  { key: "building", name: "Building", canonical: null, merge: false, vertical: true },
+  { key: "building_deco", name: "Building Deco", canonical: null, merge: false, vertical: true },
 ];
 
 // --- role vocabularies (substring match, mirrors the palette buckets) --------
@@ -207,6 +211,7 @@ export function normalizeToCategories(map: LiteTileMap): LiteTileMap {
       id: nextLayer++,
       name: cat.name,
       enabled: true,
+      vertical: cat.vertical,
       tags: { "web.category": cat.key },
       objects,
     });

@@ -97,6 +97,7 @@ export function PropsPanel({ layer, objects, onToggleLayerVisible, onSetObjectsV
             <div className="prop-titlerow"><span className="prop-name static">{layer.name}</span></div>
             {layer.tags["web.category"] && <Row label="Category"><span className="prop-badge">{layer.tags["web.category"]}</span></Row>}
             <Row label="Objects">{layer.objects.length}</Row>
+            <Row label="Y-sort">{layer.vertical ? "开 · 按 Y" : "关 · 地面"}</Row>
             <div className="prop-checks">
               <label className="prop-check">
                 <input type="checkbox" checked={layer.enabled} onChange={onToggleLayerVisible} /> Visible
