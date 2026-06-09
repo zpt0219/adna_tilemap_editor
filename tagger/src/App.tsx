@@ -4,6 +4,9 @@ import { buildFinalTags, downloadText, parseBundle, tagsFileToData } from "./bun
 import { flattenTree } from "./roleTree";
 import { Gallery } from "./components/Gallery";
 import { Inspector } from "./components/Inspector";
+import { MobileTagger } from "./components/MobileTagger";
+import { ServerPanel } from "./components/ServerPanel";
+import { getBundle, getTags, putTags } from "./api";
 
 const draftKey = (set: string) => `adna_tagger_draft_${set}`;
 const RECENT_CAP = 8;
@@ -23,8 +26,20 @@ export default function App() {
   // recently-applied roles (most recent first) — quick re-apply row in the Inspector
   const [recentRoles, setRecentRoles] = useState<string[]>([]);
   const [error, setError] = useState<string>("");
+  // server-backed bundle: the .adnatags filename we sync the draft to (null = local file)
+  const [serverName, setServerName] = useState<string | null>(null);
+  const [serverOpen, setServerOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(() => window.matchMedia("(max-width: 720px)").matches);
   const fileInput = useRef<HTMLInputElement>(null);
   const tagsInput = useRef<HTMLInputElement>(null);
+  const saveTimer = useRef<number | null>(null);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 720px)");
+    const on = () => setIsMobile(mq.matches);
+    mq.addEventListener("change", on);
+    return () => mq.removeEventListener("change", on);
+  }, []);
 
   const rolePaths = useMemo(() => flattenTree(bundle?.tree ?? null), [bundle]);
 
@@ -57,6 +72,7 @@ export default function App() {
       setSelected(new Set());
       setActive(parsed.manifest.palettes[0]?.index ?? null);
       setAnchor(null);
+      setServerName(null);
       setError("");
     } catch (e) {
       setError(`加载失败: ${(e as Error).message}`);
@@ -72,6 +88,7 @@ export default function App() {
       setSelected(new Set());
       setActive(parsed.manifest.palettes[0]?.index ?? null);
       setAnchor(null);
+      setServerName(null);
       setError("");
     } catch (e) {
       setError(`样例加载失败: ${(e as Error).message}`);
@@ -174,6 +191,39 @@ export default function App() {
     downloadText("final_tags.json", buildFinalTags(bundle.manifest.palette_set, bundle.tagData));
   }, [bundle]);
 
+  // ---- open a bundle from the server (resumes its saved draft) ----
+  const onPickServerBundle = useCallback(async (name: string) => {
+    try {
+      const parsed = parseBundle(name, await getBundle(name));
+      const saved = await getTags(name);
+      if (saved && Object.keys(saved).length) parsed.tagData = saved;
+      setBundle(parsed);
+      setServerName(name);
+      setServerOpen(false);
+      setSelected(new Set());
+      setActive(parsed.manifest.palettes[0]?.index ?? null);
+      setAnchor(null);
+      setError("");
+    } catch (e) {
+      setError(`服务器打开失败: ${(e as Error).message}`);
+    }
+  }, []);
+
+  // ---- sync the draft back to the server (debounced) for server-backed bundles ----
+  useEffect(() => {
+    if (!bundle || !serverName) return;
+    if (saveTimer.current) window.clearTimeout(saveTimer.current);
+    saveTimer.current = window.setTimeout(() => {
+      void putTags(serverName, bundle.manifest.palette_set, bundle.tagData);
+    }, 800);
+    return () => { if (saveTimer.current) window.clearTimeout(saveTimer.current); };
+  }, [bundle, serverName]);
+
+  // ---- on phone, the single-item flow always has the active palette selected ----
+  useEffect(() => {
+    if (isMobile && bundle && active != null && selected.size === 0) setSelected(new Set([active]));
+  }, [isMobile, bundle, active, selected]);
+
   // ---- keyboard navigation over the visible grid ----
   useEffect(() => {
     if (!bundle) return;
@@ -221,8 +271,13 @@ export default function App() {
         <button disabled={!bundle} onClick={() => tagsInput.current?.click()}>Load tags…</button>
         <input ref={tagsInput} type="file" accept=".json" hidden
           onChange={(e) => e.target.files?.[0] && onLoadTagsFile(e.target.files[0])} />
+        <button onClick={() => setServerOpen(true)}>服务器…</button>
         <span className="spacer" />
-        {bundle && <span className="stat">{bundle.name} · {stats.tagged}/{stats.total} tagged</span>}
+        {bundle && (
+          <span className="stat">
+            {bundle.name} · {stats.tagged}/{stats.total} tagged{serverName ? " · ☁ 自动同步" : ""}
+          </span>
+        )}
         <button disabled={!bundle} onClick={onExport}>导出 final_tags.json</button>
       </header>
 
@@ -231,8 +286,25 @@ export default function App() {
       {!bundle ? (
         <div className="dropzone">
           <div>把 <code>.adnatags</code> 拖到这里，或点「打开 .adnatags…」</div>
-          <button onClick={loadSample}>试用样例</button>
+          <div className="dz-actions">
+            <button onClick={loadSample}>试用样例</button>
+            <button onClick={() => setServerOpen(true)}>从服务器打开</button>
+          </div>
         </div>
+      ) : isMobile ? (
+        <MobileTagger
+          bundle={bundle}
+          items={items}
+          active={active}
+          onlyUntagged={onlyUntagged}
+          setOnlyUntagged={setOnlyUntagged}
+          onSelect={onSelect}
+          selected={selected}
+          rolePaths={rolePaths}
+          recentRoles={recentRoles}
+          onSetRole={onSetRole}
+          applyToSelection={applyToSelection}
+        />
       ) : (
         <div className="main">
           <Gallery
@@ -257,6 +329,8 @@ export default function App() {
           />
         </div>
       )}
+
+      {serverOpen && <ServerPanel onPick={onPickServerBundle} onClose={() => setServerOpen(false)} />}
     </div>
   );
 }

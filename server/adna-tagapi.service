@@ -1,0 +1,20 @@
+# Adna tagger backend (server/tagapi.mjs) — bundle list/serve + draft save, behind nginx /api/.
+# Install:
+#   sudo cp server/adna-tagapi.service /etc/systemd/system/adna-tagapi.service
+#   sudo systemctl daemon-reload && sudo systemctl enable --now adna-tagapi
+#   sudo systemctl status adna-tagapi
+[Unit]
+Description=Adna Web Asset Tagger API
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/node /home/ubuntu/game_dev/adna_tilemap_editor/server/tagapi.mjs
+# The password lives OUTSIDE the repo. Create /home/ubuntu/adna-tagger.env with
+# `TAG_PW=yourpassword` (see adna-tagapi.env.example). The `-` makes it optional.
+EnvironmentFile=-/home/ubuntu/adna-tagger.env
+Environment=TAG_DATA=/home/ubuntu/game_dev/adna-tagger-data
+Restart=always
+User=ubuntu
+
+[Install]
+WantedBy=multi-user.target
