@@ -66,6 +66,7 @@ input[type="text"], input:not([type]), .role-filter {
 .cell.ai_suggested { border-color: var(--ai); }
 .cell.human_verified { border-color: var(--human); }
 .cell.sel { outline: 2px solid var(--accent); outline-offset: 1px; }
+.cell.active { box-shadow: 0 0 0 2px var(--accent); }
 .swatch {
   background-repeat: no-repeat; image-rendering: pixelated;
   border-radius: 3px; background-color: #15161a;
@@ -83,6 +84,8 @@ input[type="text"], input:not([type]), .role-filter {
 .insp-head .link { position: absolute; right: 0; top: 0; }
 .lbl { font-weight: 600; margin-bottom: 6px; }
 .cur-role { margin-bottom: 6px; }
+.recent { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin-bottom: 6px; }
+.recent-role { font-size: 11px; padding: 2px 8px; background: #294063; border-color: var(--accent); }
 .role-list { margin-top: 6px; max-height: 280px; overflow: auto; border: 1px solid var(--line); border-radius: 6px; }
 .role-row {
   display: flex; justify-content: space-between; gap: 8px; width: 100%;

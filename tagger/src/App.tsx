@@ -1,38 +1,62 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ParsedBundle, PaletteTags, TagsFile } from "./types";
+import type { ParsedBundle, PaletteEntry, PaletteTags, TagsFile } from "./types";
 import { buildFinalTags, downloadText, parseBundle, tagsFileToData } from "./bundle";
 import { flattenTree } from "./roleTree";
 import { Gallery } from "./components/Gallery";
 import { Inspector } from "./components/Inspector";
 
 const draftKey = (set: string) => `adna_tagger_draft_${set}`;
+const RECENT_CAP = 8;
+
+const isTagged = (t: PaletteTags | undefined): boolean => !!t && (!!t.role || t.style.length > 0);
 
 export default function App() {
   const [bundle, setBundle] = useState<ParsedBundle | null>(null);
   const [selected, setSelected] = useState<Set<number>>(new Set());
+  // active = the keyboard cursor / primary selection (for arrow nav + scroll-into-view)
+  const [active, setActive] = useState<number | null>(null);
+  // anchor for Shift range-select (the last plainly-picked index)
+  const [anchor, setAnchor] = useState<number | null>(null);
+  // gallery filter (lifted here so keyboard nav / range / select-all see the visible list)
+  const [q, setQ] = useState("");
+  const [onlyUntagged, setOnlyUntagged] = useState(false);
+  // recently-applied roles (most recent first) — quick re-apply row in the Inspector
+  const [recentRoles, setRecentRoles] = useState<string[]>([]);
   const [error, setError] = useState<string>("");
   const fileInput = useRef<HTMLInputElement>(null);
   const tagsInput = useRef<HTMLInputElement>(null);
 
   const rolePaths = useMemo(() => flattenTree(bundle?.tree ?? null), [bundle]);
 
+  // the visible (filtered) palette list — drives the gallery AND keyboard/range/select-all
+  const items = useMemo<PaletteEntry[]>(() => {
+    if (!bundle) return [];
+    const query = q.trim().toLowerCase();
+    return bundle.manifest.palettes.filter((p) => {
+      const t = bundle.tagData[p.index];
+      if (onlyUntagged && isTagged(t)) return false;
+      if (!query) return true;
+      const hay = `${p.index} ${p.mode} ${t?.role ?? ""} ${(t?.style ?? []).join(" ")}`.toLowerCase();
+      return hay.includes(query);
+    });
+  }, [bundle, q, onlyUntagged]);
+
   // ---- load a bundle ----
   const loadBundleFile = useCallback(async (file: File) => {
     try {
       const buf = await file.arrayBuffer();
       const parsed = parseBundle(file.name, buf);
-      // restore a local draft for this palette set if present
       const draftRaw = localStorage.getItem(draftKey(parsed.manifest.palette_set));
       if (draftRaw) {
         try {
           const draft = JSON.parse(draftRaw) as Record<number, PaletteTags>;
-          if (confirm("发现该 palette 集合上次未导出的本地草稿，是否恢复？")) {
-            parsed.tagData = draft;
-          }
+          if (confirm("发现该 palette 集合上次未导出的本地草稿，是否恢复？")) parsed.tagData = draft;
         } catch { /* ignore bad draft */ }
       }
       setBundle(parsed);
       setSelected(new Set());
+      setActive(parsed.manifest.palettes[0]?.index ?? null);
+      setAnchor(null);
       setError("");
     } catch (e) {
       setError(`加载失败: ${(e as Error).message}`);
@@ -43,10 +67,11 @@ export default function App() {
     try {
       const res = await fetch(`${import.meta.env.BASE_URL}sample/my_retro_clean.adnatags`);
       if (!res.ok) throw new Error(`sample 不可用 (${res.status})`);
-      const buf = await res.arrayBuffer();
-      const parsed = parseBundle("my_retro_clean.adnatags (sample)", buf);
+      const parsed = parseBundle("my_retro_clean.adnatags (sample)", await res.arrayBuffer());
       setBundle(parsed);
       setSelected(new Set());
+      setActive(parsed.manifest.palettes[0]?.index ?? null);
+      setAnchor(null);
       setError("");
     } catch (e) {
       setError(`样例加载失败: ${(e as Error).message}`);
@@ -55,18 +80,11 @@ export default function App() {
 
   // ---- drag & drop anywhere ----
   useEffect(() => {
-    const onDrop = (e: DragEvent) => {
-      e.preventDefault();
-      const f = e.dataTransfer?.files?.[0];
-      if (f) void loadBundleFile(f);
-    };
+    const onDrop = (e: DragEvent) => { e.preventDefault(); const f = e.dataTransfer?.files?.[0]; if (f) void loadBundleFile(f); };
     const onDragOver = (e: DragEvent) => e.preventDefault();
     window.addEventListener("drop", onDrop);
     window.addEventListener("dragover", onDragOver);
-    return () => {
-      window.removeEventListener("drop", onDrop);
-      window.removeEventListener("dragover", onDragOver);
-    };
+    return () => { window.removeEventListener("drop", onDrop); window.removeEventListener("dragover", onDragOver); };
   }, [loadBundleFile]);
 
   // ---- autosave draft to localStorage ----
@@ -91,17 +109,54 @@ export default function App() {
     [],
   );
 
-  // ---- selection ----
-  const onSelect = useCallback((index: number, additive: boolean) => {
-    setSelected((prev) => {
-      const next = new Set(additive ? prev : []);
-      if (additive && prev.has(index)) next.delete(index);
-      else next.add(index);
-      return next;
-    });
-  }, []);
+  // ---- selection: plain = single, ctrl/meta = toggle, shift = range over visible order ----
+  const onSelect = useCallback((index: number, mods: { additive: boolean; range: boolean }) => {
+    if (mods.range && anchor != null) {
+      const a = items.findIndex((p) => p.index === anchor);
+      const b = items.findIndex((p) => p.index === index);
+      if (a >= 0 && b >= 0) {
+        const [lo, hi] = a <= b ? [a, b] : [b, a];
+        setSelected(new Set(items.slice(lo, hi + 1).map((p) => p.index)));
+        setActive(index);
+        return; // keep anchor so the range can grow/shrink
+      }
+    }
+    if (mods.additive) {
+      setSelected((prev) => { const n = new Set(prev); if (n.has(index)) n.delete(index); else n.add(index); return n; });
+    } else {
+      setSelected(new Set([index]));
+    }
+    setActive(index);
+    setAnchor(index);
+  }, [items, anchor]);
 
-  // ---- load an external tags file, merge onto current doc (§3.1.1) ----
+  const selectAllFiltered = useCallback(() => {
+    setSelected(new Set(items.map((p) => p.index)));
+    if (items.length) { setActive(items[0].index); setAnchor(items[0].index); }
+  }, [items]);
+
+  // next untagged after `fromIndex` in visible order (wraps); null if none left
+  const nextUntagged = useCallback((fromIndex: number): number | null => {
+    if (!bundle) return null;
+    const pos = items.findIndex((p) => p.index === fromIndex);
+    const order = [...items.slice(pos + 1), ...items.slice(0, pos + 1)];
+    for (const p of order) if (!isTagged(bundle.tagData[p.index])) return p.index;
+    return null;
+  }, [bundle, items]);
+
+  // ---- set role on the selection; record recent; auto-advance to next untagged (single) ----
+  const onSetRole = useCallback((path: string) => {
+    const indices = [...selected];
+    if (indices.length === 0) return;
+    applyToSelection(indices, (cur) => ({ ...cur, role: path, status: "human_verified" }));
+    setRecentRoles((prev) => [path, ...prev.filter((p) => p !== path)].slice(0, RECENT_CAP));
+    if (indices.length === 1) {
+      const nxt = nextUntagged(indices[0]);
+      if (nxt != null) { setSelected(new Set([nxt])); setActive(nxt); setAnchor(nxt); }
+    }
+  }, [selected, applyToSelection, nextUntagged]);
+
+  // ---- load an external tags file, merge onto current doc ----
   const onLoadTagsFile = useCallback(async (file: File) => {
     if (!bundle) return;
     try {
@@ -114,17 +169,45 @@ export default function App() {
     }
   }, [bundle]);
 
-  // ---- export ----
   const onExport = useCallback(() => {
     if (!bundle) return;
-    const text = buildFinalTags(bundle.manifest.palette_set, bundle.tagData);
-    downloadText("final_tags.json", text);
+    downloadText("final_tags.json", buildFinalTags(bundle.manifest.palette_set, bundle.tagData));
   }, [bundle]);
+
+  // ---- keyboard navigation over the visible grid ----
+  useEffect(() => {
+    if (!bundle) return;
+    const onKey = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA") return;
+      if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(e.key)) return;
+      if (items.length === 0) return;
+      e.preventDefault();
+      // columns = number of cells sharing the first row's offsetTop (responsive grid)
+      const grid = document.querySelector(".grid");
+      let cols = 1;
+      if (grid && grid.children.length > 1) {
+        const top0 = (grid.children[0] as HTMLElement).offsetTop;
+        for (let i = 1; i < grid.children.length; i++) {
+          if ((grid.children[i] as HTMLElement).offsetTop === top0) cols++; else break;
+        }
+      }
+      const pos = Math.max(0, items.findIndex((p) => p.index === active));
+      const delta = e.key === "ArrowLeft" ? -1 : e.key === "ArrowRight" ? 1 : e.key === "ArrowUp" ? -cols : cols;
+      const next = Math.min(items.length - 1, Math.max(0, pos + delta));
+      const idx = items[next].index;
+      setSelected(new Set([idx]));
+      setActive(idx);
+      setAnchor(idx);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [bundle, items, active]);
 
   const stats = useMemo(() => {
     if (!bundle) return { total: 0, tagged: 0 };
     const total = bundle.manifest.palettes.length;
-    const tagged = Object.values(bundle.tagData).filter((t) => t.role || t.style.length).length;
+    const tagged = Object.values(bundle.tagData).filter(isTagged).length;
     return { total, tagged };
   }, [bundle]);
 
@@ -133,32 +216,14 @@ export default function App() {
       <header className="topbar">
         <strong>Adna Web Asset Tagger</strong>
         <button onClick={() => fileInput.current?.click()}>打开 .adnatags…</button>
-        <input
-          ref={fileInput}
-          type="file"
-          accept=".adnatags,.zip"
-          hidden
-          onChange={(e) => e.target.files?.[0] && loadBundleFile(e.target.files[0])}
-        />
-        <button disabled={!bundle} onClick={() => tagsInput.current?.click()}>
-          Load tags…
-        </button>
-        <input
-          ref={tagsInput}
-          type="file"
-          accept=".json"
-          hidden
-          onChange={(e) => e.target.files?.[0] && onLoadTagsFile(e.target.files[0])}
-        />
+        <input ref={fileInput} type="file" accept=".adnatags,.zip" hidden
+          onChange={(e) => e.target.files?.[0] && loadBundleFile(e.target.files[0])} />
+        <button disabled={!bundle} onClick={() => tagsInput.current?.click()}>Load tags…</button>
+        <input ref={tagsInput} type="file" accept=".json" hidden
+          onChange={(e) => e.target.files?.[0] && onLoadTagsFile(e.target.files[0])} />
         <span className="spacer" />
-        {bundle && (
-          <span className="stat">
-            {bundle.name} · {stats.tagged}/{stats.total} tagged
-          </span>
-        )}
-        <button disabled={!bundle} onClick={onExport}>
-          导出 final_tags.json
-        </button>
+        {bundle && <span className="stat">{bundle.name} · {stats.tagged}/{stats.total} tagged</span>}
+        <button disabled={!bundle} onClick={onExport}>导出 final_tags.json</button>
       </header>
 
       {error && <div className="error">{error}</div>}
@@ -170,11 +235,24 @@ export default function App() {
         </div>
       ) : (
         <div className="main">
-          <Gallery bundle={bundle} selected={selected} onSelect={onSelect} />
+          <Gallery
+            bundle={bundle}
+            items={items}
+            selected={selected}
+            active={active}
+            q={q}
+            onlyUntagged={onlyUntagged}
+            setQ={setQ}
+            setOnlyUntagged={setOnlyUntagged}
+            onSelect={onSelect}
+            onSelectAllFiltered={selectAllFiltered}
+          />
           <Inspector
             bundle={bundle}
             selected={selected}
             rolePaths={rolePaths}
+            recentRoles={recentRoles}
+            onSetRole={onSetRole}
             applyToSelection={applyToSelection}
           />
         </div>

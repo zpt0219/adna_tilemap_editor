@@ -1,10 +1,17 @@
-import { useMemo, useState } from "react";
-import type { ParsedBundle, PaletteTags } from "../types";
+import { useEffect, useRef } from "react";
+import type { ParsedBundle, PaletteEntry, PaletteTags } from "../types";
 
 interface Props {
   bundle: ParsedBundle;
+  items: PaletteEntry[];
   selected: Set<number>;
-  onSelect: (index: number, additive: boolean) => void;
+  active: number | null;
+  q: string;
+  onlyUntagged: boolean;
+  setQ: (v: string) => void;
+  setOnlyUntagged: (v: boolean) => void;
+  onSelect: (index: number, mods: { additive: boolean; range: boolean }) => void;
+  onSelectAllFiltered: () => void;
 }
 
 function statusOf(t: PaletteTags | undefined): PaletteTags["status"] {
@@ -17,10 +24,8 @@ function Swatch({ bundle, index }: { bundle: ParsedBundle; index: number }) {
   const g = bundle.manifest.grid;
   const sheetIdx = Math.floor(index / g.per_sheet);
   const li = index % g.per_sheet;
-  const col = li % g.cols;
-  const row = Math.floor(li / g.cols);
-  const x = col * g.cell_w + g.pad;
-  const y = row * g.cell_h + g.pad;
+  const x = (li % g.cols) * g.cell_w + g.pad;
+  const y = Math.floor(li / g.cols) * g.cell_h + g.pad;
   const url = bundle.sheetUrls[sheetIdx];
   return (
     <div
@@ -35,20 +40,15 @@ function Swatch({ bundle, index }: { bundle: ParsedBundle; index: number }) {
   );
 }
 
-export function Gallery({ bundle, selected, onSelect }: Props) {
-  const [q, setQ] = useState("");
-  const [onlyUntagged, setOnlyUntagged] = useState(false);
+export function Gallery({ bundle, items, selected, active, q, onlyUntagged, setQ, setOnlyUntagged, onSelect, onSelectAllFiltered }: Props) {
+  const gridRef = useRef<HTMLDivElement>(null);
 
-  const items = useMemo(() => {
-    const query = q.trim().toLowerCase();
-    return bundle.manifest.palettes.filter((p) => {
-      const t = bundle.tagData[p.index];
-      if (onlyUntagged && t && (t.role || t.style.length)) return false;
-      if (!query) return true;
-      const hay = `${p.index} ${p.mode} ${t?.role ?? ""} ${(t?.style ?? []).join(" ")}`.toLowerCase();
-      return hay.includes(query);
-    });
-  }, [bundle, q, onlyUntagged]);
+  // keep the keyboard cursor in view
+  useEffect(() => {
+    if (active == null || !gridRef.current) return;
+    const el = gridRef.current.querySelector<HTMLElement>(`[data-index="${active}"]`);
+    el?.scrollIntoView({ block: "nearest" });
+  }, [active]);
 
   return (
     <div className="gallery">
@@ -62,17 +62,21 @@ export function Gallery({ bundle, selected, onSelect }: Props) {
           <input type="checkbox" checked={onlyUntagged} onChange={(e) => setOnlyUntagged(e.target.checked)} />
           只看未标注
         </label>
-        <span className="muted">{items.length} 项</span>
+        <button disabled={items.length === 0} onClick={onSelectAllFiltered} title="选中当前筛选出的全部，便于批量套 role">
+          全选筛选 ({items.length})
+        </button>
+        <span className="muted">方向键移动 · Shift 范围选 · Ctrl/Cmd 加选</span>
       </div>
-      <div className="grid">
+      <div className="grid" ref={gridRef}>
         {items.map((p) => {
           const t = bundle.tagData[p.index];
           const st = statusOf(t);
           return (
             <div
               key={p.index}
-              className={`cell ${st} ${selected.has(p.index) ? "sel" : ""}`}
-              onClick={(e) => onSelect(p.index, e.metaKey || e.ctrlKey || e.shiftKey)}
+              data-index={p.index}
+              className={`cell ${st}${selected.has(p.index) ? " sel" : ""}${active === p.index ? " active" : ""}`}
+              onClick={(e) => onSelect(p.index, { additive: e.metaKey || e.ctrlKey, range: e.shiftKey })}
               title={`#${p.index} · ${p.mode}${t?.role ? ` · ${t.role}` : ""}`}
             >
               <Swatch bundle={bundle} index={p.index} />
