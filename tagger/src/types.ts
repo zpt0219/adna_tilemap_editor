@@ -30,6 +30,7 @@ export interface TreeNode {
   label?: string;
   object_type?: string;
   feeds_modes?: string[];
+  stratum?: string; // "ground" | "vertical" — declared per node in the engine tree
   children: TreeNode[];
 }
 

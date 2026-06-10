@@ -4,7 +4,6 @@ import { buildFinalTags, downloadText, parseBundle, tagsFileToData } from "./bun
 import { flattenTree } from "./roleTree";
 import { Gallery } from "./components/Gallery";
 import { Inspector } from "./components/Inspector";
-import { MobileTagger } from "./components/MobileTagger";
 import { ServerPanel } from "./components/ServerPanel";
 import { getBundle, getTags, putTags } from "./api";
 
@@ -23,25 +22,45 @@ export default function App() {
   // gallery filter (lifted here so keyboard nav / range / select-all see the visible list)
   const [q, setQ] = useState("");
   const [onlyUntagged, setOnlyUntagged] = useState(false);
+  // show only palettes whose role sits on a non-leaf (parent/internal) node — i.e. not fully refined
+  const [onlyCoarse, setOnlyCoarse] = useState(false);
+  // toolbar filters: exact role ("" = all) and a set of styles (item must have all selected)
+  const [roleFilter, setRoleFilter] = useState("");
+  const [styleFilter, setStyleFilter] = useState<Set<string>>(new Set());
   // recently-applied roles (most recent first) — quick re-apply row in the Inspector
   const [recentRoles, setRecentRoles] = useState<string[]>([]);
   const [error, setError] = useState<string>("");
   // server-backed bundle: the .adnatags filename we sync the draft to (null = local file)
   const [serverName, setServerName] = useState<string | null>(null);
   const [serverOpen, setServerOpen] = useState(false);
-  const [isMobile, setIsMobile] = useState(() => window.matchMedia("(max-width: 720px)").matches);
+  // draggable width of the right inspector panel (px), persisted
+  const [inspectorWidth, setInspectorWidth] = useState(() => Number(localStorage.getItem("adna_insp_w")) || 360);
   const fileInput = useRef<HTMLInputElement>(null);
   const tagsInput = useRef<HTMLInputElement>(null);
   const saveTimer = useRef<number | null>(null);
 
-  useEffect(() => {
-    const mq = window.matchMedia("(max-width: 720px)");
-    const on = () => setIsMobile(mq.matches);
-    mq.addEventListener("change", on);
-    return () => mq.removeEventListener("change", on);
+  // drag the gallery|inspector divider to resize the right panel
+  const startResize = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    const onMove = (ev: MouseEvent) =>
+      setInspectorWidth(Math.min(760, Math.max(280, window.innerWidth - ev.clientX)));
+    const onUp = () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
   }, []);
 
+  useEffect(() => { localStorage.setItem("adna_insp_w", String(inspectorWidth)); }, [inspectorWidth]);
+
   const rolePaths = useMemo(() => flattenTree(bundle?.tree ?? null), [bundle]);
+  // role paths that are tree leaves — a role NOT in here (but set) is "coarse" (parent node)
+  const leafRoles = useMemo(() => new Set(rolePaths.filter((r) => r.isLeaf).map((r) => r.path)), [rolePaths]);
 
   // the visible (filtered) palette list — drives the gallery AND keyboard/range/select-all
   const items = useMemo<PaletteEntry[]>(() => {
@@ -50,11 +69,17 @@ export default function App() {
     return bundle.manifest.palettes.filter((p) => {
       const t = bundle.tagData[p.index];
       if (onlyUntagged && isTagged(t)) return false;
+      if (onlyCoarse && !(t?.role && !leafRoles.has(t.role))) return false;
+      if (roleFilter && (t?.role ?? "") !== roleFilter) return false;
+      if (styleFilter.size > 0) {
+        const styles = t?.style ?? [];
+        for (const s of styleFilter) if (!styles.includes(s)) return false;
+      }
       if (!query) return true;
       const hay = `${p.index} ${p.mode} ${t?.role ?? ""} ${(t?.style ?? []).join(" ")}`.toLowerCase();
       return hay.includes(query);
     });
-  }, [bundle, q, onlyUntagged]);
+  }, [bundle, q, onlyUntagged, onlyCoarse, leafRoles, roleFilter, styleFilter]);
 
   // ---- load a bundle ----
   const loadBundleFile = useCallback(async (file: File) => {
@@ -152,14 +177,12 @@ export default function App() {
     if (items.length) { setActive(items[0].index); setAnchor(items[0].index); }
   }, [items]);
 
-  // next untagged after `fromIndex` in visible order (wraps); null if none left
-  const nextUntagged = useCallback((fromIndex: number): number | null => {
-    if (!bundle) return null;
+  // simply the next palette after `fromIndex` in the current visible list.
+  // No "find next untagged" magic — use the 未标 filter to shorten the list.
+  const nextInList = useCallback((fromIndex: number): number | null => {
     const pos = items.findIndex((p) => p.index === fromIndex);
-    const order = [...items.slice(pos + 1), ...items.slice(0, pos + 1)];
-    for (const p of order) if (!isTagged(bundle.tagData[p.index])) return p.index;
-    return null;
-  }, [bundle, items]);
+    return pos >= 0 && pos + 1 < items.length ? items[pos + 1].index : null;
+  }, [items]);
 
   // ---- set role on the selection; record recent; auto-advance to next untagged (single) ----
   const onSetRole = useCallback((path: string) => {
@@ -168,10 +191,10 @@ export default function App() {
     applyToSelection(indices, (cur) => ({ ...cur, role: path, status: "human_verified" }));
     setRecentRoles((prev) => [path, ...prev.filter((p) => p !== path)].slice(0, RECENT_CAP));
     if (indices.length === 1) {
-      const nxt = nextUntagged(indices[0]);
+      const nxt = nextInList(indices[0]);
       if (nxt != null) { setSelected(new Set([nxt])); setActive(nxt); setAnchor(nxt); }
     }
-  }, [selected, applyToSelection, nextUntagged]);
+  }, [selected, applyToSelection, nextInList]);
 
   // ---- load an external tags file, merge onto current doc ----
   const onLoadTagsFile = useCallback(async (file: File) => {
@@ -218,11 +241,6 @@ export default function App() {
     }, 800);
     return () => { if (saveTimer.current) window.clearTimeout(saveTimer.current); };
   }, [bundle, serverName]);
-
-  // ---- on phone, the single-item flow always has the active palette selected ----
-  useEffect(() => {
-    if (isMobile && bundle && active != null && selected.size === 0) setSelected(new Set([active]));
-  }, [isMobile, bundle, active, selected]);
 
   // ---- keyboard navigation over the visible grid ----
   useEffect(() => {
@@ -291,22 +309,8 @@ export default function App() {
             <button onClick={() => setServerOpen(true)}>从服务器打开</button>
           </div>
         </div>
-      ) : isMobile ? (
-        <MobileTagger
-          bundle={bundle}
-          items={items}
-          active={active}
-          onlyUntagged={onlyUntagged}
-          setOnlyUntagged={setOnlyUntagged}
-          onSelect={onSelect}
-          selected={selected}
-          rolePaths={rolePaths}
-          recentRoles={recentRoles}
-          onSetRole={onSetRole}
-          applyToSelection={applyToSelection}
-        />
       ) : (
-        <div className="main">
+        <div className="main" style={{ "--insp-w": `${inspectorWidth}px` } as React.CSSProperties}>
           <Gallery
             bundle={bundle}
             items={items}
@@ -314,11 +318,18 @@ export default function App() {
             active={active}
             q={q}
             onlyUntagged={onlyUntagged}
+            onlyCoarse={onlyCoarse}
+            roleFilter={roleFilter}
+            styleFilter={styleFilter}
             setQ={setQ}
             setOnlyUntagged={setOnlyUntagged}
+            setOnlyCoarse={setOnlyCoarse}
+            setRoleFilter={setRoleFilter}
+            setStyleFilter={setStyleFilter}
             onSelect={onSelect}
             onSelectAllFiltered={selectAllFiltered}
           />
+          <div className="resizer" onMouseDown={startResize} title="拖动调整右栏宽度" />
           <Inspector
             bundle={bundle}
             selected={selected}

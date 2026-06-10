@@ -51,10 +51,25 @@ button.link { background: none; border: none; color: var(--accent); padding: 0; 
 .gallery { flex: 1; display: flex; flex-direction: column; min-width: 0; }
 .gallery-bar { display: flex; gap: 10px; align-items: center; padding: 8px 12px; border-bottom: 1px solid var(--line); }
 .gallery-bar input[type="text"], .gallery-bar input:not([type]) { flex: 0 0 320px; }
-input[type="text"], input:not([type]), .role-filter {
+input[type="text"], input:not([type]) {
   background: var(--panel2); color: var(--txt); border: 1px solid var(--line);
   border-radius: 6px; padding: 5px 8px; width: 100%;
 }
+.role-filter {
+  background: var(--panel2); color: var(--txt); border: 1px solid var(--line);
+  border-radius: 6px; padding: 5px 8px; max-width: 220px;
+}
+.flt-btn {
+  background: var(--panel2); color: var(--txt); border: 1px solid var(--line);
+  border-radius: 6px; padding: 5px 10px; cursor: pointer; white-space: nowrap;
+}
+.flt-btn.on { border-color: var(--accent); color: var(--accent); }
+.style-filter {
+  display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+  padding: 8px 12px; border-bottom: 1px solid var(--line); background: var(--panel);
+}
+.style-filter .chip.on { background: #294063; border-color: var(--accent); color: var(--txt); }
+.style-filter .chip.clear { background: none; border-color: var(--line); color: var(--muted); }
 .grid {
   flex: 1; overflow: auto; padding: 12px;
   display: grid; grid-template-columns: repeat(auto-fill, 76px); gap: 8px; align-content: start;
@@ -77,9 +92,12 @@ input[type="text"], input:not([type]), .role-filter {
 
 /* inspector */
 .inspector {
-  flex: 0 0 320px; background: var(--panel); border-left: 1px solid var(--line);
+  flex: 0 0 var(--insp-w, 320px); background: var(--panel); border-left: 1px solid var(--line);
   padding: 12px; overflow: auto; display: flex; flex-direction: column; gap: 16px;
 }
+/* draggable gallery|inspector divider */
+.resizer { flex: 0 0 5px; cursor: col-resize; background: var(--line); }
+.resizer:hover, .resizer:active { background: var(--accent); }
 .insp-head { display: flex; flex-direction: column; gap: 2px; border-bottom: 1px solid var(--line); padding-bottom: 8px; position: relative; }
 .insp-head .link { position: absolute; right: 0; top: 0; }
 .lbl { font-weight: 600; margin-bottom: 6px; }
@@ -99,6 +117,9 @@ input[type="text"], input:not([type]), .role-filter {
 .role-row.d1 .rp { padding-left: 10px; }
 .role-row.d2 .rp { padding-left: 22px; }
 .role-row.d3 .rp { padding-left: 34px; }
+.strat { font-size: 9px; padding: 0 4px; margin-left: 6px; border-radius: 8px; vertical-align: middle; }
+.strat.ground { background: #2e4a32; color: #b9e6bf; }
+.strat.vertical { background: #3a2e52; color: #d6c2f0; }
 
 .chips { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 6px; }
 .chip { background: #2c3a52; border: 1px solid var(--accent); border-radius: 12px; padding: 2px 8px; cursor: pointer; font-size: 12px; }
@@ -132,25 +153,7 @@ input[type="text"], input:not([type]), .role-filter {
 .bundle-row .bm { color: var(--muted); font-size: 12px; white-space: nowrap; }
 .refresh { align-self: flex-start; margin-top: 4px; }
 
-/* --- mobile single-item flow --- */
-.mobile { flex: 1; display: flex; flex-direction: column; min-height: 0; overflow: auto; }
-.m-bar {
-  display: flex; align-items: center; gap: 10px; padding: 10px 12px;
-  border-bottom: 1px solid var(--line); position: sticky; top: 0; background: var(--panel); z-index: 2;
-}
-.m-bar button { padding: 8px 16px; font-size: 16px; }
-.m-prog { flex: 1; text-align: center; color: var(--muted); font-size: 12px; }
-.m-only { display: flex; align-items: center; gap: 4px; white-space: nowrap; }
-.m-swatch { display: flex; justify-content: center; padding: 16px; }
-.big-swatch { background: #15161a; border: 1px solid var(--line); border-radius: 8px; image-rendering: pixelated; }
-/* the reused Inspector becomes a full-width block on phone */
-.mobile .inspector { flex: 1 0 auto; width: 100%; border-left: none; border-top: 1px solid var(--line); }
-.mobile .role-list { max-height: none; }
-/* bigger tap targets for touch */
-.mobile .role-row { padding: 10px 10px; }
-.mobile .preset, .mobile .chip { padding: 6px 12px; font-size: 13px; }
-
-/* --- phone: let the topbar wrap so nothing overflows the viewport --- */
+/* --- narrow widths: let the topbar wrap so nothing overflows the viewport --- */
 @media (max-width: 720px) {
   .topbar { flex-wrap: wrap; row-gap: 6px; }
   .topbar .spacer { display: none; }

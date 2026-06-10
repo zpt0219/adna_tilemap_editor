@@ -105,9 +105,16 @@ export function Inspector({ bundle, selected, rolePaths, recentRoles, onSetRole,
               key={r.path}
               className={`role-row d${Math.min(r.depth, 3)} ${commonRole === r.path ? "active" : ""}`}
               onClick={() => onSetRole(r.path)}
-              title={`${r.label} · ${r.objectType}`}
+              title={`${r.label} · ${r.objectType}${r.stratum ? ` · ${r.stratum}` : ""}`}
             >
-              <span className="rp">{r.path}</span>
+              <span className="rp">
+                {r.path}
+                {r.stratum && (
+                  <span className={`strat ${r.stratum}`} title={r.stratum}>
+                    {r.stratum === "ground" ? "地" : r.stratum === "vertical" ? "立" : r.stratum}
+                  </span>
+                )}
+              </span>
               <span className="ot">{r.objectType}</span>
             </button>
           ))}
