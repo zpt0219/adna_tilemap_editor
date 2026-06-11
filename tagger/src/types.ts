@@ -64,4 +64,5 @@ export interface ParsedBundle {
   tree: TagTree | null;
   sheetUrls: string[]; // object URLs, indexed to match manifest.sheet order
   tagData: Record<number, PaletteTags>;
+  files: Record<string, Uint8Array>; // raw unzipped members, kept so export can re-zip
 }

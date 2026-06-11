@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ParsedBundle, PaletteEntry, PaletteTags, TagsFile } from "./types";
-import { buildFinalTags, downloadText, parseBundle, tagsFileToData } from "./bundle";
+import { buildBundleZip, bundleBaseName, downloadBytes, parseBundle, tagsFileToData } from "./bundle";
 import { flattenTree } from "./roleTree";
 import { Gallery } from "./components/Gallery";
 import { Inspector } from "./components/Inspector";
@@ -209,9 +209,10 @@ export default function App() {
     }
   }, [bundle]);
 
+  // export the whole .adnatags bundle (current tags baked into tags.json) — engine imports this directly
   const onExport = useCallback(() => {
     if (!bundle) return;
-    downloadText("final_tags.json", buildFinalTags(bundle.manifest.palette_set, bundle.tagData));
+    downloadBytes(`${bundleBaseName(bundle)}.adnatags`, buildBundleZip(bundle));
   }, [bundle]);
 
   // ---- open a bundle from the server (resumes its saved draft) ----
@@ -296,7 +297,7 @@ export default function App() {
             {bundle.name} · {stats.tagged}/{stats.total} tagged{serverName ? " · ☁ 自动同步" : ""}
           </span>
         )}
-        <button disabled={!bundle} onClick={onExport}>导出 final_tags.json</button>
+        <button disabled={!bundle} onClick={onExport}>导出 .adnatags</button>
       </header>
 
       {error && <div className="error">{error}</div>}

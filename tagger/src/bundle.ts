@@ -1,4 +1,4 @@
-import { unzipSync, strFromU8 } from "fflate";
+import { unzipSync, zipSync, strFromU8, strToU8 } from "fflate";
 import type { Manifest, ParsedBundle, PaletteTags, TagsFile, TagTree } from "./types";
 
 // Normalize a TagsFile (style may be string or string[]) into the in-app
@@ -22,7 +22,7 @@ export function tagsFileToData(
 // Parses an .adnatags ArrayBuffer into a ParsedBundle. Throws on a missing
 // manifest. A missing tree or tags only degrades gracefully.
 export function parseBundle(name: string, buf: ArrayBuffer): ParsedBundle {
-  const files = unzipSync(new Uint8Array(buf));
+  const files = unzipSync(new Uint8Array(buf)); // kept raw on the bundle so we can re-zip on export
 
   const manifestRaw = files["manifest.json"];
   if (!manifestRaw) throw new Error("bundle has no manifest.json");
@@ -54,7 +54,31 @@ export function parseBundle(name: string, buf: ArrayBuffer): ParsedBundle {
     return URL.createObjectURL(blob);
   });
 
-  return { name, manifest, tree, sheetUrls, tagData };
+  return { name, manifest, tree, sheetUrls, tagData, files };
+}
+
+// Re-zip the loaded bundle with the current tags baked into tags.json — the
+// engine now imports the whole .adnatags bundle (no separate final_tags.json).
+export function buildBundleZip(bundle: ParsedBundle): Uint8Array {
+  const tagsJson = buildFinalTags(bundle.manifest.palette_set, bundle.tagData);
+  const out: Record<string, Uint8Array> = { ...bundle.files, "tags.json": strToU8(tagsJson) };
+  return zipSync(out, { level: 6 });
+}
+
+// Strips a trailing " (sample)" note and any .adnatags extension, for the download name.
+export function bundleBaseName(bundle: ParsedBundle): string {
+  const n = bundle.name.replace(/\s*\(sample\)\s*$/i, "").replace(/\.adnatags$/i, "").trim();
+  return n || bundle.manifest.palette_set || "tags";
+}
+
+export function downloadBytes(filename: string, bytes: Uint8Array, mime = "application/octet-stream") {
+  const blob = new Blob([bytes as BlobPart], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 // Builds final_tags.json text from the current tagData (only tagged palettes).
