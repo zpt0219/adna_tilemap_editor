@@ -31,9 +31,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
-          cache-dependency-path: reroll/package-lock.json
-      - run: npm ci
+      # --include=dev so @types/*, typescript and vite install even if the
+      # runner has NODE_ENV=production (tsc/vite are devDependencies).
+      - run: npm ci --include=dev
+        env:
+          NODE_ENV: development
       - run: npm run build # prebuild regenerates roleColors.ts from vendor/
       - uses: actions/upload-pages-artifact@v3
         with:
