@@ -11,6 +11,9 @@ engine repo so web development has its own repo, build, and history.
 Each app is a standalone Vite project; see its own README for run/build steps
 (`cd reroll && npm install && npm run dev`).
 
+**Deploying** (adna.world self-host + GitHub Pages): see
+[`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
+
 ## Self-contained — no other-repo dependency
 
 This repo builds and runs from a **single checkout** and is meant to ship as a
