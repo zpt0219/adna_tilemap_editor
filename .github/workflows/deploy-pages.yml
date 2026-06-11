@@ -31,11 +31,13 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      # --include=dev so @types/*, typescript and vite install even if the
-      # runner has NODE_ENV=production (tsc/vite are devDependencies).
-      - run: npm ci --include=dev
-        env:
-          NODE_ENV: development
+      # The runner's default npm crashes `npm ci` with "Exit handler never
+      # called!" (an npm bug) and exits 0 with an INCOMPLETE node_modules, so
+      # tsc then can't find react/fflate. Pin npm to a version that installs
+      # cleanly, and verify the tree afterwards so a partial install fails loudly.
+      - run: npm install -g npm@10.8.2
+      - run: npm ci
+      - run: test -d node_modules/react && test -d node_modules/fflate
       - run: npm run build # prebuild regenerates roleColors.ts from vendor/
       - uses: actions/upload-pages-artifact@v3
         with:
