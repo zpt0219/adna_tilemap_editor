@@ -1,10 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent as ReactDragEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent as ReactDragEvent } from "react";
 import { parseBlueprint } from "./blueprint";
 import { blueprintToLite } from "./convert";
 import { normalizeToCategories } from "./normalize";
 import { assignUniqueObjectNames, cloneTerrain, displayName, findLayer, findObject, isLocked, layerOfObject, roleOf, setTerrainCell, type LiteObject, type LiteTileMap, type Rect } from "./model";
-import { UndoStack, moveObjectCommand, moveObjectsCommand, paintTerrainCommand, renameObjectCommand, reorderLayerObjectsCommand, resizeObjectCommand, setObjectsEnabledCommand, toggleLayerEnabledCommand, toggleObjectEnabledCommand, type Command, type TerrainSnapshot } from "./commands";
+import { UndoStack, moveObjectCommand, moveObjectsCommand, paintTerrainCommand, renameObjectCommand, reorderLayerObjectsCommand, resizeObjectCommand, setObjectsEnabledCommand, setObjectPaletteCommand, setObjectTypeCommand, toggleLayerEnabledCommand, toggleObjectEnabledCommand, type Command, type TerrainSnapshot } from "./commands";
+import type { LiteType } from "./model";
 import { liteToWebSave } from "./saveFormat";
+import { clearDraft, loadDraft, saveDraft } from "./draft";
 import { downloadJson } from "./download";
 import { colorForRole } from "./generated/roleColors";
 import { CanvasView, type BrushState } from "./components/CanvasView";
@@ -56,6 +58,8 @@ export default function App() {
   const [pack, setPack] = useState<PackRuntime | null>(null);
   const [renderMode, setRenderMode] = useState<RenderMode>("mixed");
   const [packVersion, setPackVersion] = useState(0);
+  // draggable width of the right props panel (px), persisted
+  const [propsWidth, setPropsWidth] = useState(() => Number(localStorage.getItem("reroll_props_w")) || 240);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   // anchor for Shift-range selection (the last plainly-picked / Ctrl-toggled id)
   const [anchorId, setAnchorId] = useState<number | null>(null);
@@ -71,10 +75,21 @@ export default function App() {
   const undo = useRef(new UndoStack());
   const stroke = useRef<{ id: number; before: TerrainSnapshot; dirty: boolean } | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
+  const saveTimer = useRef<number | null>(null);
 
   const build = useCallback((name: string, text: string) => {
-    const lite = normalizeToCategories(blueprintToLite(parseBlueprint(name, text)));
+    let lite = normalizeToCategories(blueprintToLite(parseBlueprint(name, text)));
     assignUniqueObjectNames(lite);
+    // resume an unfinished local session for this source, if the user wants it
+    const draft = loadDraft(name);
+    if (draft) {
+      const when = new Date(draft.savedAt).toLocaleString();
+      if (confirm(`发现「${name}」上次未完成的修改（保存于 ${when}）。\n\n确定 = 继续上次进度；取消 = 放弃改动,重新打开。`)) {
+        lite = draft.map;
+      } else {
+        clearDraft(name);
+      }
+    }
     undo.current = new UndoStack();
     setMap(lite);
     setSelected(new Set());
@@ -122,8 +137,9 @@ export default function App() {
   // tiles immediately); the user can still drop or open their own blueprint
   useEffect(() => { void loadSample(); /* eslint-disable-line react-hooks/exhaustive-deps */ }, []);
 
-  // bind a palette to each object by role (recompiled when map or pack changes)
-  const bindings = useMemo(() => (map && pack ? compileMap(map, pack) : null), [map, pack]);
+  // bind a palette to each object by role (also recompiled on edits — type
+  // conversion / palette override change the bindings; version bumps on every command)
+  const bindings = useMemo(() => (map && pack ? compileMap(map, pack) : null), [map, pack, version]);
   // invalidate the cached scene when bindings / render mode change
   useEffect(() => { setPackVersion((v) => v + 1); }, [bindings, renderMode]);
 
@@ -135,6 +151,33 @@ export default function App() {
     return () => { window.removeEventListener("drop", onDrop); window.removeEventListener("dragover", onDragOver); };
   }, [loadFile]);
 
+  // drag the canvas|props divider to resize the right panel
+  const startResize = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    const onMove = (ev: MouseEvent) =>
+      setPropsWidth(Math.min(560, Math.max(180, window.innerWidth - ev.clientX)));
+    const onUp = () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+  }, []);
+  useEffect(() => { localStorage.setItem("reroll_props_w", String(propsWidth)); }, [propsWidth]);
+
+  // autosave the edit session to localStorage (debounced) — only after a real
+  // edit (version>0), so just opening a map doesn't create a phantom "resume?" draft
+  useEffect(() => {
+    if (!map || version === 0) return;
+    if (saveTimer.current) window.clearTimeout(saveTimer.current);
+    saveTimer.current = window.setTimeout(() => saveDraft(map.name, map), 500);
+    return () => { if (saveTimer.current) window.clearTimeout(saveTimer.current); };
+  }, [map, version]);
+
   // --- commands ---
   const run = useCallback((cmd: Command) => { undo.current.push(cmd); setVersion((v) => v + 1); }, []);
   const onUndo = useCallback(() => { undo.current.undo(); setVersion((v) => v + 1); }, []);
@@ -144,6 +187,7 @@ export default function App() {
     if (!map) return;
     const base = (map.name || "map").replace(/\s*\(sample\)$/, "").replace(/\.[^.]+$/, "") || "map";
     downloadJson(`${base}.adnaweb.json`, liteToWebSave(map));
+    clearDraft(map.name); // saved to disk → drop the local resume draft
   }, [map]);
 
   const onMove = useCallback((id: number, before: [number, number], after: [number, number]) => {
@@ -302,6 +346,23 @@ export default function App() {
     if (o) run(renameObjectCommand(map, id, o.tags["web.name"] ?? "", name));
   }, [map, run]);
 
+  // convert a terrain object's autotile type (fix 2-edge/2-corner mislabels)
+  const onSetObjectType = useCallback((id: number, type: LiteType) => {
+    if (!map) return;
+    const o = findObject(map, id);
+    if (o && o.type !== type) run(setObjectTypeCommand(map, id, o.type, type));
+  }, [map, run]);
+
+  // manually pick (hash) or reset (null) the palette bound to an object
+  const onSetPalette = useCallback((id: number, hash: string | null) => {
+    if (!map) return;
+    const o = findObject(map, id);
+    if (!o) return;
+    const before = o.tags["web.palette"];
+    const after = hash ?? undefined;
+    if (before !== after) run(setObjectPaletteCommand(map, id, before, after));
+  }, [map, run]);
+
   const onObjectDragStart = useCallback((layerId: number, objectId: number) => (e: ReactDragEvent<HTMLDivElement>) => {
     e.dataTransfer.effectAllowed = "move";
     e.dataTransfer.setData("text/plain", `${layerId}:${objectId}`);
@@ -414,7 +475,7 @@ export default function App() {
           </>
         )}
         <span className="spacer" />
-        {map && <span className="stat">{map.name}</span>}
+        {map && <span className="stat">{map.name}{version > 0 && <em className="muted"> · 进度已存本地</em>}</span>}
       </header>
 
       {error && <div className="error">{error}</div>}
@@ -425,7 +486,7 @@ export default function App() {
           <button onClick={loadSample}>试用样例</button>
         </div>
       ) : (
-        <div className="main">
+        <div className="main" style={{ "--props-w": `${propsWidth}px` } as CSSProperties}>
           <aside className="layers">
             <div className="layers-head">
               <span className="legend-title">Layers</span>
@@ -502,13 +563,18 @@ export default function App() {
             onMarquee={onMarquee}
             onMarqueeDone={() => setMarquee(false)}
           />
+          <div className="resizer" onMouseDown={startResize} title="拖动调整右栏宽度" />
           <PropsPanel
             layer={activeLayer}
             objects={selObjs}
+            pack={pack}
+            bindings={bindings}
             onToggleLayerVisible={onToggleLayerVisible}
             onSetObjectsVisible={onSetObjectsVisible}
             onToggleLock={onToggleLock}
             onRename={onRename}
+            onSetObjectType={onSetObjectType}
+            onSetPalette={onSetPalette}
           />
         </div>
       )}

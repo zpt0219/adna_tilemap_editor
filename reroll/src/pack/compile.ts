@@ -105,22 +105,27 @@ function bindingKind(mode: number): "auto" | "slice" | "fixed" {
   return "fixed";
 }
 
-/** Bind every object in the map to a palette (or variant set) by role. */
+/**
+ * Bind every object to a palette (or variant set). A `web.palette` tag (set via
+ * the Palette panel) forces a specific palette, overriding the role resolution.
+ */
 export function compileMap(map: LiteTileMap, pack: PackRuntime): Bindings {
   const out: Bindings = new Map();
+  const byHash = new Map(pack.palettes.map((p) => [p.hash, p]));
   for (const o of eachObject(map)) {
     const role = roleOf(o);
-    if (!role) continue;
+    const override = o.tags["web.palette"] ? byHash.get(o.tags["web.palette"]) : undefined;
+    if (!role && !override) continue;
     const style = o.tags["blueprint.style"] ?? "";
     const seed = objSeed(o);
 
     if (o.type === "FIXED_RECT_GROUP" && o.terrain) {
-      const variants = resolvePalettesForRole(pack.palettes, role, style, 6);
+      const variants = override ? [override] : resolvePalettesForRole(pack.palettes, role, style, 6);
       if (variants.length === 0) continue;
       out.set(o.id, { kind: "frg", variants, cellVariant: assignFrgCells(o.terrain, variants.length, seed) });
       continue;
     }
-    const palette = resolvePaletteForRole(pack.palettes, role, style, seed, o.type);
+    const palette = override ?? resolvePaletteForRole(pack.palettes, role, style, seed, o.type);
     if (!palette) continue;
     out.set(o.id, { kind: bindingKind(palette.mode), palette });
   }

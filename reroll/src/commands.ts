@@ -9,6 +9,7 @@ import {
   isLocked,
   translateObject,
   type LiteTileMap,
+  type LiteType,
   type Rect,
   type TerrainMatrix,
 } from "./model";
@@ -126,6 +127,24 @@ export function renameObjectCommand(map: LiteTileMap, id: number, before: string
     if (name) o.tags["web.name"] = name; else delete o.tags["web.name"];
   };
   return { label: "Rename", do: () => set(after), undo: () => set(before) };
+}
+
+/** Change a terrain object's autotile type (e.g. fix a 2-edge/2-corner mislabel).
+ *  Geometry (the cell matrix) is unchanged; the bound palette is re-resolved. */
+export function setObjectTypeCommand(map: LiteTileMap, id: number, before: LiteType, after: LiteType): Command {
+  const set = (t: LiteType) => { const o = findObject(map, id); if (o) o.type = t; };
+  return { label: "Change type", do: () => set(after), undo: () => set(before) };
+}
+
+/** Force a specific pack palette on an object (the `web.palette` tag), or clear
+ *  it (undefined) to fall back to automatic role resolution. */
+export function setObjectPaletteCommand(map: LiteTileMap, id: number, before: string | undefined, after: string | undefined): Command {
+  const set = (hash: string | undefined) => {
+    const o = findObject(map, id);
+    if (!o) return;
+    if (hash) o.tags["web.palette"] = hash; else delete o.tags["web.palette"];
+  };
+  return { label: after ? "Set palette" : "Reset palette", do: () => set(after), undo: () => set(before) };
 }
 
 export interface TerrainSnapshot {

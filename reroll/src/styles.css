@@ -231,7 +231,7 @@ button.active {
 
 /* --- properties sidebar (right): Layer + Object attrs --- */
 .props {
-  width: 210px;
+  width: var(--props-w, 210px);
   background: var(--panel);
   border-left: 1px solid var(--border);
   padding: 12px;
@@ -239,6 +239,9 @@ button.active {
   font-size: 12px;
   flex: none;
 }
+/* draggable canvas|props divider */
+.resizer { flex: 0 0 5px; cursor: col-resize; background: var(--border); }
+.resizer:hover, .resizer:active { background: var(--accent); }
 .prop-head {
   font-weight: 600;
   color: var(--muted);
@@ -406,3 +409,21 @@ button.active {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* palette panel (props sidebar) — manual palette replacement */
+.pal-picker { margin: 8px 0 4px; }
+.pal-picker-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.pal-auto { font-size: 11px; padding: 2px 8px; }
+.pal-all { margin-left: auto; display: flex; align-items: center; gap: 4px; color: var(--muted); font-size: 12px; cursor: pointer; }
+.pal-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, 44px); gap: 4px;
+  max-height: 220px; overflow-y: auto; padding: 3px;
+  background: var(--panel-2); border-radius: 6px;
+}
+.pal-cell {
+  padding: 1px; background: #15161a; border: 2px solid transparent;
+  border-radius: 4px; cursor: pointer; line-height: 0;
+}
+.pal-cell:hover { border-color: var(--accent); }
+.pal-cell.sel { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.pal-sw { display: block; image-rendering: pixelated; background: #15161a; border-radius: 2px; }
