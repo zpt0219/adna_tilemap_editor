@@ -5,6 +5,20 @@
 import type { LiteObject, LiteTileMap, Rect } from "./model";
 import { eachVisibleDrawOrder, eachVisibleObject, isLocked, roleOf } from "./model";
 import { colorForRole, rgbaCss, type RGB } from "./generated/roleColors";
+import type { PackRuntime } from "./pack/types";
+import type { Bindings } from "./pack/compile";
+import { blitFixedRect } from "./pack/blit";
+import { drawAutotile } from "./pack/autotile";
+import { blitNineSlice } from "./pack/slice";
+
+export type RenderMode = "blueprint" | "mixed" | "real";
+
+/** When set, objects with a palette binding draw real atlas tiles. */
+export interface RenderCtx {
+  pack: PackRuntime;
+  bindings: Bindings;
+  renderMode: RenderMode;
+}
 
 // --- constants mirrored from render_overlay.py ---
 export const KRAFT = "rgb(228, 207, 168)";
@@ -144,13 +158,27 @@ export function sceneScaleFor(map: LiteTileMap): number {
   return Math.max(6, Math.min(24, Math.floor(2800 / maxDim)));
 }
 
+// ~24 MP — keep the offscreen scene canvas under the cross-browser ceiling.
+const MAX_SCENE_AREA = 24_000_000;
+
+/**
+ * Scene px/tile when a pack is loaded: render at native tile resolution (1:1
+ * atlas pixels) for crisp pixel-art, shrinking only if the canvas would exceed
+ * MAX_SCENE_AREA. `drawMap` nearest-neighbour-scales the result on blit.
+ */
+export function sceneScaleForPack(map: LiteTileMap, tileRes: number): number {
+  if (map.width * tileRes * (map.height * tileRes) <= MAX_SCENE_AREA) return tileRes;
+  const s = Math.floor(Math.sqrt(MAX_SCENE_AREA / Math.max(1, map.width * map.height)));
+  return Math.max(1, s);
+}
+
 /**
  * Render the static scene (KRAFT + objects + terrain) into `cv` at `s` px/tile.
  * Re-run only when map data changes — `drawMap` blits the result every frame.
  * (PIL composites translucent pixels by replacement; Canvas source-over blends —
  * identical except where translucent objects overlap, already accepted.)
  */
-export function renderScene(cv: HTMLCanvasElement, map: LiteTileMap, s: number): void {
+export function renderScene(cv: HTMLCanvasElement, map: LiteTileMap, s: number, rctx: RenderCtx | null = null): void {
   cv.width = Math.max(1, map.width * s);
   cv.height = Math.max(1, map.height * s);
   const ctx = cv.getContext("2d");
@@ -158,7 +186,7 @@ export function renderScene(cv: HTMLCanvasElement, map: LiteTileMap, s: number):
   ctx.imageSmoothingEnabled = false;
   ctx.fillStyle = KRAFT;
   ctx.fillRect(0, 0, cv.width, cv.height);
-  for (const o of eachVisibleDrawOrder(map)) drawObjectToScene(ctx, o, s, null);
+  for (const o of eachVisibleDrawOrder(map)) drawObjectToScene(ctx, o, s, null, rctx);
 }
 
 /**
@@ -168,7 +196,7 @@ export function renderScene(cv: HTMLCanvasElement, map: LiteTileMap, s: number):
  * that intersect it, clipped. Used for paint strokes (small, frequent, local);
  * structural edits fall back to the full renderScene.
  */
-export function renderSceneRegion(cv: HTMLCanvasElement, map: LiteTileMap, s: number, dirty: Rect): void {
+export function renderSceneRegion(cv: HTMLCanvasElement, map: LiteTileMap, s: number, dirty: Rect, rctx: RenderCtx | null = null): void {
   const ctx = cv.getContext("2d");
   if (!ctx) return;
   ctx.imageSmoothingEnabled = false;
@@ -178,7 +206,7 @@ export function renderSceneRegion(cv: HTMLCanvasElement, map: LiteTileMap, s: nu
   ctx.clip();
   ctx.fillStyle = KRAFT;
   ctx.fillRect(dirty[0] * s, dirty[1] * s, dirty[2] * s, dirty[3] * s);
-  for (const o of eachVisibleDrawOrder(map)) if (rectsOverlap(o.rect, dirty)) drawObjectToScene(ctx, o, s, dirty);
+  for (const o of eachVisibleDrawOrder(map)) if (rectsOverlap(o.rect, dirty)) drawObjectToScene(ctx, o, s, dirty, rctx);
   ctx.restore();
 }
 
@@ -188,7 +216,10 @@ function rectsOverlap(a: Rect, b: Rect): boolean {
 
 // Draw one object into the scene at `s` px/tile. `clip` (when set) limits the
 // terrain-cell scan to the dirty rect so a big terrain object stays cheap.
-function drawObjectToScene(ctx: CanvasRenderingContext2D, o: LiteObject, s: number, clip: Rect | null): void {
+function drawObjectToScene(ctx: CanvasRenderingContext2D, o: LiteObject, s: number, clip: Rect | null, rctx: RenderCtx | null = null): void {
+  // real-tile path: bound objects draw atlas tiles; in "real" mode unbound
+  // objects draw nothing (skip the colour block), in "mixed" they fall through.
+  if (rctx && rctx.renderMode !== "blueprint" && drawObjectReal(ctx, o, s, clip, rctx)) return;
   const rgb = colorForRole(roleOf(o));
   switch (o.type) {
     case "FIXED_RECT": {
@@ -220,6 +251,62 @@ function drawObjectToScene(ctx: CanvasRenderingContext2D, o: LiteObject, s: numb
       fillTerrainRuns(ctx, o, s, rgbaCss(rgb, CELL_TERRAIN_A), clip);
       break;
   }
+}
+
+/**
+ * Draw object `o` with real atlas tiles when it has a palette binding.
+ * Returns true when it handled the object (caller skips the colour block).
+ * - "fixed": stamp the palette's size block at the object footprint.
+ * - "frg": stamp the assigned scatter variant at each active cell.
+ * - "auto" (terrain auto-tile): P2 — not yet drawn; in "real" mode draw nothing
+ *   (return true to suppress the colour block), in "mixed" fall back (return false).
+ */
+function drawObjectReal(ctx: CanvasRenderingContext2D, o: LiteObject, s: number, clip: Rect | null, rctx: RenderCtx): boolean {
+  const b = rctx.bindings.get(o.id);
+  if (!b) return rctx.renderMode === "real"; // unbound: real⇒nothing, mixed⇒colour block
+  if (b.kind === "fixed") {
+    blitFixedRect(ctx, rctx.pack.atlas, b.palette, o.rect[0], o.rect[1], s);
+    return true;
+  }
+  if (b.kind === "slice") {
+    blitNineSlice(ctx, rctx.pack.atlas, b.palette, o.rect, s);
+    return true;
+  }
+  if (b.kind === "frg" && o.terrain) {
+    blitFrg(ctx, o, b.variants, b.cellVariant, rctx.pack, s, clip);
+    return true;
+  }
+  if (b.kind === "auto" && o.terrain && drawAutotile(ctx, rctx.pack.atlas, b.palette, o.terrain, s, clip)) {
+    return true;
+  }
+  return rctx.renderMode === "real"; // unsupported mode (e.g. NINE_PATCH/CLIFF) — suppress colour in real mode
+}
+
+function blitFrg(
+  ctx: CanvasRenderingContext2D,
+  o: LiteObject,
+  variants: import("./pack/types").Palette[],
+  cellVariant: Int16Array,
+  pack: PackRuntime,
+  s: number,
+  clip: Rect | null,
+): void {
+  const t = o.terrain;
+  if (!t) return;
+  let r0 = 0, r1 = t.h, c0 = 0, c1 = t.w;
+  if (clip) {
+    r0 = Math.max(0, clip[1] - t.oy);
+    r1 = Math.min(t.h, clip[1] + clip[3] - t.oy);
+    c0 = Math.max(0, clip[0] - t.ox);
+    c1 = Math.min(t.w, clip[0] + clip[2] - t.ox);
+  }
+  for (let r = r0; r < r1; r++)
+    for (let c = c0; c < c1; c++) {
+      const vi = cellVariant[r * t.w + c];
+      if (vi < 0) continue;
+      const v = variants[vi];
+      if (v) blitFixedRect(ctx, pack.atlas, v, t.ox + c, t.oy + r, s);
+    }
 }
 
 // Fill present terrain cells, merging consecutive cells in each row into one

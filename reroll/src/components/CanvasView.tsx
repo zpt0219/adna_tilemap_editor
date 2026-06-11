@@ -10,11 +10,16 @@ import {
   renderScene,
   renderSceneRegion,
   sceneScaleFor,
+  sceneScaleForPack,
   screenToTile,
   tileToScreen,
   type HitGrid,
+  type RenderCtx,
+  type RenderMode,
   type View,
 } from "../render";
+import type { PackRuntime } from "../pack/types";
+import type { Bindings } from "../pack/compile";
 
 export interface BrushState {
   rgb: RGB;
@@ -27,6 +32,14 @@ export interface BrushState {
 interface Props {
   map: LiteTileMap;
   version: number;
+  /** loaded palette pack (null = no real tiles, abstract overlay only) */
+  pack: PackRuntime | null;
+  /** per-object palette bindings from compileMap (null until compiled) */
+  bindings: Bindings | null;
+  /** blueprint = overlay only; mixed = bound→tiles; real = tiles only */
+  renderMode: RenderMode;
+  /** bumps when pack/bindings/renderMode change → full scene re-render */
+  packVersion: number;
   brush: BrushState;
   selected: Set<number>;
   /** the one-shot Marquee tool is armed (LMB box-selects, then pops back) */
@@ -147,7 +160,7 @@ function cursorFor(edges: Edges | "inside" | "outside"): string {
 }
 
 export function CanvasView({
-  map, version, brush, selected, marqueeArmed,
+  map, version, pack, bindings, renderMode, packVersion, brush, selected, marqueeArmed,
   onPick, onMove, onMoveGroup, onResize, onToggleLock, onStrokeStart, onStrokePaint, onStrokeEnd,
   onMarquee, onMarqueeDone,
 }: Props) {
@@ -175,6 +188,9 @@ export function CanvasView({
   selectedRef.current = selected;
   const marqueeArmedRef = useRef(marqueeArmed);
   marqueeArmedRef.current = marqueeArmed;
+  // real-tile render context (null = abstract overlay only); read by scheduleDraw
+  const rctxRef = useRef<RenderCtx | null>(null);
+  rctxRef.current = pack && bindings ? { pack, bindings, renderMode } : null;
 
   const [hover, setHover] = useState<{ tx: number; ty: number; role: string; type: string } | null>(null);
   const [selBox, setSelBox] = useState<SelBox | null>(null);
@@ -194,11 +210,11 @@ export function CanvasView({
       const { w, h, dpr } = sizeRef.current;
       const s = sceneScaleRef.current;
       if (sceneFullDirtyRef.current) {
-        renderScene(sceneRef.current, map, s);
+        renderScene(sceneRef.current, map, s, rctxRef.current);
         sceneFullDirtyRef.current = false;
         sceneRectDirtyRef.current = null;
       } else if (sceneRectDirtyRef.current) {
-        renderSceneRegion(sceneRef.current, map, s, sceneRectDirtyRef.current);
+        renderSceneRegion(sceneRef.current, map, s, sceneRectDirtyRef.current, rctxRef.current);
         sceneRectDirtyRef.current = null;
       }
       const ht = hoverTileRef.current;
@@ -241,7 +257,7 @@ export function CanvasView({
 
   useEffect(() => {
     hitRef.current = buildHitGrid(map);
-    sceneScaleRef.current = sceneScaleFor(map);
+    sceneScaleRef.current = pack ? sceneScaleForPack(map, pack.tileResolution) : sceneScaleFor(map);
     sceneFullDirtyRef.current = true;
     sceneRectDirtyRef.current = null;
     const wrap = wrapRef.current;
@@ -254,6 +270,13 @@ export function CanvasView({
   }, [map]);
 
   useEffect(() => { hitRef.current = buildHitGrid(map); sceneFullDirtyRef.current = true; scheduleDraw(); /* eslint-disable-line */ }, [version]);
+  // pack loaded / bindings recompiled / render-mode toggled → rescale + full re-render
+  useEffect(() => {
+    sceneScaleRef.current = pack ? sceneScaleForPack(map, pack.tileResolution) : sceneScaleFor(map);
+    sceneFullDirtyRef.current = true;
+    scheduleDraw();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [packVersion]);
   useEffect(() => { scheduleDraw(); }, [selected, scheduleDraw]);
   useEffect(() => { if (canvasRef.current) canvasRef.current.style.cursor = marqueeArmed ? "crosshair" : "default"; }, [marqueeArmed]);
 

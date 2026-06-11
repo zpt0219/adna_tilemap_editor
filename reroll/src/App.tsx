@@ -9,6 +9,10 @@ import { downloadJson } from "./download";
 import { colorForRole } from "./generated/roleColors";
 import { CanvasView, type BrushState } from "./components/CanvasView";
 import { PropsPanel } from "./components/PropsPanel";
+import { loadPackFromUrl } from "./pack/loadPack";
+import { compileMap } from "./pack/compile";
+import type { PackRuntime } from "./pack/types";
+import type { RenderMode } from "./render";
 
 const isTerrain = (o: LiteObject | null) => !!o && (o.type === "TERRAIN_2_CORNER" || o.type === "TERRAIN_2_EDGE");
 
@@ -48,6 +52,10 @@ export default function App() {
   const [map, setMap] = useState<LiteTileMap | null>(null);
   const [error, setError] = useState("");
   const [version, setVersion] = useState(0);
+  // palette pack + real-tile rendering
+  const [pack, setPack] = useState<PackRuntime | null>(null);
+  const [renderMode, setRenderMode] = useState<RenderMode>("mixed");
+  const [packVersion, setPackVersion] = useState(0);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   // anchor for Shift-range selection (the last plainly-picked / Ctrl-toggled id)
   const [anchorId, setAnchorId] = useState<number | null>(null);
@@ -97,11 +105,27 @@ export default function App() {
 
   const loadSample = useCallback(async () => {
     try {
-      const res = await fetch(`${import.meta.env.BASE_URL}sample/beach_village.blueprint.json`);
+      const res = await fetch(`${import.meta.env.BASE_URL}sample/test_village_strict.blueprint.json`);
       if (!res.ok) throw new Error(`sample 不可用 (${res.status})`);
-      load("beach_village (sample)", await res.text());
+      load("test_village_strict (sample)", await res.text());
     } catch (e) { setError(`样例加载失败: ${(e as Error).message}`); }
   }, [load]);
+
+  // load the bundled palette pack once (real-tile rendering); abstract overlay until ready
+  useEffect(() => {
+    loadPackFromUrl(`${import.meta.env.BASE_URL}sample/palettes.adnapalettepack`)
+      .then(setPack)
+      .catch((e) => setError(`palette pack 加载失败: ${(e as Error).message}`));
+  }, []);
+
+  // open straight to the rendered sample village (so the live/Pages link shows
+  // tiles immediately); the user can still drop or open their own blueprint
+  useEffect(() => { void loadSample(); /* eslint-disable-line react-hooks/exhaustive-deps */ }, []);
+
+  // bind a palette to each object by role (recompiled when map or pack changes)
+  const bindings = useMemo(() => (map && pack ? compileMap(map, pack) : null), [map, pack]);
+  // invalidate the cached scene when bindings / render mode change
+  useEffect(() => { setPackVersion((v) => v + 1); }, [bindings, renderMode]);
 
   useEffect(() => {
     const onDrop = (e: DragEvent) => { e.preventDefault(); const f = e.dataTransfer?.files?.[0]; if (f) void loadFile(f); };
@@ -360,6 +384,17 @@ export default function App() {
             <button disabled={!canRedo} onClick={onRedo} title="重做 (Shift+Cmd/Ctrl+Z)">↷ Redo</button>
             <button onClick={onExport} title="导出 adna-web-lite 存档">⤓ Export</button>
             <button className={marquee ? "active" : ""} onClick={() => setMarquee((m) => !m)} title="框选工具(M)：左键拖一次框选,松手自动退回">▭ Marquee</button>
+            {pack && (
+              <>
+                <span className="ts-sep" />
+                <span className="ts-label">Tiles</span>
+                <span className="seg">
+                  <button className={renderMode === "blueprint" ? "active" : ""} onClick={() => setRenderMode("blueprint")} title="抽象示意图(role 颜色)">Overlay</button>
+                  <button className={renderMode === "mixed" ? "active" : ""} onClick={() => setRenderMode("mixed")} title="已绑定的画真实图块,其余示意">Mixed</button>
+                  <button className={renderMode === "real" ? "active" : ""} onClick={() => setRenderMode("real")} title="只画真实图块">Real</button>
+                </span>
+              </>
+            )}
             {selIsTerrain && (
               <>
                 <span className="ts-sep" />
@@ -449,6 +484,10 @@ export default function App() {
           <CanvasView
             map={map}
             version={version}
+            pack={pack}
+            bindings={bindings}
+            renderMode={renderMode}
+            packVersion={packVersion}
             brush={brush}
             selected={selected}
             marqueeArmed={marquee}
