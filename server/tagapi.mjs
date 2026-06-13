@@ -18,12 +18,18 @@
 import http from "node:http";
 import { readdir, readFile, writeFile, stat, mkdir } from "node:fs/promises";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 const PORT = Number(process.env.TAG_PORT || 8717);
 const PW = process.env.TAG_PW || "changeme";
 const ROOT = process.env.TAG_DATA || "/home/ubuntu/game_dev/adna-tagger-data";
 const BUNDLES = path.join(ROOT, "adnatags");   // you drop .adnatags files here
 const TAGS = path.join(ROOT, ".progress");      // auto-saved drafts (hidden; leave it)
+// The reroll editor's default palette pack — served live (GET, public) so reroll
+// always loads the latest, and overwritten by the tagger's "apply roles" button
+// (PUT, password). It IS the repo file, so committing it updates GitHub Pages too.
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const REROLL_PACK = process.env.REROLL_PACK || path.join(__dirname, "..", "reroll", "public", "sample", "palettes.adnapalettepack");
 
 await mkdir(BUNDLES, { recursive: true });
 await mkdir(TAGS, { recursive: true });
@@ -41,8 +47,23 @@ const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url, "http://x");
     const p = url.pathname;
+
+    // Public (no password): reroll fetches its default pack here.
+    if (p === "/api/reroll-pack" && req.method === "GET") {
+      try { return send(res, 200, await readFile(REROLL_PACK), "application/octet-stream"); }
+      catch { return send(res, 404, { error: "no pack" }); }
+    }
+
     const pw = req.headers["x-tag-pw"] || url.searchParams.get("pw");
     if (pw !== PW) return send(res, 401, { error: "bad password" });
+
+    // Overwrite the reroll default pack (the tagger "apply roles → reroll" button).
+    if (p === "/api/reroll-pack" && req.method === "PUT") {
+      const chunks = [];
+      for await (const c of req) chunks.push(c);
+      await writeFile(REROLL_PACK, Buffer.concat(chunks));
+      return send(res, 200, { ok: true });
+    }
 
     if (p === "/api/ping") return send(res, 200, { ok: true });
 

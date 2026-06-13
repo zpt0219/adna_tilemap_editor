@@ -54,3 +54,17 @@ export async function putTags(name: string, paletteSet: string, tagData: Record<
     body: JSON.stringify({ palette_set: paletteSet, tagData }),
   });
 }
+
+/** The reroll editor's current default palette pack (public, no password). */
+export async function getRerollPack(): Promise<ArrayBuffer> {
+  const r = await fetch("/api/reroll-pack");
+  if (!r.ok) throw new Error(`获取 reroll 包失败 (${r.status})`);
+  return r.arrayBuffer();
+}
+
+/** Overwrite the reroll default pack (password required). */
+export async function putRerollPack(bytes: Uint8Array): Promise<void> {
+  const r = await fetch("/api/reroll-pack", { method: "PUT", headers: { ...auth() }, body: new Blob([bytes as BlobPart]) });
+  if (r.status === 401) throw new Error("密码错误");
+  if (!r.ok) throw new Error(`上传失败 (${r.status})`);
+}

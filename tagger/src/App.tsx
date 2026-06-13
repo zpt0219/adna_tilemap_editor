@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ParsedBundle, PaletteEntry, PaletteTags, TagsFile } from "./types";
-import { buildBundleZip, bundleBaseName, downloadBytes, parseBundle, tagsFileToData } from "./bundle";
+import { buildBundleZip, bundleBaseName, downloadBytes, parseBundle, patchPackRoles, tagsFileToData } from "./bundle";
 import { flattenTree } from "./roleTree";
 import { Gallery } from "./components/Gallery";
 import { Inspector } from "./components/Inspector";
 import { ServerPanel } from "./components/ServerPanel";
-import { getBundle, getTags, putTags } from "./api";
+import { getBundle, getPw, getRerollPack, getTags, putRerollPack, putTags } from "./api";
 
 const draftKey = (set: string) => `adna_tagger_draft_${set}`;
 const RECENT_CAP = 8;
@@ -215,6 +215,21 @@ export default function App() {
     downloadBytes(`${bundleBaseName(bundle)}.adnatags`, buildBundleZip(bundle));
   }, [bundle]);
 
+  // ---- overwrite reroll's default pack roles from the current tags (server pw) ----
+  const onApplyToReroll = useCallback(async () => {
+    if (!bundle) return;
+    if (!getPw()) { setError("请先在「服务器…」里输入密码"); return; }
+    try {
+      setError("");
+      const patched = patchPackRoles(await getRerollPack(), bundle);
+      await putRerollPack(patched);
+      const n = Object.values(bundle.tagData).filter((t) => t && t.role).length;
+      window.alert(`已把 ${n} 个 role 写入 reroll 默认 palette 包`);
+    } catch (e) {
+      setError(`应用到 reroll 失败: ${(e as Error).message}`);
+    }
+  }, [bundle]);
+
   // ---- open a bundle from the server (resumes its saved draft) ----
   const onPickServerBundle = useCallback(async (name: string) => {
     try {
@@ -298,6 +313,7 @@ export default function App() {
           </span>
         )}
         <button disabled={!bundle} onClick={onExport}>导出 .adnatags</button>
+        <button disabled={!bundle} onClick={onApplyToReroll} title="把当前 role 覆盖写入 reroll 默认 palette 包（需服务器密码）">→ reroll 默认</button>
       </header>
 
       {error && <div className="error">{error}</div>}

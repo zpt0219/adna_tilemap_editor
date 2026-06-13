@@ -71,6 +71,42 @@ export function bundleBaseName(bundle: ParsedBundle): string {
   return n || bundle.manifest.palette_set || "tags";
 }
 
+// Overwrite the role of every palette in a `.adnapalettepack` from this bundle's
+// current tags, matching pack `originalHash` ⇆ bundle palette `hash` (the stable
+// link). Only `role` is touched — atlas, geometry and mappingMatrix are untouched
+// ("只要 role 覆盖"). Empty roles are left as-is so we never clear a pack role.
+export function patchPackRoles(packBuf: ArrayBuffer, bundle: ParsedBundle): Uint8Array {
+  const files = unzipSync(new Uint8Array(packBuf));
+  const manifest = JSON.parse(strFromU8(files["manifest.json"]));
+  const palettesFile = JSON.parse(strFromU8(files["palettes.json"]));
+
+  // bundle palette hash → current role (from tagData, keyed by palette index)
+  const hashToRole = new Map<string, string>();
+  for (const p of bundle.manifest.palettes) {
+    const role = bundle.tagData[p.index]?.role ?? "";
+    if (role) hashToRole.set(p.hash, role);
+  }
+
+  // manifest.palettes: role keyed by originalHash; also map pack hash → role
+  const packHashToRole = new Map<string, string>();
+  for (const mp of manifest.palettes) {
+    const role = hashToRole.get(mp.originalHash);
+    if (role) { mp.role = role; packHashToRole.set(mp.hash, role); }
+  }
+  // palettes.json: each record's tags["blueprint.role"], keyed by pack hash
+  for (const rp of palettesFile.palettes) {
+    const role = packHashToRole.get(rp.hash);
+    if (role) rp.tags = { ...(rp.tags ?? {}), "blueprint.role": role };
+  }
+
+  const out: Record<string, Uint8Array> = {
+    ...files,
+    "manifest.json": strToU8(JSON.stringify(manifest)),
+    "palettes.json": strToU8(JSON.stringify(palettesFile)),
+  };
+  return zipSync(out, { level: 6 });
+}
+
 export function downloadBytes(filename: string, bytes: Uint8Array, mime = "application/octet-stream") {
   const blob = new Blob([bytes as BlobPart], { type: mime });
   const url = URL.createObjectURL(blob);
