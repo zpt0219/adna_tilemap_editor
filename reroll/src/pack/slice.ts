@@ -31,7 +31,7 @@ export function isStructureMode(mode: number): boolean {
 /** Nine-slice the palette over `rect` (tile coords), blitting atlas tiles. */
 export function blitNineSlice(
   ctx: CanvasRenderingContext2D,
-  atlas: ImageBitmap,
+  atlas: CanvasImageSource,
   palette: Palette,
   rect: Rect,
   s: number,

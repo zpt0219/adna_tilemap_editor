@@ -9,6 +9,7 @@
 
 import type { BlueprintLayer, BlueprintObject, LoadedBlueprint, Vec2 } from "./types";
 import type { Layer, LiteObject, LiteType, Rect, TerrainMatrix } from "./model";
+import { makeHouse } from "./house";
 
 // Inclusive integer bounds, matching the engine's Recti (minX..maxX inclusive).
 interface Bounds {
@@ -176,6 +177,8 @@ function convertObject(src: BlueprintObject, allocId: () => number): LiteObject 
   const cells = readPoints(src.cells);
 
   let type = objectTypeFor(role, typeStr, width);
+  // The house body becomes a composite HouseObject (wall/roof bands + deco slots).
+  if (role === "building/house") type = "HOUSE";
   // Structural cells→terrain rule, MIRRORING the engine importer
   // (blueprint_importer.cpp objectTypeFor, bottom branch): an object authored with
   // explicit `cells` is terrain-shaped by construction, so it's an area terrain
@@ -207,6 +210,8 @@ function convertObject(src: BlueprintObject, allocId: () => number): LiteObject 
   } else if (type === "FIXED_RECT_GROUP") {
     if (!cells.length) return null;
     obj.terrain = makeTerrain(cells, bounds);
+  } else if (type === "HOUSE") {
+    obj.house = makeHouse(obj.rect[2], obj.rect[3]);
   }
   return obj;
 }

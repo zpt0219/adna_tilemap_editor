@@ -12,7 +12,31 @@ export type LiteType =
   | "TERRAIN_2_EDGE"
   | "FIXED_RECT"
   | "FIXED_RECT_GROUP"
-  | "DUNGEON";
+  | "DUNGEON"
+  | "HOUSE";
+
+/** Decoration slots on a HouseObject (index order = draw order). */
+export const DECO_DOOR = 0, DECO_WINDOW = 1, DECO_CHIMNEY = 2;
+export const DECO_COUNT = 3;
+export const DECO_ROLES = ["building_prop/door", "building_prop/window", "building_prop/chimney"] as const;
+
+/** One movable decoration slot: a top-left cell (data coords) + optional palette
+ *  hash override (FIXED_RECT). Unset palette = empty slot / role-resolved. */
+export interface HouseDeco {
+  cell: [number, number];
+  palette?: string;
+}
+
+/** A composite house (desktop HouseObject port): wall + roof nine-slice bands and
+ *  three decoration slots. `wall`/`roof`/`deco[].palette` are optional hash
+ *  overrides; unset = resolved by role at compile time. */
+export interface HouseData {
+  wallHeight: number;  // rows from the bottom (roof height = rect.h - wallHeight)
+  overlap: number;     // wall rows backing transparent roof eaves (-1 = auto; 0 = none)
+  wall?: string;
+  roof?: string;
+  deco: HouseDeco[];   // length DECO_COUNT: [door, window, chimney]
+}
 
 /** [x, y, w, h] in tile coords (origin + size, w/h ≥ 1). */
 export type Rect = [number, number, number, number];
@@ -43,6 +67,8 @@ export interface LiteObject {
   terrain?: TerrainMatrix;
   /** present for DUNGEON — absolute polygon points */
   borderPoints?: Vec2[];
+  /** present for HOUSE — wall/roof bands + decoration slots */
+  house?: HouseData;
 }
 
 export interface Layer {

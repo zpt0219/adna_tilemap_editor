@@ -29,12 +29,27 @@ async function parsePackBytes(buf: ArrayBuffer): Promise<PackRuntime> {
     });
   }
 
-  const atlasBytes = files[manifest.atlas.path];
-  const atlas = await createImageBitmap(new Blob([atlasBytes as BlobPart], { type: "image/png" }), {
-    premultiplyAlpha: "none",
-  });
-
+  const atlas = await decodeAtlas(files[manifest.atlas.path]);
   return { atlas, tileResolution: manifest.atlas.tileResolution, palettes };
+}
+
+// Decode the atlas PNG to something drawImage-able. Prefer createImageBitmap
+// (fast, off-thread); fall back to an HTMLImageElement where it's unavailable or
+// throws (some headless/embedded WebViews), so rendering never silently fails.
+async function decodeAtlas(bytes: Uint8Array): Promise<CanvasImageSource> {
+  const blob = new Blob([bytes as BlobPart], { type: "image/png" });
+  if (typeof createImageBitmap === "function") {
+    try { return await createImageBitmap(blob); } catch { /* fall through to <img> */ }
+  }
+  const url = URL.createObjectURL(blob);
+  try {
+    const img = new Image();
+    img.src = url;
+    await img.decode();
+    return img;
+  } finally {
+    setTimeout(() => URL.revokeObjectURL(url), 0);
+  }
 }
 
 export async function loadPackFromUrl(url: string): Promise<PackRuntime> {

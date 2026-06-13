@@ -7,7 +7,7 @@ import { mappingCell, type Palette } from "./types";
 /** Blit one tileRes×tileRes atlas tile at atlas (ax,ay) to map tile (dx,dy). */
 export function blitTile(
   ctx: CanvasRenderingContext2D,
-  atlas: ImageBitmap,
+  atlas: CanvasImageSource,
   ax: number,
   ay: number,
   tileRes: number,
@@ -24,7 +24,7 @@ export function blitTile(
  */
 export function blitFixedRect(
   ctx: CanvasRenderingContext2D,
-  atlas: ImageBitmap,
+  atlas: CanvasImageSource,
   palette: Palette,
   originX: number,
   originY: number,

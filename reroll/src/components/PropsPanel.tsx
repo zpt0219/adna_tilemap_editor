@@ -3,7 +3,7 @@
 // manually replace the palette bound to the selected object.
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { displayName, isLocked, roleOf, type Layer, type LiteObject, type LiteType } from "../model";
+import { DECO_ROLES, displayName, isLocked, roleOf, type Layer, type LiteObject, type LiteType } from "../model";
 import { colorForRole, rgbaCss } from "../generated/roleColors";
 import { mappingCell, PaletteMode, type Palette, type PackRuntime } from "../pack/types";
 import { roleTreeDistance, type Bindings } from "../pack/compile";
@@ -15,6 +15,7 @@ const TYPE_LABEL: Record<LiteObject["type"], string> = {
   FIXED_RECT_GROUP: "Group",
   FIXED_RECT: "Rect",
   DUNGEON: "Dungeon",
+  HOUSE: "House",
 };
 
 // Terrain types a cell-matrix object can be converted between.
@@ -36,6 +37,8 @@ export interface PropsPanelProps {
   onRename: (id: number, name: string) => void;
   onSetObjectType: (id: number, type: LiteType) => void;
   onSetPalette: (id: number, hash: string | null) => void;
+  onSetHouseSlot: (id: number, slot: "wall" | "roof" | number, hash: string | null) => void;
+  onSetWallHeight: (id: number, height: number) => void;
 }
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
@@ -66,12 +69,13 @@ function PaletteSwatch({ pack, palette, px = 40 }: { pack: PackRuntime; palette:
   return <canvas ref={ref} width={px} height={px} className="pal-sw" />;
 }
 
-function PalettePicker({ pack, o, currentHash, onSetPalette }: {
-  pack: PackRuntime; o: LiteObject; currentHash: string | undefined;
-  onSetPalette: (id: number, hash: string | null) => void;
+// Reusable palette grid for one role/slot: in-range candidates (or 全部), with
+// the current one highlighted, an Auto reset, and a click → onPick(hash).
+function PalettePicker({ pack, label, role, currentHash, hasOverride, onPick, onAuto }: {
+  pack: PackRuntime; label: string; role: string; currentHash: string | undefined;
+  hasOverride: boolean; onPick: (hash: string) => void; onAuto: () => void;
 }) {
   const [showAll, setShowAll] = useState(false);
-  const role = roleOf(o);
   const ranked = useMemo(() => {
     const arr = pack.palettes.map((p) => ({ p, d: roleTreeDistance(role, p.role) }));
     const list = showAll ? arr : arr.filter((x) => x.d <= 2);
@@ -82,8 +86,8 @@ function PalettePicker({ pack, o, currentHash, onSetPalette }: {
   return (
     <div className="pal-picker">
       <div className="pal-picker-head">
-        <span className="prop-label">Palette</span>
-        <button className="pal-auto" disabled={!o.tags["web.palette"]} onClick={() => onSetPalette(o.id, null)} title="恢复按 role 自动选">Auto</button>
+        <span className="prop-label">{label}</span>
+        <button className="pal-auto" disabled={!hasOverride} onClick={onAuto} title="恢复按 role 自动选">Auto</button>
         <label className="pal-all"><input type="checkbox" checked={showAll} onChange={(e) => setShowAll(e.target.checked)} /> 全部</label>
       </div>
       <div className="pal-grid">
@@ -92,7 +96,7 @@ function PalettePicker({ pack, o, currentHash, onSetPalette }: {
             key={p.hash}
             className={`pal-cell${p.hash === currentHash ? " sel" : ""}`}
             title={`${p.role}${p.style ? " · " + p.style : ""} · ${PaletteMode[p.mode] ?? p.mode}${d > 0 ? ` · d${d}` : ""}`}
-            onClick={() => onSetPalette(o.id, p.hash)}
+            onClick={() => onPick(p.hash)}
           >
             <PaletteSwatch pack={pack} palette={p} />
           </button>
@@ -103,7 +107,43 @@ function PalettePicker({ pack, o, currentHash, onSetPalette }: {
   );
 }
 
-function ObjectBody({ o, pack, bindings, onSetVisible, onToggleLock, onRename, onSetObjectType, onSetPalette }: {
+// House inspector: wall-height stepper + per-slot palette pickers (wall/roof/door/window/chimney).
+function HouseSlots({ o, pack, bindings, onSetHouseSlot, onSetWallHeight }: {
+  o: LiteObject; pack: PackRuntime; bindings: Bindings | null;
+  onSetHouseSlot: (id: number, slot: "wall" | "roof" | number, hash: string | null) => void;
+  onSetWallHeight: (id: number, height: number) => void;
+}) {
+  const h = o.house!;
+  const b = bindings?.get(o.id);
+  const hb = b && b.kind === "house" ? b : null;
+  const maxWallH = Math.max(1, o.rect[3] - 1);
+  const slots: { label: string; role: string; key: "wall" | "roof" | number; cur?: string; over: boolean }[] = [
+    { label: "Wall", role: "building/house_wall", key: "wall", cur: h.wall ?? hb?.wall?.hash, over: !!h.wall },
+    { label: "Roof", role: "building/house_roof", key: "roof", cur: h.roof ?? hb?.roof?.hash, over: !!h.roof },
+    ...["Door", "Window", "Chimney"].map((label, i) => ({
+      label, role: DECO_ROLES[i], key: i, cur: h.deco[i].palette ?? hb?.deco[i]?.hash, over: !!h.deco[i].palette,
+    })),
+  ];
+  return (
+    <>
+      <Row label="Wall H">
+        <input
+          className="prop-num" type="number" min={1} max={maxWallH} value={h.wallHeight}
+          onChange={(e) => onSetWallHeight(o.id, Math.max(1, Math.min(maxWallH, parseInt(e.target.value, 10) || 1)))}
+        />
+      </Row>
+      <div className="prop-hint">拖动门/窗在房子范围内移动</div>
+      {slots.map((sl) => (
+        <PalettePicker
+          key={sl.label} pack={pack} label={sl.label} role={sl.role} currentHash={sl.cur} hasOverride={sl.over}
+          onPick={(hash) => onSetHouseSlot(o.id, sl.key, hash)} onAuto={() => onSetHouseSlot(o.id, sl.key, null)}
+        />
+      ))}
+    </>
+  );
+}
+
+function ObjectBody({ o, pack, bindings, onSetVisible, onToggleLock, onRename, onSetObjectType, onSetPalette, onSetHouseSlot, onSetWallHeight }: {
   o: LiteObject;
   pack: PackRuntime | null;
   bindings: Bindings | null;
@@ -112,6 +152,8 @@ function ObjectBody({ o, pack, bindings, onSetVisible, onToggleLock, onRename, o
   onRename: (id: number, name: string) => void;
   onSetObjectType: (id: number, type: LiteType) => void;
   onSetPalette: (id: number, hash: string | null) => void;
+  onSetHouseSlot: (id: number, slot: "wall" | "roof" | number, hash: string | null) => void;
+  onSetWallHeight: (id: number, height: number) => void;
 }) {
   const shown = displayName(o);
   const rgb = colorForRole(roleOf(o));
@@ -123,7 +165,10 @@ function ObjectBody({ o, pack, bindings, onSetVisible, onToggleLock, onRename, o
 
   // effective bound palette: manual override wins, else the compiled binding
   const b = bindings?.get(o.id);
-  const boundHash = b ? (b.kind === "frg" ? b.variants[0]?.hash : b.palette.hash) : undefined;
+  const boundHash = !b ? undefined
+    : b.kind === "frg" ? b.variants[0]?.hash
+    : b.kind === "house" ? b.wall?.hash
+    : b.palette.hash;
   const currentHash = o.tags["web.palette"] ?? boundHash;
 
   return (
@@ -157,8 +202,13 @@ function ObjectBody({ o, pack, bindings, onSetVisible, onToggleLock, onRename, o
         </Row>
       )}
 
-      {/* manual palette replacement */}
-      {pack && <PalettePicker pack={pack} o={o} currentHash={currentHash} onSetPalette={onSetPalette} />}
+      {/* palette: house slots, or single-object override */}
+      {pack && (o.type === "HOUSE" && o.house
+        ? <HouseSlots o={o} pack={pack} bindings={bindings} onSetHouseSlot={onSetHouseSlot} onSetWallHeight={onSetWallHeight} />
+        : <PalettePicker
+            pack={pack} label="Palette" role={roleOf(o)} currentHash={currentHash} hasOverride={!!o.tags["web.palette"]}
+            onPick={(h) => onSetPalette(o.id, h)} onAuto={() => onSetPalette(o.id, null)} />
+      )}
 
       <div className="prop-checks">
         <label className="prop-check">
@@ -172,7 +222,7 @@ function ObjectBody({ o, pack, bindings, onSetVisible, onToggleLock, onRename, o
   );
 }
 
-export function PropsPanel({ layer, objects, pack, bindings, onToggleLayerVisible, onSetObjectsVisible, onToggleLock, onRename, onSetObjectType, onSetPalette }: PropsPanelProps) {
+export function PropsPanel({ layer, objects, pack, bindings, onToggleLayerVisible, onSetObjectsVisible, onToggleLock, onRename, onSetObjectType, onSetPalette, onSetHouseSlot, onSetWallHeight }: PropsPanelProps) {
   const primary = objects[0] ?? null;
   const allVisible = objects.length > 0 && objects.every((o) => o.enabled);
 
@@ -226,6 +276,8 @@ export function PropsPanel({ layer, objects, pack, bindings, onToggleLayerVisibl
             onRename={onRename}
             onSetObjectType={onSetObjectType}
             onSetPalette={onSetPalette}
+            onSetHouseSlot={onSetHouseSlot}
+            onSetWallHeight={onSetWallHeight}
           />
         ) : null}
       </section>

@@ -3,7 +3,7 @@
 // and src/command/commands_blueprint.cpp compileLayer's FRG branch). MVP style
 // ranking only (no MiniLM cosine): prefer palettes sharing a style word.
 
-import { eachObject, roleOf, type LiteObject, type LiteTileMap, type LiteType } from "../model";
+import { eachObject, roleOf, DECO_ROLES, type LiteObject, type LiteTileMap, type LiteType } from "../model";
 import { PaletteMode, type Palette, type PackRuntime } from "./types";
 import { assignFrgCells } from "./frg";
 import { hashString, mulberry32 } from "./rng";
@@ -21,6 +21,7 @@ const MODE_PREF: Record<LiteType, PaletteMode[]> = {
   FIXED_RECT: [PaletteMode.FIXED_RECT, PaletteMode.NINE_PATCH, PaletteMode.CLIFF, PaletteMode.H_STRETCH, PaletteMode.V_STRETCH],
   FIXED_RECT_GROUP: [PaletteMode.FIXED_RECT, PaletteMode.NINE_PATCH],
   DUNGEON: [PaletteMode.DUNGEON],
+  HOUSE: [PaletteMode.NINE_PATCH, PaletteMode.CLIFF], // houses resolve slots separately; this is unused
 };
 function modeRank(objType: LiteType, mode: number): number {
   const i = MODE_PREF[objType].indexOf(mode);
@@ -92,7 +93,8 @@ export type Binding =
   | { kind: "fixed"; palette: Palette }   // stamp native size at the object origin
   | { kind: "slice"; palette: Palette }   // nine-slice / stretch over the object rect
   | { kind: "auto"; palette: Palette }    // matrix auto-tile over the object's terrain cells
-  | { kind: "frg"; variants: Palette[]; cellVariant: Int16Array };
+  | { kind: "frg"; variants: Palette[]; cellVariant: Int16Array }
+  | { kind: "house"; wall: Palette | null; roof: Palette | null; deco: (Palette | null)[] };
 
 export type Bindings = Map<number, Binding>;
 
@@ -103,6 +105,21 @@ function bindingKind(mode: number): "auto" | "slice" | "fixed" {
   if (isMatrixAutotile(mode)) return "auto";
   if (isStructureMode(mode)) return "slice";
   return "fixed";
+}
+
+// Resolve a house slot's palette: closest role tier, preferring `preferMode`.
+function resolveSlotPalette(palettes: Palette[], role: string, style: string, seed: number, preferMode: PaletteMode): Palette | null {
+  const tier = tierFor(palettes, role, style);
+  if (tier.length === 0) return null;
+  const pref = tier.filter((p) => p.mode === preferMode);
+  const pool = pref.length ? pref : tier;
+  return pool[Math.floor(mulberry32(seed)() * pool.length)] ?? null;
+}
+
+// A decoration slot must be a FIXED_RECT palette (else not drawn — desktop parity).
+function resolveDecoPalette(palettes: Palette[], role: string, style: string, seed: number): Palette | null {
+  const fr = tierFor(palettes, role, style).filter((p) => p.mode === PaletteMode.FIXED_RECT);
+  return fr.length ? fr[Math.floor(mulberry32(seed)() * fr.length)] : null;
 }
 
 /**
@@ -118,6 +135,21 @@ export function compileMap(map: LiteTileMap, pack: PackRuntime): Bindings {
     if (!role && !override) continue;
     const style = o.tags["blueprint.style"] ?? "";
     const seed = objSeed(o);
+
+    if (o.type === "HOUSE" && o.house) {
+      const h = o.house;
+      const pick = (hash?: string) => (hash ? byHash.get(hash) ?? null : null);
+      // wall: explicit override → building/house_wall → fall back to the CLIFF body
+      const wall = pick(h.wall)
+        ?? resolveSlotPalette(pack.palettes, "building/house_wall", style, seed ^ 0x11, PaletteMode.NINE_PATCH)
+        ?? resolveSlotPalette(pack.palettes, "building/house", style, seed ^ 0x13, PaletteMode.CLIFF);
+      const roof = pick(h.roof)
+        ?? resolveSlotPalette(pack.palettes, "building/house_roof", style, seed ^ 0x17, PaletteMode.NINE_PATCH);
+      const deco = DECO_ROLES.map((dRole, i) =>
+        pick(h.deco[i]?.palette) ?? resolveDecoPalette(pack.palettes, dRole, style, seed ^ (0x20 + i)));
+      out.set(o.id, { kind: "house", wall, roof, deco });
+      continue;
+    }
 
     if (o.type === "FIXED_RECT_GROUP" && o.terrain) {
       const variants = override ? [override] : resolvePalettesForRole(pack.palettes, role, style, 6);

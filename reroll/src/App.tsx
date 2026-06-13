@@ -3,7 +3,7 @@ import { parseBlueprint } from "./blueprint";
 import { blueprintToLite } from "./convert";
 import { normalizeToCategories } from "./normalize";
 import { assignUniqueObjectNames, cloneTerrain, displayName, findLayer, findObject, isLocked, layerOfObject, roleOf, setTerrainCell, type LiteObject, type LiteTileMap, type Rect } from "./model";
-import { UndoStack, moveObjectCommand, moveObjectsCommand, paintTerrainCommand, renameObjectCommand, reorderLayerObjectsCommand, resizeObjectCommand, setObjectsEnabledCommand, setObjectPaletteCommand, setObjectTypeCommand, toggleLayerEnabledCommand, toggleObjectEnabledCommand, type Command, type TerrainSnapshot } from "./commands";
+import { UndoStack, moveHouseDecoCommand, moveObjectCommand, moveObjectsCommand, paintTerrainCommand, renameObjectCommand, reorderLayerObjectsCommand, resizeObjectCommand, setHouseDecoPaletteCommand, setHouseSlotPaletteCommand, setObjectsEnabledCommand, setObjectPaletteCommand, setObjectTypeCommand, setWallHeightCommand, toggleLayerEnabledCommand, toggleObjectEnabledCommand, type Command, type TerrainSnapshot } from "./commands";
 import type { LiteType } from "./model";
 import { liteToWebSave } from "./saveFormat";
 import { clearDraft, loadDraft, saveDraft } from "./draft";
@@ -74,6 +74,7 @@ export default function App() {
   const [dropTarget, setDropTarget] = useState<DropTarget | null>(null);
   const undo = useRef(new UndoStack());
   const stroke = useRef<{ id: number; before: TerrainSnapshot; dirty: boolean } | null>(null);
+  const decoDrag = useRef<{ id: number; slot: number; before: [number, number] } | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const saveTimer = useRef<number | null>(null);
 
@@ -126,9 +127,11 @@ export default function App() {
     } catch (e) { setError(`样例加载失败: ${(e as Error).message}`); }
   }, [load]);
 
-  // load the bundled palette pack once (real-tile rendering); abstract overlay until ready
+  // load the palette pack once: prefer the server's live default (kept current by
+  // the tagger's "apply roles" button), fall back to the bundled copy (gh-pages/offline).
   useEffect(() => {
-    loadPackFromUrl(`${import.meta.env.BASE_URL}sample/palettes.adnapalettepack`)
+    loadPackFromUrl("/api/reroll-pack")
+      .catch(() => loadPackFromUrl(`${import.meta.env.BASE_URL}sample/palettes.adnapalettepack`))
       .then(setPack)
       .catch((e) => setError(`palette pack 加载失败: ${(e as Error).message}`));
   }, []);
@@ -363,6 +366,53 @@ export default function App() {
     if (before !== after) run(setObjectPaletteCommand(map, id, before, after));
   }, [map, run]);
 
+  // --- house decoration drag (door/window/chimney within the house rect) ---
+  const onHouseDecoStart = useCallback((id: number, slot: number) => {
+    if (!map) { decoDrag.current = null; return; }
+    const o = findObject(map, id);
+    decoDrag.current = o?.house ? { id, slot, before: [...o.house.deco[slot].cell] as [number, number] } : null;
+  }, [map]);
+
+  const onHouseDecoMove = useCallback((id: number, slot: number, cell: [number, number]) => {
+    if (!map) return;
+    const o = findObject(map, id);
+    if (!o?.house) return;
+    const cur = o.house.deco[slot].cell;
+    if (cur[0] === cell[0] && cur[1] === cell[1]) return;
+    o.house.deco[slot].cell = [...cell];
+    setVersion((v) => v + 1); // live preview (also recompiles, but house bindings don't depend on cell)
+  }, [map]);
+
+  const onHouseDecoEnd = useCallback(() => {
+    const d = decoDrag.current;
+    decoDrag.current = null;
+    if (!map || !d) return;
+    const o = findObject(map, d.id);
+    if (!o?.house) return;
+    const after = [...o.house.deco[d.slot].cell] as [number, number];
+    if (after[0] !== d.before[0] || after[1] !== d.before[1]) run(moveHouseDecoCommand(map, d.id, d.slot, d.before, after));
+  }, [map, run]);
+
+  // --- house inspector: per-slot palette + wall height ---
+  const onSetHouseSlot = useCallback((id: number, slot: "wall" | "roof" | number, hash: string | null) => {
+    if (!map) return;
+    const o = findObject(map, id);
+    if (!o?.house) return;
+    const after = hash ?? undefined;
+    if (slot === "wall" || slot === "roof") {
+      if (o.house[slot] !== after) run(setHouseSlotPaletteCommand(map, id, slot, o.house[slot], after));
+    } else {
+      const before = o.house.deco[slot].palette;
+      if (before !== after) run(setHouseDecoPaletteCommand(map, id, slot, before, after));
+    }
+  }, [map, run]);
+
+  const onSetWallHeight = useCallback((id: number, height: number) => {
+    if (!map) return;
+    const o = findObject(map, id);
+    if (o?.house && o.house.wallHeight !== height) run(setWallHeightCommand(map, id, o.house.wallHeight, height));
+  }, [map, run]);
+
   const onObjectDragStart = useCallback((layerId: number, objectId: number) => (e: ReactDragEvent<HTMLDivElement>) => {
     e.dataTransfer.effectAllowed = "move";
     e.dataTransfer.setData("text/plain", `${layerId}:${objectId}`);
@@ -549,6 +599,9 @@ export default function App() {
             bindings={bindings}
             renderMode={renderMode}
             packVersion={packVersion}
+            onHouseDecoStart={onHouseDecoStart}
+            onHouseDecoMove={onHouseDecoMove}
+            onHouseDecoEnd={onHouseDecoEnd}
             brush={brush}
             selected={selected}
             marqueeArmed={marquee}
@@ -575,6 +628,8 @@ export default function App() {
             onRename={onRename}
             onSetObjectType={onSetObjectType}
             onSetPalette={onSetPalette}
+            onSetHouseSlot={onSetHouseSlot}
+            onSetWallHeight={onSetWallHeight}
           />
         </div>
       )}

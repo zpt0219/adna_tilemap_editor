@@ -147,6 +147,38 @@ export function setObjectPaletteCommand(map: LiteTileMap, id: number, before: st
   return { label: after ? "Set palette" : "Reset palette", do: () => set(after), undo: () => set(before) };
 }
 
+/** Move a house decoration slot to a new (already-clamped) local cell. */
+export function moveHouseDecoCommand(map: LiteTileMap, id: number, slot: number, before: [number, number], after: [number, number]): Command {
+  const set = (cell: [number, number]) => { const o = findObject(map, id); if (o?.house) o.house.deco[slot].cell = [...cell]; };
+  return { label: "Move decoration", do: () => set(after), undo: () => set(before) };
+}
+
+/** Set / clear a decoration slot's palette override (hash). */
+export function setHouseDecoPaletteCommand(map: LiteTileMap, id: number, slot: number, before: string | undefined, after: string | undefined): Command {
+  const set = (h: string | undefined) => {
+    const o = findObject(map, id);
+    if (!o?.house) return;
+    if (h) o.house.deco[slot].palette = h; else delete o.house.deco[slot].palette;
+  };
+  return { label: "Decoration palette", do: () => set(after), undo: () => set(before) };
+}
+
+/** Set / clear the wall or roof slot palette override (hash). */
+export function setHouseSlotPaletteCommand(map: LiteTileMap, id: number, slot: "wall" | "roof", before: string | undefined, after: string | undefined): Command {
+  const set = (h: string | undefined) => {
+    const o = findObject(map, id);
+    if (!o?.house) return;
+    if (h) o.house[slot] = h; else delete o.house[slot];
+  };
+  return { label: `${slot} palette`, do: () => set(after), undo: () => set(before) };
+}
+
+/** Change a house's wall-band height (rows from the bottom). */
+export function setWallHeightCommand(map: LiteTileMap, id: number, before: number, after: number): Command {
+  const set = (v: number) => { const o = findObject(map, id); if (o?.house) o.house.wallHeight = v; };
+  return { label: "Wall height", do: () => set(after), undo: () => set(before) };
+}
+
 export interface TerrainSnapshot {
   terrain: TerrainMatrix;
   rect: Rect;

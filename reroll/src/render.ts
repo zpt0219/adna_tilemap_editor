@@ -2,14 +2,15 @@
 // scripts/render_overlay.py (KRAFT parchment, role-colored shapes, tile grid)
 // plus editor overlays (selection, lock badge, drag ghost). No React / DOM state.
 
-import type { LiteObject, LiteTileMap, Rect } from "./model";
-import { eachVisibleDrawOrder, eachVisibleObject, isLocked, roleOf } from "./model";
+import type { HouseData, LiteObject, LiteTileMap, Rect } from "./model";
+import { DECO_COUNT, eachVisibleDrawOrder, eachVisibleObject, isLocked, roleOf } from "./model";
 import { colorForRole, rgbaCss, type RGB } from "./generated/roleColors";
-import type { PackRuntime } from "./pack/types";
+import type { Palette, PackRuntime } from "./pack/types";
 import type { Bindings } from "./pack/compile";
-import { blitFixedRect } from "./pack/blit";
-import { drawAutotile } from "./pack/autotile";
+import { blitFixedRect, blitTile } from "./pack/blit";
+import { drawAutotile, autotileCellAtlas } from "./pack/autotile";
 import { blitNineSlice } from "./pack/slice";
+import { effectiveDecoCell, regionForPart } from "./house";
 
 export type RenderMode = "blueprint" | "mixed" | "real";
 
@@ -186,7 +187,7 @@ export function renderScene(cv: HTMLCanvasElement, map: LiteTileMap, s: number, 
   ctx.imageSmoothingEnabled = false;
   ctx.fillStyle = KRAFT;
   ctx.fillRect(0, 0, cv.width, cv.height);
-  for (const o of eachVisibleDrawOrder(map)) drawObjectToScene(ctx, o, s, null, rctx);
+  drawScene(ctx, map, s, null, rctx);
 }
 
 /**
@@ -206,8 +207,122 @@ export function renderSceneRegion(cv: HTMLCanvasElement, map: LiteTileMap, s: nu
   ctx.clip();
   ctx.fillStyle = KRAFT;
   ctx.fillRect(dirty[0] * s, dirty[1] * s, dirty[2] * s, dirty[3] * s);
-  for (const o of eachVisibleDrawOrder(map)) if (rectsOverlap(o.rect, dirty)) drawObjectToScene(ctx, o, s, dirty, rctx);
+  drawScene(ctx, map, s, dirty, rctx);
   ctx.restore();
+}
+
+/**
+ * Draw all visible objects. With real tiles (pack + non-blueprint mode), ground
+ * objects draw first in layer order, then ALL vertical-stratum objects share one
+ * z-plane and draw **per-tile, y-sorted by foot row** (tie-break: object order in
+ * the layer tree, then x) — so a tree/house with a lower base occludes whatever
+ * sits behind it, including individual scatter tiles. Otherwise (overlay / no
+ * pack) falls back to the per-object draw order.
+ */
+function drawScene(ctx: CanvasRenderingContext2D, map: LiteTileMap, s: number, clip: Rect | null, rctx: RenderCtx | null): void {
+  if (!rctx || rctx.renderMode === "blueprint") {
+    for (const o of eachVisibleDrawOrder(map)) {
+      if (!clip || rectsOverlap(o.rect, clip)) drawObjectToScene(ctx, o, s, clip, rctx);
+    }
+    return;
+  }
+  // ground stratum: flat, drawn in layer order
+  for (const layer of map.layers) {
+    if (!layer.enabled || layer.vertical) continue;
+    for (const o of layer.objects) {
+      if (o.enabled && (!clip || rectsOverlap(o.rect, clip))) drawObjectToScene(ctx, o, s, clip, rctx);
+    }
+  }
+  // vertical stratum: one z-plane, per-tile y-sort
+  const items: YSortItem[] = [];
+  let ord = 0;
+  for (const layer of map.layers) {
+    if (!layer.enabled || !layer.vertical) continue;
+    for (const o of layer.objects) {
+      if (o.enabled) emitVerticalItems(items, ord++, o, s, clip, rctx);
+    }
+  }
+  items.sort((a, b) => a.footY - b.footY || a.ord - b.ord || a.x - b.x);
+  for (const it of items) it.draw(ctx);
+}
+
+/** A y-sortable vertical draw unit (one sprite/tile stamp). */
+interface YSortItem {
+  footY: number; // bottom row of the sprite (larger = nearer the viewer = drawn later)
+  ord: number;   // object order in the layer tree (tie-break)
+  x: number;     // left tile (final tie-break)
+  draw: (ctx: CanvasRenderingContext2D) => void;
+}
+
+const overlapsClip = (clip: Rect | null, x: number, y: number, w: number, h: number): boolean =>
+  !clip || rectsOverlap([x, y, w, h], clip);
+
+// Emit y-sortable draw items for one vertical object (per scatter cell / per
+// auto-tile cell / one stamp for fixed-rect & nine-slice; colour block if unbound).
+function emitVerticalItems(items: YSortItem[], ord: number, o: LiteObject, s: number, clip: Rect | null, rctx: RenderCtx): void {
+  const b = rctx.bindings.get(o.id);
+  const atlas = rctx.pack.atlas;
+  if (!b) {
+    if (rctx.renderMode === "mixed" && overlapsClip(clip, o.rect[0], o.rect[1], o.rect[2], o.rect[3]))
+      items.push({ footY: o.rect[1] + o.rect[3], ord, x: o.rect[0], draw: (ctx) => drawObjectColor(ctx, o, s, clip) });
+    return;
+  }
+  if (b.kind === "fixed") {
+    const [pw, ph] = b.palette.size;
+    if (overlapsClip(clip, o.rect[0], o.rect[1], pw, ph))
+      items.push({ footY: o.rect[1] + ph, ord, x: o.rect[0], draw: (ctx) => blitFixedRect(ctx, atlas, b.palette, o.rect[0], o.rect[1], s) });
+    return;
+  }
+  if (b.kind === "slice") {
+    if (overlapsClip(clip, o.rect[0], o.rect[1], o.rect[2], o.rect[3]))
+      items.push({ footY: o.rect[1] + o.rect[3], ord, x: o.rect[0], draw: (ctx) => blitNineSlice(ctx, atlas, b.palette, o.rect, s) });
+    return;
+  }
+  if (b.kind === "frg" && o.terrain) {
+    const t = o.terrain;
+    for (let r = 0; r < t.h; r++)
+      for (let c = 0; c < t.w; c++) {
+        const vi = b.cellVariant[r * t.w + c];
+        if (vi < 0) continue;
+        const v = b.variants[vi];
+        if (!v) continue;
+        const x = t.ox + c, y = t.oy + r, ph = v.size[1];
+        if (!overlapsClip(clip, x, y, v.size[0], ph)) continue;
+        items.push({ footY: y + ph, ord, x, draw: (ctx) => blitFixedRect(ctx, atlas, v, x, y, s) });
+      }
+    return;
+  }
+  if (b.kind === "auto" && o.terrain) {
+    const t = o.terrain, tr = b.palette.tileResolution;
+    for (let r = 0; r < t.h; r++)
+      for (let c = 0; c < t.w; c++) {
+        if (t.data[r * t.w + c] < 0) continue;
+        const x = t.ox + c, y = t.oy + r;
+        if (!overlapsClip(clip, x, y, 1, 1)) continue;
+        const a = autotileCellAtlas(b.palette, t, c, r);
+        if (!a) continue;
+        items.push({ footY: y + 1, ord, x, draw: (ctx) => blitTile(ctx, atlas, a[0], a[1], tr, x, y, s) });
+      }
+    return;
+  }
+  if (b.kind === "house" && o.house) {
+    const house = o.house, rect = o.rect, wall = b.wall, roof = b.roof, deco = b.deco;
+    if (overlapsClip(clip, rect[0], rect[1], rect[2], rect[3]))
+      items.push({ footY: rect[1] + rect[3], ord, x: rect[0], draw: (ctx) => drawHouse(ctx, rect, house, wall, roof, deco, atlas, s) });
+    return;
+  }
+}
+
+// Composite a house: wall band (under) → roof band (over) → decorations (top).
+function drawHouse(ctx: CanvasRenderingContext2D, rect: Rect, house: HouseData, wall: Palette | null, roof: Palette | null, deco: (Palette | null)[], atlas: CanvasImageSource, s: number): void {
+  if (wall) blitNineSlice(ctx, atlas, wall, regionForPart(house, rect, 0), s);
+  if (roof) blitNineSlice(ctx, atlas, roof, regionForPart(house, rect, 1), s);
+  for (let slot = 0; slot < DECO_COUNT; slot++) {
+    const p = deco[slot];
+    if (!p) continue;
+    const [cx, cy] = effectiveDecoCell(house, rect, slot, p);
+    blitFixedRect(ctx, atlas, p, rect[0] + cx, rect[1] + cy, s);
+  }
 }
 
 function rectsOverlap(a: Rect, b: Rect): boolean {
@@ -220,9 +335,15 @@ function drawObjectToScene(ctx: CanvasRenderingContext2D, o: LiteObject, s: numb
   // real-tile path: bound objects draw atlas tiles; in "real" mode unbound
   // objects draw nothing (skip the colour block), in "mixed" they fall through.
   if (rctx && rctx.renderMode !== "blueprint" && drawObjectReal(ctx, o, s, clip, rctx)) return;
+  drawObjectColor(ctx, o, s, clip);
+}
+
+// The abstract role-colour drawing of one object (overlay view + mixed fallback).
+function drawObjectColor(ctx: CanvasRenderingContext2D, o: LiteObject, s: number, clip: Rect | null): void {
   const rgb = colorForRole(roleOf(o));
   switch (o.type) {
-    case "FIXED_RECT": {
+    case "FIXED_RECT":
+    case "HOUSE": {
       const [x, y, w, h] = o.rect;
       ctx.fillStyle = rgbaCss(rgb, RECT_FILL_A);
       ctx.fillRect(x * s, y * s, w * s, h * s);

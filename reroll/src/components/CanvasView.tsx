@@ -20,6 +20,7 @@ import {
 } from "../render";
 import type { PackRuntime } from "../pack/types";
 import type { Bindings } from "../pack/compile";
+import { clampDecoCell, decorationAt, effectiveDecoCell } from "../house";
 
 export interface BrushState {
   rgb: RGB;
@@ -40,6 +41,10 @@ interface Props {
   renderMode: RenderMode;
   /** bumps when pack/bindings/renderMode change → full scene re-render */
   packVersion: number;
+  /** house decoration drag (door/window/chimney within the selected house) */
+  onHouseDecoStart: (id: number, slot: number) => void;
+  onHouseDecoMove: (id: number, slot: number, cell: [number, number]) => void;
+  onHouseDecoEnd: () => void;
   brush: BrushState;
   selected: Set<number>;
   /** the one-shot Marquee tool is armed (LMB box-selects, then pops back) */
@@ -61,7 +66,7 @@ interface Props {
 interface Edges { l: boolean; r: boolean; t: boolean; b: boolean; }
 
 interface Gesture {
-  mode: "pan" | "move" | "resize" | "paint" | "marquee";
+  mode: "pan" | "move" | "resize" | "paint" | "marquee" | "deco";
   downX: number;
   downY: number;
   downFx: number;
@@ -81,6 +86,8 @@ interface Gesture {
   ids?: number[]; // group-move members
   startRects?: Rect[]; // their rects at press (parallel to ids, or [startRect] for single)
   additive?: boolean; // marquee: Ctrl/Cmd at press
+  decoSlot?: number; // house decoration drag: which slot
+  grabOffset?: [number, number]; // click point within the deco footprint
 }
 
 // Clamp a group delta so the union bounding box of `rects` stays on the map.
@@ -160,7 +167,7 @@ function cursorFor(edges: Edges | "inside" | "outside"): string {
 }
 
 export function CanvasView({
-  map, version, pack, bindings, renderMode, packVersion, brush, selected, marqueeArmed,
+  map, version, pack, bindings, renderMode, packVersion, onHouseDecoStart, onHouseDecoMove, onHouseDecoEnd, brush, selected, marqueeArmed,
   onPick, onMove, onMoveGroup, onResize, onToggleLock, onStrokeStart, onStrokePaint, onStrokeEnd,
   onMarquee, onMarqueeDone,
 }: Props) {
@@ -367,6 +374,21 @@ export function CanvasView({
     }
     const sel = primarySel();
     if (!sel || isLocked(sel)) { gestureRef.current = null; return; }
+    // house decoration drag takes priority over house move/resize when a deco is clicked
+    if (sel.type === "HOUSE" && sel.house && bindings) {
+      const hb = bindings.get(sel.id);
+      if (hb && hb.kind === "house") {
+        const slot = decorationAt(sel.house, sel.rect, hb.deco, tx, ty);
+        if (slot >= 0) {
+          const [cx, cy] = effectiveDecoCell(sel.house, sel.rect, slot, hb.deco[slot]);
+          g.mode = "deco"; g.id = sel.id; g.decoSlot = slot;
+          g.grabOffset = [tx - sel.rect[0] - cx, ty - sel.rect[1] - cy];
+          onHouseDecoStart(sel.id, slot);
+          gestureRef.current = g;
+          return;
+        }
+      }
+    }
     if (isTerrain(sel)) {
       g.mode = "paint"; g.lastTx = tx; g.lastTy = ty;
       gestureRef.current = g;
@@ -375,7 +397,7 @@ export function CanvasView({
       scheduleDraw();
       return;
     }
-    if (sel.type === "FIXED_RECT") {
+    if (sel.type === "FIXED_RECT" || sel.type === "HOUSE") {
       const grab = edgeGrab(viewRef.current, sel.rect, sx, sy);
       if (grab === "outside") { gestureRef.current = null; return; }
       g.id = sel.id; g.startRect = sel.rect; ghostRef.current = [sel.rect];
@@ -387,7 +409,7 @@ export function CanvasView({
     // FRG / DUNGEON: interior move
     g.mode = "move"; g.id = sel.id; g.startRect = sel.rect; ghostRef.current = [sel.rect];
     gestureRef.current = g;
-  }, [map, onPick, onStrokeStart, primarySel, scheduleDraw]);
+  }, [map, onPick, onStrokeStart, primarySel, scheduleDraw, bindings, onHouseDecoStart]);
 
   const onPointerMove = useCallback((e: React.PointerEvent) => {
     const rect = canvasRef.current!.getBoundingClientRect();
@@ -404,6 +426,15 @@ export function CanvasView({
           sceneRectDirtyRef.current = mergeRect(sceneRectDirtyRef.current, brushTileRect(tx, ty, brushRef.current.size, map.width, map.height));
         }
         scheduleDraw();
+      } else if (g.mode === "deco" && g.id != null && g.decoSlot != null && g.grabOffset) {
+        const o = findObject(map, g.id);
+        if (o?.house) {
+          const [fx, fy] = screenToTile(viewRef.current, sx, sy);
+          const target: [number, number] = [Math.floor(fx) - o.rect[0] - g.grabOffset[0], Math.floor(fy) - o.rect[1] - g.grabOffset[1]];
+          const hb = bindings?.get(g.id);
+          const p = hb && hb.kind === "house" ? hb.deco[g.decoSlot] : null;
+          onHouseDecoMove(g.id, g.decoSlot, clampDecoCell(o.rect[2], o.rect[3], p ? p.size : [1, 1], target));
+        }
       } else if (g.mode === "marquee") {
         if (g.downSx != null && g.downSy != null) {
           marqueeBoxRef.current = {
@@ -433,7 +464,7 @@ export function CanvasView({
       updateCursor(sx, sy);
     }
     updateHover(sx, sy);
-  }, [map.width, map.height, onStrokePaint, scheduleDraw, updateCursor, updateHover]);
+  }, [map, bindings, onStrokePaint, onHouseDecoMove, scheduleDraw, updateCursor, updateHover]);
 
   const onPointerUp = useCallback((e: React.PointerEvent) => {
     try { (e.target as Element).releasePointerCapture(e.pointerId); } catch { /* not captured */ }
@@ -443,6 +474,7 @@ export function CanvasView({
     gestureRef.current = null;
     if (!g) return;
     if (g.mode === "paint") { onStrokeEnd(); return; }
+    if (g.mode === "deco") { onHouseDecoEnd(); return; }
     if (g.mode === "marquee") {
       marqueeBoxRef.current = null;
       if (g.moved) {
@@ -485,7 +517,7 @@ export function CanvasView({
       }
       scheduleDraw();
     }
-  }, [map.width, map.height, onMove, onMoveGroup, onResize, onStrokeEnd, onMarquee, onMarqueeDone, onPick, scheduleDraw]);
+  }, [map.width, map.height, onMove, onMoveGroup, onResize, onStrokeEnd, onHouseDecoEnd, onMarquee, onMarqueeDone, onPick, scheduleDraw]);
 
   const onPointerLeave = useCallback(() => { hoverTileRef.current = null; setHover(null); scheduleDraw(); }, [scheduleDraw]);
   const resetView = useCallback(() => {

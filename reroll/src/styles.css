@@ -427,3 +427,7 @@ button.active {
 .pal-cell:hover { border-color: var(--accent); }
 .pal-cell.sel { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
 .pal-sw { display: block; image-rendering: pixelated; background: #15161a; border-radius: 2px; }
+
+/* house inspector */
+.prop-num { width: 56px; background: var(--panel-2); color: var(--text); border: 1px solid var(--border); border-radius: 4px; padding: 2px 6px; font: inherit; }
+.prop-hint { color: var(--muted); font-size: 11px; font-style: italic; margin: 4px 0 2px; }

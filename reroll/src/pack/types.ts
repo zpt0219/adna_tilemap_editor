@@ -76,9 +76,10 @@ export interface Palette {
   lut?: Int32Array;
 }
 
-/** Everything the renderer needs once a pack is loaded. */
+/** Everything the renderer needs once a pack is loaded. (atlas is drawImage-able:
+ *  an ImageBitmap normally, or an HTMLImageElement where createImageBitmap fails.) */
 export interface PackRuntime {
-  atlas: ImageBitmap;
+  atlas: CanvasImageSource;
   tileResolution: number;
   palettes: Palette[];
 }

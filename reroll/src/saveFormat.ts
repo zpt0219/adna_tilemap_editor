@@ -10,6 +10,13 @@ import type { Vec2 } from "./types";
 export const WEB_SAVE_FORMAT = "adna-web-lite";
 export const WEB_SAVE_VERSION = 1;
 
+export interface WebSaveHouse {
+  wallHeight: number;
+  wall?: string;
+  roof?: string;
+  decorations: { slot: number; cell: Vec2; palette?: string }[];
+}
+
 export interface WebSaveObject {
   type: LiteObject["type"];
   rect: [number, number, number, number];
@@ -17,6 +24,7 @@ export interface WebSaveObject {
   tags?: Record<string, string>;
   cells?: Vec2[];
   points?: Vec2[];
+  house?: WebSaveHouse;
 }
 
 export interface WebSaveLayer {
@@ -60,6 +68,17 @@ function objectJson(o: LiteObject): WebSaveObject {
       break;
     case "DUNGEON":
       if (o.borderPoints) out.points = o.borderPoints.map((p) => [p[0], p[1]] as Vec2);
+      break;
+    case "HOUSE":
+      if (o.house) {
+        const h = o.house;
+        out.house = {
+          wallHeight: h.wallHeight,
+          ...(h.wall ? { wall: h.wall } : {}),
+          ...(h.roof ? { roof: h.roof } : {}),
+          decorations: h.deco.map((d, slot) => ({ slot, cell: [d.cell[0], d.cell[1]] as Vec2, ...(d.palette ? { palette: d.palette } : {}) })),
+        };
+      }
       break;
     case "FIXED_RECT":
       break;

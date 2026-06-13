@@ -9,7 +9,9 @@
 import type { LiteTileMap } from "./model";
 
 const PREFIX = "reroll_draft_";
-const VERSION = 1;
+// Bump to invalidate older drafts when the object model changes (e.g. the HOUSE
+// composite was added) — an old draft restores pre-feature object types.
+const VERSION = 2;
 
 const keyFor = (name: string) => PREFIX + name;
 

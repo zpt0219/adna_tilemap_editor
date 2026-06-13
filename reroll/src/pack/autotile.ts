@@ -78,6 +78,16 @@ export function isMatrixAutotile(mode: number): boolean {
   return mode === PaletteMode.TWO_CORNER || mode === PaletteMode.TWO_EDGE;
 }
 
+/** Atlas (x,y) for a single auto-tile cell (for per-tile y-sorted drawing), or
+ *  null if the mode isn't matrix-autotile / the cell maps nowhere. */
+export function autotileCellAtlas(palette: Palette, t: TerrainMatrix, c: number, r: number): [number, number] | null {
+  if (!isMatrixAutotile(palette.mode)) return null;
+  const lut = (palette.lut ??= buildAutotileLUT(palette));
+  const bits = palette.mode === PaletteMode.TWO_CORNER ? bitsTwoCorner(t, c, r) : bitsTwoEdge(t, c, r);
+  const ax = lut[bits * 2];
+  return ax < 0 ? null : [ax, lut[bits * 2 + 1]];
+}
+
 /**
  * Draw a terrain object's present cells with auto-tiled atlas tiles. Returns
  * true if handled (matrix mode), false for modes not yet supported (caller falls
@@ -85,7 +95,7 @@ export function isMatrixAutotile(mode: number): boolean {
  */
 export function drawAutotile(
   ctx: CanvasRenderingContext2D,
-  atlas: ImageBitmap,
+  atlas: CanvasImageSource,
   palette: Palette,
   t: TerrainMatrix,
   s: number,
