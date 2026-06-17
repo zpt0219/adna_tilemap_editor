@@ -7,11 +7,12 @@
 // reopening the same blueprint/sample finds its draft.
 
 import type { LiteTileMap } from "./model";
+import { normalizeHouseData } from "./house";
 
 const PREFIX = "reroll_draft_";
 // Bump to invalidate older drafts when the object model changes (e.g. the HOUSE
 // composite was added) — an old draft restores pre-feature object types.
-const VERSION = 2;
+const VERSION = 3;
 
 const keyFor = (name: string) => PREFIX + name;
 
@@ -36,6 +37,7 @@ function fromJSON(m: any): LiteTileMap {
   for (const l of m.layers ?? []) {
     for (const o of l.objects ?? []) {
       if (o.terrain && Array.isArray(o.terrain.data)) o.terrain.data = Int16Array.from(o.terrain.data);
+      if (o.type === "HOUSE" && o.rect) o.house = normalizeHouseData(o.house, o.rect);
     }
   }
   return m as LiteTileMap;
@@ -54,7 +56,7 @@ export function loadDraft(name: string): { map: LiteTileMap; savedAt: number } |
   if (!raw) return null;
   try {
     const env = JSON.parse(raw) as Envelope;
-    if (env.v !== VERSION || !env.map) return null;
+    if ((env.v !== VERSION && env.v !== 2) || !env.map) return null;
     return { map: fromJSON(env.map), savedAt: env.savedAt };
   } catch {
     return null;

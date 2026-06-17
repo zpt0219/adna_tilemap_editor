@@ -4,15 +4,19 @@
 
 import {
   cloneTerrain,
+  cloneObjectDeep,
   findLayer,
   findObject,
   isLocked,
   translateObject,
+  type HouseDecoration,
+  type LiteObject,
   type LiteTileMap,
   type LiteType,
   type Rect,
   type TerrainMatrix,
 } from "./model";
+import { resizeHouse } from "./house";
 
 export interface Command {
   label: string;
@@ -77,7 +81,9 @@ export function moveObjectsCommand(map: LiteTileMap, ids: number[], dx: number, 
 export function resizeObjectCommand(map: LiteTileMap, id: number, before: Rect, after: Rect): Command {
   const set = (r: Rect) => {
     const o = findObject(map, id);
-    if (o) o.rect = [...r];
+    if (!o) return;
+    if (o.type === "HOUSE" && o.house) o.house = resizeHouse(o.house, o.rect, r);
+    o.rect = [...r];
   };
   return { label: "Resize", do: () => set(after), undo: () => set(before) };
 }
@@ -148,19 +154,40 @@ export function setObjectPaletteCommand(map: LiteTileMap, id: number, before: st
 }
 
 /** Move a house decoration slot to a new (already-clamped) local cell. */
-export function moveHouseDecoCommand(map: LiteTileMap, id: number, slot: number, before: [number, number], after: [number, number]): Command {
-  const set = (cell: [number, number]) => { const o = findObject(map, id); if (o?.house) o.house.deco[slot].cell = [...cell]; };
+export function moveHouseDecoCommand(map: LiteTileMap, id: number, index: number, before: [number, number], after: [number, number]): Command {
+  const set = (cell: [number, number]) => {
+    const o = findObject(map, id);
+    if (o?.house?.decorations[index]) o.house.decorations[index].cell = [...cell];
+  };
   return { label: "Move decoration", do: () => set(after), undo: () => set(before) };
 }
 
 /** Set / clear a decoration slot's palette override (hash). */
-export function setHouseDecoPaletteCommand(map: LiteTileMap, id: number, slot: number, before: string | undefined, after: string | undefined): Command {
+export function setHouseDecoPaletteCommand(map: LiteTileMap, id: number, index: number, before: string | undefined, after: string | undefined): Command {
   const set = (h: string | undefined) => {
     const o = findObject(map, id);
-    if (!o?.house) return;
-    if (h) o.house.deco[slot].palette = h; else delete o.house.deco[slot].palette;
+    if (!o?.house?.decorations[index]) return;
+    if (h) o.house.decorations[index].palette = h; else delete o.house.decorations[index].palette;
   };
   return { label: "Decoration palette", do: () => set(after), undo: () => set(before) };
+}
+
+function cloneDecorations(decorations: HouseDecoration[]): HouseDecoration[] {
+  return decorations.map((deco) => ({ ...deco, cell: [...deco.cell] as [number, number] }));
+}
+
+export function setHouseDecorationsCommand(
+  map: LiteTileMap,
+  id: number,
+  before: HouseDecoration[],
+  after: HouseDecoration[],
+  label: string,
+): Command {
+  const set = (decorations: HouseDecoration[]) => {
+    const o = findObject(map, id);
+    if (o?.house) o.house.decorations = cloneDecorations(decorations);
+  };
+  return { label, do: () => set(after), undo: () => set(before) };
 }
 
 /** Set / clear the wall or roof slot palette override (hash). */
@@ -179,10 +206,72 @@ export function setWallHeightCommand(map: LiteTileMap, id: number, before: numbe
   return { label: "Wall height", do: () => set(after), undo: () => set(before) };
 }
 
-/** Change a house's wall/roof overlap rows. */
 export function setHouseOverlapCommand(map: LiteTileMap, id: number, before: number, after: number): Command {
   const set = (v: number) => { const o = findObject(map, id); if (o?.house) o.house.overlap = v; };
-  return { label: "House overlap", do: () => set(after), undo: () => set(before) };
+  return { label: "Roof overlap", do: () => set(after), undo: () => set(before) };
+}
+
+export function createObjectCommand(map: LiteTileMap, layerId: number, object: LiteObject): Command {
+  const snapshot = cloneObjectDeep(object);
+  const add = () => {
+    const layer = findLayer(map, layerId);
+    if (!layer) return;
+    if (!layer.objects.some((o) => o.id === snapshot.id)) layer.objects.push(cloneObjectDeep(snapshot));
+  };
+  const remove = () => {
+    const layer = findLayer(map, layerId);
+    if (!layer) return;
+    layer.objects = layer.objects.filter((o) => o.id !== snapshot.id);
+  };
+  return { label: "Create object", do: add, undo: remove };
+}
+
+export interface LayerObjectSnapshot {
+  layerId: number;
+  index: number;
+  object: LiteObject;
+}
+
+function removeObjectsById(map: LiteTileMap, ids: Set<number>): void {
+  for (const layer of map.layers) layer.objects = layer.objects.filter((o) => !ids.has(o.id));
+}
+
+function restoreObjects(map: LiteTileMap, snapshots: LayerObjectSnapshot[]): void {
+  const byLayer = new Map<number, LayerObjectSnapshot[]>();
+  for (const snapshot of snapshots) {
+    const list = byLayer.get(snapshot.layerId);
+    if (list) list.push(snapshot);
+    else byLayer.set(snapshot.layerId, [snapshot]);
+  }
+  for (const [layerId, list] of byLayer) {
+    const layer = findLayer(map, layerId);
+    if (!layer) continue;
+    const ordered = [...list].sort((a, b) => a.index - b.index);
+    for (const snapshot of ordered) {
+      if (layer.objects.some((o) => o.id === snapshot.object.id)) continue;
+      layer.objects.splice(Math.min(snapshot.index, layer.objects.length), 0, cloneObjectDeep(snapshot.object));
+    }
+  }
+}
+
+export function createObjectsCommand(map: LiteTileMap, snapshots: LayerObjectSnapshot[]): Command {
+  const stored = snapshots.map((snapshot) => ({ ...snapshot, object: cloneObjectDeep(snapshot.object) }));
+  const ids = new Set(stored.map((snapshot) => snapshot.object.id));
+  return {
+    label: stored.length > 1 ? "Duplicate objects" : "Duplicate object",
+    do: () => restoreObjects(map, stored),
+    undo: () => removeObjectsById(map, ids),
+  };
+}
+
+export function deleteObjectsCommand(map: LiteTileMap, snapshots: LayerObjectSnapshot[]): Command {
+  const stored = snapshots.map((snapshot) => ({ ...snapshot, object: cloneObjectDeep(snapshot.object) }));
+  const ids = new Set(stored.map((snapshot) => snapshot.object.id));
+  return {
+    label: stored.length > 1 ? "Delete objects" : "Delete object",
+    do: () => removeObjectsById(map, ids),
+    undo: () => restoreObjects(map, stored),
+  };
 }
 
 export interface TerrainSnapshot {
@@ -208,7 +297,7 @@ export function paintTerrainCommand(
   return { label: "Paint terrain", do: () => restore(after), undo: () => restore(before) };
 }
 
-// --- layer commands (document state → undoable; active-layer highlight is not) ---
+// --- layer commands (document state -> undoable; active-layer highlight is not) ---
 
 /** Toggle a layer's visibility (enabled). Captured by layer id. */
 export function toggleLayerEnabledCommand(map: LiteTileMap, layerId: number): Command {

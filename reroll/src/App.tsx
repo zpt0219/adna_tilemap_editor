@@ -2,19 +2,23 @@ import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, 
 import { parseBlueprint } from "./blueprint";
 import { blueprintToLite } from "./convert";
 import { normalizeToCategories } from "./normalize";
-import { assignUniqueObjectNames, cloneTerrain, displayName, findLayer, findObject, isLocked, layerOfObject, roleOf, setTerrainCell, type LiteObject, type LiteTileMap, type Rect } from "./model";
-import { UndoStack, moveHouseDecoCommand, moveObjectCommand, moveObjectsCommand, paintTerrainCommand, renameObjectCommand, reorderLayerObjectsCommand, resizeObjectCommand, setHouseDecoPaletteCommand, setHouseOverlapCommand, setHouseSlotPaletteCommand, setObjectsEnabledCommand, setObjectPaletteCommand, setObjectTypeCommand, setWallHeightCommand, toggleLayerEnabledCommand, toggleObjectEnabledCommand, type Command, type TerrainSnapshot } from "./commands";
+import { assignUniqueObjectNames, cloneObjectDeep, cloneTerrain, displayName, findLayer, findObject, isLocked, layerOfObject, roleOf, setTerrainCell, translateObject, type HouseDecorationKind, type LiteObject, type LiteTileMap, type Rect } from "./model";
+import { UndoStack, createObjectCommand, createObjectsCommand, deleteObjectsCommand, moveHouseDecoCommand, moveObjectCommand, moveObjectsCommand, paintTerrainCommand, renameObjectCommand, reorderLayerObjectsCommand, resizeObjectCommand, setHouseDecoPaletteCommand, setHouseDecorationsCommand, setHouseOverlapCommand, setHouseSlotPaletteCommand, setObjectsEnabledCommand, setObjectPaletteCommand, setObjectTypeCommand, setWallHeightCommand, toggleLayerEnabledCommand, toggleObjectEnabledCommand, type Command, type LayerObjectSnapshot, type TerrainSnapshot } from "./commands";
 import type { LiteType } from "./model";
 import { liteToWebSave } from "./saveFormat";
 import { clearDraft, loadDraft, saveDraft } from "./draft";
 import { downloadJson } from "./download";
 import { colorForRole } from "./generated/roleColors";
 import { CanvasView, type BrushState } from "./components/CanvasView";
+import { PaletteSwatch } from "./components/PaletteSwatch";
 import { PropsPanel } from "./components/PropsPanel";
 import { loadPackFromUrl } from "./pack/loadPack";
 import { compileMap } from "./pack/compile";
-import type { PackRuntime } from "./pack/types";
+import { PaletteMode, type Palette, type PackRuntime } from "./pack/types";
 import type { RenderMode } from "./render";
+import { generateDecorations } from "./house";
+import { createObjectForRole, type CreateKind } from "./objectFactory";
+import { createKindsForRole, roleRoot } from "./roleTree";
 
 const isTerrain = (o: LiteObject | null) => !!o && (o.type === "TERRAIN_2_CORNER" || o.type === "TERRAIN_2_EDGE");
 
@@ -29,6 +33,24 @@ interface DropTarget {
   layerId: number;
   targetId: number;
   side: DropSide;
+}
+
+interface ClipboardEntry {
+  index: number;
+  object: LiteObject;
+}
+
+interface ObjectClipboard {
+  layerId: number;
+  layerName: string;
+  entries: ClipboardEntry[];
+  pasteCount: number;
+}
+
+interface CreatePaletteChoice {
+  kind: CreateKind;
+  palette: Palette;
+  role: string;
 }
 
 function dropSideFromEvent(e: ReactDragEvent<HTMLDivElement>): DropSide {
@@ -48,6 +70,43 @@ function reorderWithinLayer(ids: number[], sourceId: number, targetId: number, s
 
 function sameOrder(a: number[], b: number[]): boolean {
   return a.length === b.length && a.every((v, i) => v === b[i]);
+}
+
+function uniqueName(existing: Set<string>, base: string): string {
+  if (!existing.has(base)) {
+    existing.add(base);
+    return base;
+  }
+  let n = 2;
+  while (existing.has(`${base} #${n}`)) n++;
+  const next = `${base} #${n}`;
+  existing.add(next);
+  return next;
+}
+
+const CREATE_KIND_LABEL: Record<CreateKind, string> = {
+  terrain_area: "Area",
+  terrain_line: "Line",
+  fixed_rect: "Rect",
+  fixed_rect_group: "FRG",
+  house: "House",
+};
+
+const DEFAULT_KIND_ORDER: CreateKind[] = ["terrain_area", "terrain_line", "fixed_rect", "fixed_rect_group", "house"];
+const BUILDING_KIND_ORDER: CreateKind[] = ["house", "fixed_rect", "fixed_rect_group", "terrain_area", "terrain_line"];
+
+function paletteSupportsKind(mode: PaletteMode, kind: CreateKind): boolean {
+  if (kind === "terrain_area") return mode === PaletteMode.TWO_CORNER || mode === PaletteMode.QUAD;
+  if (kind === "terrain_line") return mode === PaletteMode.TWO_EDGE || mode === PaletteMode.CONTOUR;
+  if (kind === "fixed_rect" || kind === "fixed_rect_group") {
+    return mode === PaletteMode.FIXED_RECT || mode === PaletteMode.NINE_PATCH || mode === PaletteMode.H_STRETCH || mode === PaletteMode.V_STRETCH;
+  }
+  return mode === PaletteMode.CLIFF;
+}
+
+function paletteCreateKinds(palette: Palette): CreateKind[] {
+  const roleKinds = createKindsForRole(palette.role);
+  return roleKinds.filter((kind) => paletteSupportsKind(palette.mode, kind));
 }
 
 export default function App() {
@@ -72,9 +131,13 @@ export default function App() {
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
   const [dragging, setDragging] = useState<DraggedObject | null>(null);
   const [dropTarget, setDropTarget] = useState<DropTarget | null>(null);
+  const [createKind, setCreateKind] = useState<CreateKind>("fixed_rect");
+  const [createPaletteHash, setCreatePaletteHash] = useState("");
+  const [createArmed, setCreateArmed] = useState(false);
+  const [clipboard, setClipboard] = useState<ObjectClipboard | null>(null);
   const undo = useRef(new UndoStack());
   const stroke = useRef<{ id: number; before: TerrainSnapshot; dirty: boolean } | null>(null);
-  const decoDrag = useRef<{ id: number; slot: number; before: [number, number] } | null>(null);
+  const decoDrag = useRef<{ id: number; index: number; before: [number, number] } | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const saveTimer = useRef<number | null>(null);
 
@@ -96,6 +159,7 @@ export default function App() {
     setSelected(new Set());
     setAnchorId(null);
     setMarquee(false);
+    setClipboard(null);
     setActiveLayerId(lite.layers[0]?.id ?? null);
     setExpanded(new Set());
     setVersion(0);
@@ -367,19 +431,19 @@ export default function App() {
   }, [map, run]);
 
   // --- house decoration drag (door/window/chimney within the house rect) ---
-  const onHouseDecoStart = useCallback((id: number, slot: number) => {
+  const onHouseDecoStart = useCallback((id: number, index: number) => {
     if (!map) { decoDrag.current = null; return; }
     const o = findObject(map, id);
-    decoDrag.current = o?.house ? { id, slot, before: [...o.house.deco[slot].cell] as [number, number] } : null;
+    decoDrag.current = o?.house?.decorations[index] ? { id, index, before: [...o.house.decorations[index].cell] as [number, number] } : null;
   }, [map]);
 
-  const onHouseDecoMove = useCallback((id: number, slot: number, cell: [number, number]) => {
+  const onHouseDecoMove = useCallback((id: number, index: number, cell: [number, number]) => {
     if (!map) return;
     const o = findObject(map, id);
-    if (!o?.house) return;
-    const cur = o.house.deco[slot].cell;
+    if (!o?.house?.decorations[index]) return;
+    const cur = o.house.decorations[index].cell;
     if (cur[0] === cell[0] && cur[1] === cell[1]) return;
-    o.house.deco[slot].cell = [...cell];
+    o.house.decorations[index].cell = [...cell];
     setVersion((v) => v + 1); // live preview (also recompiles, but house bindings don't depend on cell)
   }, [map]);
 
@@ -388,12 +452,12 @@ export default function App() {
     decoDrag.current = null;
     if (!map || !d) return;
     const o = findObject(map, d.id);
-    if (!o?.house) return;
-    const after = [...o.house.deco[d.slot].cell] as [number, number];
-    if (after[0] !== d.before[0] || after[1] !== d.before[1]) run(moveHouseDecoCommand(map, d.id, d.slot, d.before, after));
+    if (!o?.house?.decorations[d.index]) return;
+    const after = [...o.house.decorations[d.index].cell] as [number, number];
+    if (after[0] !== d.before[0] || after[1] !== d.before[1]) run(moveHouseDecoCommand(map, d.id, d.index, d.before, after));
   }, [map, run]);
 
-  // --- house inspector: per-slot palette + wall height/overlap ---
+  // --- house inspector: palettes, overlap, dynamic decorations ---
   const onSetHouseSlot = useCallback((id: number, slot: "wall" | "roof" | number, hash: string | null) => {
     if (!map) return;
     const o = findObject(map, id);
@@ -402,7 +466,7 @@ export default function App() {
     if (slot === "wall" || slot === "roof") {
       if (o.house[slot] !== after) run(setHouseSlotPaletteCommand(map, id, slot, o.house[slot], after));
     } else {
-      const before = o.house.deco[slot].palette;
+      const before = o.house.decorations[slot]?.palette;
       if (before !== after) run(setHouseDecoPaletteCommand(map, id, slot, before, after));
     }
   }, [map, run]);
@@ -416,9 +480,39 @@ export default function App() {
   const onSetHouseOverlap = useCallback((id: number, overlap: number) => {
     if (!map) return;
     const o = findObject(map, id);
-    if (o?.house && o.house.overlap !== overlap) run(setHouseOverlapCommand(map, id, o.house.overlap, overlap));
+    if (!o?.house || o.house.overlap === overlap) return;
+    run(setHouseOverlapCommand(map, id, o.house.overlap, overlap));
   }, [map, run]);
 
+  const onAddHouseDecoration = useCallback((id: number, kind: HouseDecorationKind, palette?: string) => {
+    if (!map) return;
+    const o = findObject(map, id);
+    if (!o?.house) return;
+    const before = o.house.decorations.map((deco) => ({ ...deco, cell: [...deco.cell] as [number, number] }));
+    const after = [...before, { kind, cell: [0, 0] as [number, number], ...(palette ? { palette } : {}) }];
+    run(setHouseDecorationsCommand(map, id, before, after, "Add decoration"));
+  }, [map, run]);
+
+  const onRemoveHouseDecoration = useCallback((id: number, index: number) => {
+    if (!map) return;
+    const o = findObject(map, id);
+    if (!o?.house?.decorations[index]) return;
+    const before = o.house.decorations.map((deco) => ({ ...deco, cell: [...deco.cell] as [number, number] }));
+    const after = before.filter((_, i) => i !== index);
+    run(setHouseDecorationsCommand(map, id, before, after, "Remove decoration"));
+  }, [map, run]);
+
+  const onGenerateHouseDecorations = useCallback((id: number) => {
+    if (!map) return;
+    const o = findObject(map, id);
+    if (!o?.house) return;
+    const hb = bindings?.get(id);
+    if (!hb || hb.kind !== "house") return;
+    const before = o.house.decorations.map((deco) => ({ ...deco, cell: [...deco.cell] as [number, number] }));
+    const seed = Math.floor(Math.random() * 0xffffffff);
+    const after = generateDecorations(o.house, o.rect, hb.deco, seed);
+    if (JSON.stringify(before) !== JSON.stringify(after)) run(setHouseDecorationsCommand(map, id, before, after, "Generate decorations"));
+  }, [map, bindings, run]);
   const onObjectDragStart = useCallback((layerId: number, objectId: number) => (e: ReactDragEvent<HTMLDivElement>) => {
     e.dataTransfer.effectAllowed = "move";
     e.dataTransfer.setData("text/plain", `${layerId}:${objectId}`);
@@ -455,25 +549,228 @@ export default function App() {
     setDropTarget(null);
   }, []);
 
+  const nextObjectId = useCallback((cur: LiteTileMap) => {
+    let maxId = -1;
+    for (const layer of cur.layers) for (const obj of layer.objects) maxId = Math.max(maxId, obj.id);
+    return maxId + 1;
+  }, []);
+
+  const collectActiveLayerSelection = useCallback(() => {
+    if (!map || activeLayerId == null) return null;
+    const layer = findLayer(map, activeLayerId);
+    if (!layer) return null;
+    const entries = layer.objects
+      .map((obj, index) => ({ object: obj, index }))
+      .filter((entry) => selected.has(entry.object.id));
+    return entries.length > 0 ? { layer, entries } : null;
+  }, [map, activeLayerId, selected]);
+
+  const cloneSelectionIntoSnapshots = useCallback((
+    layerId: number,
+    entries: ClipboardEntry[],
+    step: number,
+    existingNames: Set<string>,
+  ) => {
+    if (!map) return { snapshots: [] as LayerObjectSnapshot[], ids: [] as number[] };
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const entry of entries) {
+      const obj = entry.object;
+      minX = Math.min(minX, obj.rect[0]);
+      minY = Math.min(minY, obj.rect[1]);
+      maxX = Math.max(maxX, obj.rect[0] + obj.rect[2]);
+      maxY = Math.max(maxY, obj.rect[1] + obj.rect[3]);
+    }
+    const unitDx = maxX < map.width ? 1 : minX > 0 ? -1 : 0;
+    const unitDy = maxY < map.height ? 1 : minY > 0 ? -1 : 0;
+    const dx = unitDx * Math.max(1, step);
+    const dy = unitDy * Math.max(1, step);
+    const insertAt = Math.max(...entries.map((entry) => entry.index)) + 1;
+    let nextId = nextObjectId(map);
+    const snapshots: LayerObjectSnapshot[] = [];
+    const ids: number[] = [];
+    entries.forEach((entry, offsetIndex) => {
+      const clone = cloneObjectDeep(entry.object, nextId++);
+      translateObject(clone, dx, dy);
+      const baseName = clone.tags["web.baseName"] || clone.tags["blueprint.label"] || roleOf(clone) || clone.type;
+      clone.tags["web.name"] = uniqueName(existingNames, baseName);
+      snapshots.push({ layerId, index: insertAt + offsetIndex, object: clone });
+      ids.push(clone.id);
+    });
+    return { snapshots, ids };
+  }, [map, nextObjectId]);
+
+  const onCopySelection = useCallback(() => {
+    const active = collectActiveLayerSelection();
+    if (!active) return;
+    setClipboard({
+      layerId: active.layer.id,
+      layerName: active.layer.name,
+      entries: active.entries.map((entry) => ({ index: entry.index, object: cloneObjectDeep(entry.object) })),
+      pasteCount: 0,
+    });
+  }, [collectActiveLayerSelection]);
+
+  const onDeleteSelection = useCallback(() => {
+    if (!map || selected.size === 0) return;
+    const snapshots: LayerObjectSnapshot[] = [];
+    for (const layer of map.layers) {
+      layer.objects.forEach((obj, index) => {
+        if (selected.has(obj.id)) snapshots.push({ layerId: layer.id, index, object: cloneObjectDeep(obj) });
+      });
+    }
+    if (snapshots.length === 0) return;
+    run(deleteObjectsCommand(map, snapshots));
+    setSelected(new Set());
+    setAnchorId(null);
+  }, [map, selected, run]);
+
+  const onDuplicateSelection = useCallback(() => {
+    const active = collectActiveLayerSelection();
+    if (!active || !map) return;
+    const existingNames = new Set<string>();
+    for (const mapLayer of map.layers) for (const obj of mapLayer.objects) existingNames.add(displayName(obj));
+    const clipboardEntries = active.entries.map((entry) => ({ index: entry.index, object: cloneObjectDeep(entry.object) }));
+    const { snapshots, ids: newIds } = cloneSelectionIntoSnapshots(active.layer.id, clipboardEntries, 1, existingNames);
+    if (snapshots.length === 0) return;
+    run(createObjectsCommand(map, snapshots));
+    setSelected(new Set(newIds));
+    setAnchorId(newIds[0] ?? null);
+    setExpanded((prev) => new Set(prev).add(active.layer.id));
+  }, [collectActiveLayerSelection, cloneSelectionIntoSnapshots, map, run]);
+
+  const canPaste = !!(map && activeLayerId != null && clipboard && clipboard.entries.length > 0 && clipboard.layerId === activeLayerId);
+  const pasteTitle = !clipboard
+    ? "没有可粘贴对象"
+    : clipboard.layerId !== activeLayerId
+      ? `只能粘贴回 ${clipboard.layerName} 层`
+      : "粘贴当前剪贴板 (Cmd/Ctrl+V)";
+
+  const onPasteClipboard = useCallback(() => {
+    if (!map || activeLayerId == null || !clipboard || clipboard.layerId !== activeLayerId || clipboard.entries.length === 0) return;
+    const existingNames = new Set<string>();
+    for (const mapLayer of map.layers) for (const obj of mapLayer.objects) existingNames.add(displayName(obj));
+    const { snapshots, ids: newIds } = cloneSelectionIntoSnapshots(
+      activeLayerId,
+      clipboard.entries.map((entry) => ({ index: entry.index, object: cloneObjectDeep(entry.object) })),
+      clipboard.pasteCount + 1,
+      existingNames,
+    );
+    if (snapshots.length === 0) return;
+    run(createObjectsCommand(map, snapshots));
+    setSelected(new Set(newIds));
+    setAnchorId(newIds[0] ?? null);
+    setExpanded((prev) => new Set(prev).add(activeLayerId));
+    setClipboard((prev) => prev && prev.layerId === activeLayerId ? { ...prev, pasteCount: prev.pasteCount + 1 } : prev);
+  }, [map, activeLayerId, clipboard, cloneSelectionIntoSnapshots, run]);
+
+  const activeLayer = useMemo(() => (map && activeLayerId != null ? findLayer(map, activeLayerId) : null), [map, activeLayerId, version]);
+  const activeRoot = activeLayer?.tags["role.root"] ?? "";
+  const createPaletteChoices = useMemo(() => {
+    if (!pack || !activeRoot) return [] as CreatePaletteChoice[];
+    const out: CreatePaletteChoice[] = [];
+    for (const palette of pack.palettes) {
+      if (roleRoot(palette.role) !== activeRoot) continue;
+      for (const kind of paletteCreateKinds(palette)) out.push({ kind, palette, role: palette.role });
+    }
+    out.sort((a, b) =>
+      a.kind.localeCompare(b.kind)
+      || a.role.localeCompare(b.role)
+      || a.palette.style.localeCompare(b.palette.style)
+      || a.palette.hash.localeCompare(b.palette.hash));
+    return out;
+  }, [pack, activeRoot]);
+  const createKindOptions = useMemo(
+    () => {
+      const seen = new Set(createPaletteChoices.map((choice) => choice.kind));
+      const order = activeRoot === "building" ? BUILDING_KIND_ORDER : DEFAULT_KIND_ORDER;
+      return order.filter((kind) => seen.has(kind));
+    },
+    [createPaletteChoices, activeRoot],
+  );
+  const createPaletteOptions = useMemo(
+    () => createPaletteChoices.filter((choice) => choice.kind === createKind),
+    [createPaletteChoices, createKind],
+  );
+  const selectedCreateChoice = useMemo(
+    () => createPaletteOptions.find((choice) => choice.palette.hash === createPaletteHash) ?? null,
+    [createPaletteOptions, createPaletteHash],
+  );
+
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const tag = (e.target as HTMLElement)?.tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA") return;
+    if (createKindOptions.length === 0) {
+      setCreateArmed(false);
+      setCreatePaletteHash("");
+      return;
+    }
+    setCreateKind((prev) => (createKindOptions.includes(prev) ? prev : createKindOptions[0]));
+  }, [createKindOptions]);
+
+  useEffect(() => {
+    if (createPaletteOptions.length === 0) {
+      setCreatePaletteHash("");
+      setCreateArmed(false);
+      return;
+    }
+    setCreatePaletteHash((prev) => createPaletteOptions.some((choice) => choice.palette.hash === prev) ? prev : createPaletteOptions[0].palette.hash);
+  }, [createPaletteOptions]);
+
+  useEffect(() => {
+    if (createArmed) setMarquee(false);
+  }, [createArmed]);
+
+  const onCreateAt = useCallback((tx: number, ty: number) => {
+    if (!map || !activeLayer || !selectedCreateChoice || !createKindOptions.includes(createKind)) return;
+    const id = nextObjectId(map);
+    const created = createObjectForRole(map, id, selectedCreateChoice.role, createKind, tx, ty, {
+      paletteHash: selectedCreateChoice.palette.hash,
+      size: selectedCreateChoice.palette.size,
+      style: selectedCreateChoice.palette.style,
+    });
+    run(createObjectCommand(map, activeLayer.id, created));
+    setSelected(new Set([id]));
+    setAnchorId(id);
+    setExpanded((prev) => new Set(prev).add(activeLayer.id));
+    setCreateArmed(false);
+  }, [map, activeLayer, selectedCreateChoice, createKind, createKindOptions, nextObjectId, run]);
+
+  useEffect(() => {
+      const onKey = (e: KeyboardEvent) => {
+        const tag = (e.target as HTMLElement)?.tagName;
+        if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z") {
         e.preventDefault();
         if (e.shiftKey) onRedo(); else onUndo();
         return;
       }
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "c" && selected.size > 0) {
+        e.preventDefault();
+        onCopySelection();
+        return;
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "v" && canPaste) {
+        e.preventDefault();
+        onPasteClipboard();
+        return;
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "d" && selected.size > 0) {
+        e.preventDefault();
+        onDuplicateSelection();
+        return;
+      }
+      if ((e.key === "Backspace" || e.key === "Delete") && selected.size > 0) {
+        e.preventDefault();
+        onDeleteSelection();
+        return;
+      }
       if (!e.metaKey && !e.ctrlKey && !e.altKey && map) {
         if (e.key.toLowerCase() === "m") { e.preventDefault(); setMarquee((m) => !m); }
-        else if (e.key === "Escape") setMarquee(false);
+        else if (e.key === "Escape") { setMarquee(false); setCreateArmed(false); }
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onUndo, onRedo, map]);
+  }, [onUndo, onRedo, map, selected.size, canPaste, onCopySelection, onPasteClipboard, onDuplicateSelection, onDeleteSelection]);
 
-  const activeLayer = useMemo(() => (map && activeLayerId != null ? findLayer(map, activeLayerId) : null), [map, activeLayerId, version]);
   const selObjs = useMemo(() => (map ? ([...selected].map((id) => findObject(map, id)).filter(Boolean) as LiteObject[]) : []), [map, selected, version]);
   const selObj = selObjs[0] ?? null;
   const selIsTerrain = isTerrain(selObj);
@@ -500,7 +797,16 @@ export default function App() {
             <button disabled={!canUndo} onClick={onUndo} title="撤销 (Cmd/Ctrl+Z)">↶ Undo</button>
             <button disabled={!canRedo} onClick={onRedo} title="重做 (Shift+Cmd/Ctrl+Z)">↷ Redo</button>
             <button onClick={onExport} title="导出 adna-web-lite 存档">⤓ Export</button>
-            <button className={marquee ? "active" : ""} onClick={() => setMarquee((m) => !m)} title="框选工具(M)：左键拖一次框选,松手自动退回">▭ Marquee</button>
+            <button disabled={selected.size === 0} onClick={onCopySelection} title="复制当前对象/组到内部剪贴板 (Cmd/Ctrl+C)">⧉ Copy</button>
+            <button disabled={!canPaste} onClick={onPasteClipboard} title={pasteTitle}>⎘ Paste</button>
+            <button disabled={selected.size === 0} onClick={onDeleteSelection} title="删除当前对象/组 (Delete)">⌫ Delete</button>
+            <button className={marquee ? "active" : ""} onClick={() => {
+              setMarquee((m) => {
+                const next = !m;
+                if (next) setCreateArmed(false);
+                return next;
+              });
+            }} title="框选工具(M)：左键拖一次框选,松手自动退回">▭ Marquee</button>
             {pack && (
               <>
                 <span className="ts-sep" />
@@ -547,6 +853,54 @@ export default function App() {
             <div className="layers-head">
               <span className="legend-title">Layers</span>
             </div>
+            {activeLayer && (
+              <div className="create-panel">
+                <div className="create-head">
+                  <span className="legend-title">Palette Create</span>
+                  <button
+                    className={createArmed ? "active" : ""}
+                    disabled={!selectedCreateChoice || createKindOptions.length === 0}
+                    onClick={() => {
+                      setMarquee(false);
+                      setCreateArmed((v) => !v);
+                    }}
+                  >
+                    {createArmed ? "Cancel" : "Place"}
+                  </button>
+                </div>
+                <div className="seg create-kind">
+                  {createKindOptions.map((kind) => (
+                    <button key={kind} className={createKind === kind ? "active" : ""} onClick={() => setCreateKind(kind)}>
+                      {CREATE_KIND_LABEL[kind]}
+                    </button>
+                  ))}
+                </div>
+                <div className="pal-grid create-palette-grid">
+                  {createPaletteOptions.map((choice) => (
+                    <button
+                      key={choice.palette.hash}
+                      className={`pal-cell${createPaletteHash === choice.palette.hash ? " sel" : ""}`}
+                      title={`${choice.palette.style || choice.role.split("/").slice(-1)[0] || "palette"} · ${CREATE_KIND_LABEL[choice.kind]}`}
+                      onClick={() => setCreatePaletteHash(choice.palette.hash)}
+                    >
+                      <PaletteSwatch pack={pack!} palette={choice.palette} />
+                    </button>
+                  ))}
+                  {createPaletteOptions.length === 0 && <span className="prop-empty">No palette choices for this layer</span>}
+                </div>
+                {selectedCreateChoice && (
+                  <div className="create-meta">
+                    <div className="create-style">{selectedCreateChoice.palette.style || "untagged"}</div>
+                    <div className="create-size">{selectedCreateChoice.palette.size[0]} × {selectedCreateChoice.palette.size[1]} · {CREATE_KIND_LABEL[selectedCreateChoice.kind]}</div>
+                  </div>
+                )}
+                <div className="prop-hint">
+                  {createArmed
+                    ? `Click map to place ${selectedCreateChoice?.palette.style || selectedCreateChoice?.role || "object"}`
+                    : `Choose a palette thumbnail first; role/style will follow the selected palette`}
+                </div>
+              </div>
+            )}
             {map.layers.map((ly) => {
               const open = expanded.has(ly.id);
               return (
@@ -611,7 +965,13 @@ export default function App() {
             brush={brush}
             selected={selected}
             marqueeArmed={marquee}
+            createArmed={createArmed}
             onPick={onPick}
+            onCreateAt={onCreateAt}
+            onCopySelection={onCopySelection}
+            canPasteClipboard={canPaste}
+            onPasteClipboard={onPasteClipboard}
+            onDeleteSelection={onDeleteSelection}
             onMove={onMove}
             onMoveGroup={onMoveGroup}
             onResize={onResize}
@@ -637,6 +997,9 @@ export default function App() {
             onSetHouseSlot={onSetHouseSlot}
             onSetWallHeight={onSetWallHeight}
             onSetHouseOverlap={onSetHouseOverlap}
+            onAddHouseDecoration={onAddHouseDecoration}
+            onRemoveHouseDecoration={onRemoveHouseDecoration}
+            onGenerateHouseDecorations={onGenerateHouseDecorations}
           />
         </div>
       )}

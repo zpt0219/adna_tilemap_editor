@@ -15,27 +15,33 @@ export type LiteType =
   | "DUNGEON"
   | "HOUSE";
 
-/** Decoration slots on a HouseObject (index order = draw order). */
-export const DECO_DOOR = 0, DECO_WINDOW = 1, DECO_CHIMNEY = 2;
-export const DECO_COUNT = 3;
-export const DECO_ROLES = ["building_prop/door", "building_prop/window", "building_prop/chimney"] as const;
+export type HouseDecorationKind = "door" | "window" | "chimney" | "any";
 
-/** One movable decoration slot: a top-left cell (data coords) + optional palette
- *  hash override (FIXED_RECT). Unset palette = empty slot / role-resolved. */
-export interface HouseDeco {
+export const HOUSE_DECO_KINDS = ["door", "window", "chimney", "any"] as const satisfies readonly HouseDecorationKind[];
+
+export const HOUSE_DECO_ROLES: Record<Exclude<HouseDecorationKind, "any">, string> = {
+  door: "building_prop/door",
+  window: "building_prop/window",
+  chimney: "building_prop/chimney",
+};
+
+/** One movable house decoration: type + local top-left cell + optional palette
+ *  hash override (FIXED_RECT). Unset palette = role-resolved for known kinds. */
+export interface HouseDecoration {
+  kind: HouseDecorationKind;
   cell: [number, number];
   palette?: string;
 }
 
-/** A composite house (desktop HouseObject port): wall + roof nine-slice bands and
- *  three decoration slots. `wall`/`roof`/`deco[].palette` are optional hash
- *  overrides; unset = resolved by role at compile time. */
+/** A composite house (desktop NineSliceHouseObject port): wall + roof nine-slice
+ *  bands and a dynamic list of FIXED_RECT decorations. `wall`/`roof` and each
+ *  decoration palette are optional hash overrides; unset = role-resolved. */
 export interface HouseData {
   wallHeight: number;  // rows from the bottom (roof height = rect.h - wallHeight)
   overlap: number;     // wall rows extending up behind the roof (0 = none)
   wall?: string;
   roof?: string;
-  deco: HouseDeco[];   // length DECO_COUNT: [door, window, chimney]
+  decorations: HouseDecoration[]; // draw order = array order
 }
 
 /** [x, y, w, h] in tile coords (origin + size, w/h ≥ 1). */
@@ -245,4 +251,22 @@ export function translateObject(o: LiteObject, dx: number, dy: number): void {
   if (o.borderPoints) {
     o.borderPoints = o.borderPoints.map(([x, y]) => [x + dx, y + dy] as Vec2);
   }
+}
+
+export function cloneObjectDeep(o: LiteObject, id = o.id): LiteObject {
+  const next: LiteObject = {
+    ...o,
+    id,
+    rect: [...o.rect] as Rect,
+    tags: { ...o.tags },
+  };
+  if (o.terrain) next.terrain = { ...o.terrain, data: new Int16Array(o.terrain.data) };
+  if (o.borderPoints) next.borderPoints = o.borderPoints.map(([x, y]) => [x, y] as Vec2);
+  if (o.house) {
+    next.house = {
+      ...o.house,
+      decorations: o.house.decorations.map((deco) => ({ ...deco, cell: [...deco.cell] as [number, number] })),
+    };
+  }
+  return next;
 }

@@ -3,14 +3,14 @@
 // plus editor overlays (selection, lock badge, drag ghost). No React / DOM state.
 
 import type { HouseData, LiteObject, LiteTileMap, Rect } from "./model";
-import { DECO_COUNT, eachVisibleDrawOrder, eachVisibleObject, isLocked, roleOf } from "./model";
+import { eachVisibleDrawOrder, eachVisibleObject, isLocked, roleOf } from "./model";
 import { colorForRole, rgbaCss, type RGB } from "./generated/roleColors";
-import type { Palette, PackRuntime } from "./pack/types";
+import { mappingCell, type Palette, type PackRuntime } from "./pack/types";
 import type { Bindings } from "./pack/compile";
 import { blitFixedRect, blitTile } from "./pack/blit";
 import { drawAutotile, autotileCellAtlas } from "./pack/autotile";
 import { blitNineSlice } from "./pack/slice";
-import { effectiveDecoCell, regionForPart } from "./house";
+import { effectiveDecorationCell, regionForPart, wallOverlapRows } from "./house";
 
 export type RenderMode = "blueprint" | "mixed" | "real";
 
@@ -32,6 +32,9 @@ const GRID_MINOR = "rgba(70, 55, 40, 0.086)"; // 22/255
 const GRID_MAJOR = "rgba(70, 55, 40, 0.235)"; // 60/255
 const BORDER = "rgb(0, 0, 0)";
 const SELECT = "rgba(90, 220, 255, 0.95)";
+const paletteEmptyMaskCache = new WeakMap<Palette, boolean[]>();
+let tileProbeCanvas: HTMLCanvasElement | null = null;
+let tileProbeCtx: CanvasRenderingContext2D | null = null;
 
 export interface View {
   scale: number;
@@ -315,14 +318,58 @@ function emitVerticalItems(items: YSortItem[], ord: number, o: LiteObject, s: nu
 
 // Composite a house: wall band (under) → roof band (over) → decorations (top).
 function drawHouse(ctx: CanvasRenderingContext2D, rect: Rect, house: HouseData, wall: Palette | null, roof: Palette | null, deco: (Palette | null)[], atlas: CanvasImageSource, s: number): void {
-  if (wall) blitNineSlice(ctx, atlas, wall, regionForPart(house, rect, 0), s);
-  if (roof) blitNineSlice(ctx, atlas, roof, regionForPart(house, rect, 1), s);
-  for (let slot = 0; slot < DECO_COUNT; slot++) {
-    const p = deco[slot];
+  const overlap = wallOverlapRows(house, rect, roof, roof ? paletteCellEmptyFn(atlas, roof) : null);
+  if (wall) blitNineSlice(ctx, atlas, wall, regionForPart(house, rect, 0, overlap), s);
+  if (roof) blitNineSlice(ctx, atlas, roof, regionForPart(house, rect, 1, overlap), s);
+  for (let index = 0; index < house.decorations.length; index++) {
+    const p = deco[index];
     if (!p) continue;
-    const [cx, cy] = effectiveDecoCell(house, rect, slot, p);
+    const [cx, cy] = effectiveDecorationCell(house, rect, index, p);
     blitFixedRect(ctx, atlas, p, rect[0] + cx, rect[1] + cy, s);
   }
+}
+
+function probeCtx(tileRes: number): CanvasRenderingContext2D | null {
+  if (!tileProbeCanvas) tileProbeCanvas = document.createElement("canvas");
+  if (tileProbeCanvas.width !== tileRes || tileProbeCanvas.height !== tileRes) {
+    tileProbeCanvas.width = tileRes;
+    tileProbeCanvas.height = tileRes;
+  }
+  if (!tileProbeCtx) {
+    tileProbeCtx = tileProbeCanvas.getContext("2d", { willReadFrequently: true });
+    if (tileProbeCtx) tileProbeCtx.imageSmoothingEnabled = false;
+  }
+  return tileProbeCtx;
+}
+
+function paletteCellEmptyFn(atlas: CanvasImageSource, palette: Palette): (col: number, row: number) => boolean {
+  let cached = paletteEmptyMaskCache.get(palette);
+  if (!cached) {
+    cached = [];
+    const ctx = probeCtx(palette.tileResolution);
+    for (let row = 0; row < palette.size[1]; row++) {
+      for (let col = 0; col < palette.size[0]; col++) {
+        const [ax, ay] = mappingCell(palette.mapping, col, row);
+        let empty = false;
+        if (ctx && ax >= 0 && ay >= 0) {
+          ctx.clearRect(0, 0, palette.tileResolution, palette.tileResolution);
+          ctx.drawImage(atlas, ax, ay, palette.tileResolution, palette.tileResolution, 0, 0, palette.tileResolution, palette.tileResolution);
+          const data = ctx.getImageData(0, 0, palette.tileResolution, palette.tileResolution).data;
+          empty = true;
+          for (let i = 3; i < data.length; i += 4) {
+            if (data[i] !== 0) { empty = false; break; }
+          }
+        }
+        cached.push(empty);
+      }
+    }
+    paletteEmptyMaskCache.set(palette, cached);
+  }
+  return (col: number, row: number) => {
+    const c = Math.max(0, Math.min(palette.size[0] - 1, col));
+    const r = Math.max(0, Math.min(palette.size[1] - 1, row));
+    return cached![r * palette.size[0] + c] ?? false;
+  };
 }
 
 function rectsOverlap(a: Rect, b: Rect): boolean {

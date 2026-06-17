@@ -20,7 +20,7 @@ import {
 } from "../render";
 import type { PackRuntime } from "../pack/types";
 import type { Bindings } from "../pack/compile";
-import { clampDecoCell, decorationAt, effectiveDecoCell } from "../house";
+import { clampDecoCell, decorationAt, effectiveDecorationCell } from "../house";
 
 export interface BrushState {
   rgb: RGB;
@@ -49,7 +49,14 @@ interface Props {
   selected: Set<number>;
   /** the one-shot Marquee tool is armed (LMB box-selects, then pops back) */
   marqueeArmed: boolean;
+  /** one-shot create tool: click a tile to place a new object */
+  createArmed: boolean;
   onPick: (id: number | null, additive: boolean) => void;
+  onCreateAt: (tx: number, ty: number) => void;
+  onCopySelection: () => void;
+  canPasteClipboard: boolean;
+  onPasteClipboard: () => void;
+  onDeleteSelection: () => void;
   onMove: (id: number, before: [number, number], after: [number, number]) => void;
   onMoveGroup: (ids: number[], dx: number, dy: number) => void;
   onResize: (id: number, before: Rect, after: Rect) => void;
@@ -125,19 +132,19 @@ function edgeGrab(view: View, rect: Rect, sx: number, sy: number): Edges | "insi
   return l || r || t || b ? { l, r, t, b } : "inside";
 }
 
-function resizeRect(start: Rect, e: Edges, dx: number, dy: number, mapW: number, mapH: number): Rect {
+function resizeRect(start: Rect, e: Edges, dx: number, dy: number, mapW: number, mapH: number, minW = 1, minH = 1): Rect {
   let [x, y, w, h] = start;
   if (e.l) { x += dx; w -= dx; }
   if (e.r) { w += dx; }
   if (e.t) { y += dy; h -= dy; }
   if (e.b) { h += dy; }
-  if (w < 1) { if (e.l) x = start[0] + start[2] - 1; w = 1; }
-  if (h < 1) { if (e.t) y = start[1] + start[3] - 1; h = 1; }
+  if (w < minW) { if (e.l) x = start[0] + start[2] - minW; w = minW; }
+  if (h < minH) { if (e.t) y = start[1] + start[3] - minH; h = minH; }
   if (x < 0) { w += x; x = 0; }
   if (y < 0) { h += y; y = 0; }
   if (x + w > mapW) w = mapW - x;
   if (y + h > mapH) h = mapH - y;
-  return [x, y, Math.max(1, w), Math.max(1, h)];
+  return [x, y, Math.max(minW, w), Math.max(minH, h)];
 }
 
 // Tile rect covered by an N×N brush at (tx,ty), clamped to the map.
@@ -167,8 +174,8 @@ function cursorFor(edges: Edges | "inside" | "outside"): string {
 }
 
 export function CanvasView({
-  map, version, pack, bindings, renderMode, packVersion, onHouseDecoStart, onHouseDecoMove, onHouseDecoEnd, brush, selected, marqueeArmed,
-  onPick, onMove, onMoveGroup, onResize, onToggleLock, onStrokeStart, onStrokePaint, onStrokeEnd,
+  map, version, pack, bindings, renderMode, packVersion, onHouseDecoStart, onHouseDecoMove, onHouseDecoEnd, brush, selected, marqueeArmed, createArmed,
+  onPick, onCreateAt, onCopySelection, canPasteClipboard, onPasteClipboard, onDeleteSelection, onMove, onMoveGroup, onResize, onToggleLock, onStrokeStart, onStrokePaint, onStrokeEnd,
   onMarquee, onMarqueeDone,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -195,6 +202,8 @@ export function CanvasView({
   selectedRef.current = selected;
   const marqueeArmedRef = useRef(marqueeArmed);
   marqueeArmedRef.current = marqueeArmed;
+  const createArmedRef = useRef(createArmed);
+  createArmedRef.current = createArmed;
   // real-tile render context (null = abstract overlay only); read by scheduleDraw
   const rctxRef = useRef<RenderCtx | null>(null);
   rctxRef.current = pack && bindings ? { pack, bindings, renderMode } : null;
@@ -285,7 +294,10 @@ export function CanvasView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [packVersion]);
   useEffect(() => { scheduleDraw(); }, [selected, scheduleDraw]);
-  useEffect(() => { if (canvasRef.current) canvasRef.current.style.cursor = marqueeArmed ? "crosshair" : "default"; }, [marqueeArmed]);
+  useEffect(() => {
+    if (!canvasRef.current) return;
+    canvasRef.current.style.cursor = marqueeArmed || createArmed ? "crosshair" : "default";
+  }, [marqueeArmed, createArmed]);
 
   useEffect(() => {
     resize();
@@ -309,11 +321,11 @@ export function CanvasView({
     const canvas = canvasRef.current;
     if (!canvas) return;
     if (gestureRef.current) return;
-    if (marqueeArmedRef.current) { canvas.style.cursor = "crosshair"; return; }
+    if (marqueeArmedRef.current || createArmedRef.current) { canvas.style.cursor = "crosshair"; return; }
     const sel = primarySel();
     let cur = "default";
     if (sel && brushRef.current.ready && !isLocked(sel)) cur = "crosshair";
-    else if (sel && sel.type === "FIXED_RECT" && !isLocked(sel)) cur = cursorFor(edgeGrab(viewRef.current, sel.rect, sx, sy));
+    else if (sel && (sel.type === "FIXED_RECT" || sel.type === "HOUSE") && !isLocked(sel)) cur = cursorFor(edgeGrab(viewRef.current, sel.rect, sx, sy));
     canvas.style.cursor = cur;
   }, [primarySel]);
 
@@ -365,6 +377,12 @@ export function CanvasView({
     }
 
     // LMB: armed Marquee tool box-selects; otherwise acts on the selected object
+    if (createArmedRef.current) {
+      if (tx >= 0 && ty >= 0 && tx < map.width && ty < map.height) onCreateAt(tx, ty);
+      gestureRef.current = null;
+      scheduleDraw();
+      return;
+    }
     if (marqueeArmedRef.current) {
       g.mode = "marquee"; g.additive = ctrl; g.downSx = sx; g.downSy = sy; g.startTx = tx; g.startTy = ty;
       marqueeBoxRef.current = { x: sx, y: sy, w: 0, h: 0 };
@@ -376,14 +394,14 @@ export function CanvasView({
     if (!sel || isLocked(sel)) { gestureRef.current = null; return; }
     // house decoration drag takes priority over house move/resize when a deco is clicked
     if (sel.type === "HOUSE" && sel.house && bindings) {
-      const hb = bindings.get(sel.id);
-      if (hb && hb.kind === "house") {
-        const slot = decorationAt(sel.house, sel.rect, hb.deco, tx, ty);
-        if (slot >= 0) {
-          const [cx, cy] = effectiveDecoCell(sel.house, sel.rect, slot, hb.deco[slot]);
-          g.mode = "deco"; g.id = sel.id; g.decoSlot = slot;
-          g.grabOffset = [tx - sel.rect[0] - cx, ty - sel.rect[1] - cy];
-          onHouseDecoStart(sel.id, slot);
+        const hb = bindings.get(sel.id);
+        if (hb && hb.kind === "house") {
+          const slot = decorationAt(sel.house, sel.rect, hb.deco, tx, ty);
+          if (slot >= 0) {
+            const [cx, cy] = effectiveDecorationCell(sel.house, sel.rect, slot, hb.deco[slot]);
+            g.mode = "deco"; g.id = sel.id; g.decoSlot = slot;
+            g.grabOffset = [tx - sel.rect[0] - cx, ty - sel.rect[1] - cy];
+            onHouseDecoStart(sel.id, slot);
           gestureRef.current = g;
           return;
         }
@@ -409,7 +427,7 @@ export function CanvasView({
     // FRG / DUNGEON: interior move
     g.mode = "move"; g.id = sel.id; g.startRect = sel.rect; ghostRef.current = [sel.rect];
     gestureRef.current = g;
-  }, [map, onPick, onStrokeStart, primarySel, scheduleDraw, bindings, onHouseDecoStart]);
+  }, [map, onCreateAt, onPick, onStrokeStart, primarySel, scheduleDraw, bindings, onHouseDecoStart]);
 
   const onPointerMove = useCallback((e: React.PointerEvent) => {
     const rect = canvasRef.current!.getBoundingClientRect();
@@ -452,7 +470,12 @@ export function CanvasView({
         const [fx, fy] = screenToTile(viewRef.current, sx, sy);
         const dx = Math.round(fx - g.downFx), dy = Math.round(fy - g.downFy);
         if (g.mode === "move") ghostRef.current = [[g.startRect[0] + dx, g.startRect[1] + dy, g.startRect[2], g.startRect[3]]];
-        else ghostRef.current = [resizeRect(g.startRect, g.edges!, dx, dy, map.width, map.height)];
+        else {
+          const selectedObject = g.id != null ? findObject(map, g.id) : null;
+          const minW = selectedObject?.type === "HOUSE" ? 2 : 1;
+          const minH = selectedObject?.type === "HOUSE" ? 2 : 1;
+          ghostRef.current = [resizeRect(g.startRect, g.edges!, dx, dy, map.width, map.height, minW, minH)];
+        }
         scheduleDraw();
       } else if (g.mode === "pan") {
         const v = viewRef.current;
@@ -547,6 +570,10 @@ export function CanvasView({
         <div className="obj-toolbar" style={{ left: selBox.x, top: selBox.y - 36 }}>
           <span className="ot-type">{selObj.type.replace(/_/g, " ").toLowerCase()}</span>
           {roleOf(selObj) && <code className="ot-role">{roleOf(selObj)}</code>}
+          {selected.size > 1 && <span className="ot-count">{selected.size} selected</span>}
+          <button onClick={onCopySelection}>Copy</button>
+          <button disabled={!canPasteClipboard} onClick={onPasteClipboard}>Paste</button>
+          <button onClick={onDeleteSelection} className="danger">Delete</button>
           <button onClick={onToggleLock} className={locked ? "active" : ""}>
             {locked ? "🔒 Unlock" : "🔓 Lock"}
           </button>

@@ -3,7 +3,8 @@
 // and src/command/commands_blueprint.cpp compileLayer's FRG branch). MVP style
 // ranking only (no MiniLM cosine): prefer palettes sharing a style word.
 
-import { eachObject, roleOf, DECO_ROLES, type LiteObject, type LiteTileMap, type LiteType } from "../model";
+import { eachObject, roleOf, type LiteObject, type LiteTileMap, type LiteType } from "../model";
+import { decorationRole } from "../house";
 import { PaletteMode, type Palette, type PackRuntime } from "./types";
 import { assignFrgCells } from "./frg";
 import { hashString, mulberry32 } from "./rng";
@@ -145,8 +146,10 @@ export function compileMap(map: LiteTileMap, pack: PackRuntime): Bindings {
         ?? resolveSlotPalette(pack.palettes, "building/house", style, seed ^ 0x13, PaletteMode.CLIFF);
       const roof = pick(h.roof)
         ?? resolveSlotPalette(pack.palettes, "building/house_roof", style, seed ^ 0x17, PaletteMode.NINE_PATCH);
-      const deco = DECO_ROLES.map((dRole, i) =>
-        pick(h.deco[i]?.palette) ?? resolveDecoPalette(pack.palettes, dRole, style, seed ^ (0x20 + i)));
+      const deco = h.decorations.map((decoration, i) => {
+        const role = decorationRole(decoration.kind);
+        return pick(decoration.palette) ?? (role ? resolveDecoPalette(pack.palettes, role, style, seed ^ (0x20 + i)) : null);
+      });
       out.set(o.id, { kind: "house", wall, roof, deco });
       continue;
     }

@@ -9,7 +9,7 @@ import { blitTile } from "./blit";
 
 /** Map object-axis coord `idx` (0..n-1) to a palette index along that axis, for
  *  a P-wide nine-slice with border `b`. Verbatim port of nineSliceAxisIndex. */
-function axisIndex(idx: number, n: number, b: number, P: number): number {
+export function axisIndex(idx: number, n: number, b: number, P: number): number {
   b = Math.min(Math.max(b, 0), Math.floor((P - 1) / 2));
   const bEff = Math.min(b, Math.floor(n / 2));
   if (idx < bEff) return idx;

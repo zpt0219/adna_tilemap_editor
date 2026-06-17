@@ -64,6 +64,14 @@ button.active {
   background: #2f3b52;
   color: #cfe0ff;
 }
+button.danger {
+  border-color: #6a3942;
+  color: #ffd4d8;
+}
+button.danger:hover {
+  border-color: #d96b7a;
+  color: #fff1f3;
+}
 
 /* segmented button group */
 .seg {
@@ -331,6 +339,74 @@ button.active {
 }
 .layers-head .legend-title { margin-bottom: 0; }
 .layers-head .seg button { padding: 2px 7px; }
+.create-panel {
+  margin: 0 0 12px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(106, 160, 255, 0.08), rgba(106, 160, 255, 0)),
+    var(--panel-2);
+}
+.create-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.create-head .legend-title { margin-bottom: 0; }
+.create-panel select {
+  width: 100%;
+  margin-bottom: 8px;
+  background: #161a20;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 8px;
+  font: inherit;
+}
+.create-panel select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.create-kind {
+  display: flex;
+  width: 100%;
+  margin-bottom: 6px;
+}
+.create-kind button {
+  flex: 1;
+  padding-left: 0;
+  padding-right: 0;
+}
+.create-palette-grid {
+  grid-template-columns: repeat(auto-fill, 44px);
+  margin-bottom: 8px;
+  max-height: 192px;
+}
+.create-meta {
+  display: grid;
+  gap: 3px;
+  margin-bottom: 6px;
+  padding: 8px;
+  border-radius: 6px;
+  background: rgba(15, 18, 24, 0.55);
+  border: 1px solid rgba(106, 160, 255, 0.12);
+}
+.create-style {
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+.create-role,
+.create-size {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.2;
+  word-break: break-word;
+}
 .layer-row {
   display: flex;
   align-items: center;
