@@ -3,7 +3,7 @@ import { parseBlueprint } from "./blueprint";
 import { blueprintToLite } from "./convert";
 import { normalizeToCategories } from "./normalize";
 import { assignUniqueObjectNames, cloneTerrain, displayName, findLayer, findObject, isLocked, layerOfObject, roleOf, setTerrainCell, type LiteObject, type LiteTileMap, type Rect } from "./model";
-import { UndoStack, moveHouseDecoCommand, moveObjectCommand, moveObjectsCommand, paintTerrainCommand, renameObjectCommand, reorderLayerObjectsCommand, resizeObjectCommand, setHouseDecoPaletteCommand, setHouseSlotPaletteCommand, setObjectsEnabledCommand, setObjectPaletteCommand, setObjectTypeCommand, setWallHeightCommand, toggleLayerEnabledCommand, toggleObjectEnabledCommand, type Command, type TerrainSnapshot } from "./commands";
+import { UndoStack, moveHouseDecoCommand, moveObjectCommand, moveObjectsCommand, paintTerrainCommand, renameObjectCommand, reorderLayerObjectsCommand, resizeObjectCommand, setHouseDecoPaletteCommand, setHouseOverlapCommand, setHouseSlotPaletteCommand, setObjectsEnabledCommand, setObjectPaletteCommand, setObjectTypeCommand, setWallHeightCommand, toggleLayerEnabledCommand, toggleObjectEnabledCommand, type Command, type TerrainSnapshot } from "./commands";
 import type { LiteType } from "./model";
 import { liteToWebSave } from "./saveFormat";
 import { clearDraft, loadDraft, saveDraft } from "./draft";
@@ -393,7 +393,7 @@ export default function App() {
     if (after[0] !== d.before[0] || after[1] !== d.before[1]) run(moveHouseDecoCommand(map, d.id, d.slot, d.before, after));
   }, [map, run]);
 
-  // --- house inspector: per-slot palette + wall height ---
+  // --- house inspector: per-slot palette + wall height/overlap ---
   const onSetHouseSlot = useCallback((id: number, slot: "wall" | "roof" | number, hash: string | null) => {
     if (!map) return;
     const o = findObject(map, id);
@@ -411,6 +411,12 @@ export default function App() {
     if (!map) return;
     const o = findObject(map, id);
     if (o?.house && o.house.wallHeight !== height) run(setWallHeightCommand(map, id, o.house.wallHeight, height));
+  }, [map, run]);
+
+  const onSetHouseOverlap = useCallback((id: number, overlap: number) => {
+    if (!map) return;
+    const o = findObject(map, id);
+    if (o?.house && o.house.overlap !== overlap) run(setHouseOverlapCommand(map, id, o.house.overlap, overlap));
   }, [map, run]);
 
   const onObjectDragStart = useCallback((layerId: number, objectId: number) => (e: ReactDragEvent<HTMLDivElement>) => {
@@ -630,6 +636,7 @@ export default function App() {
             onSetPalette={onSetPalette}
             onSetHouseSlot={onSetHouseSlot}
             onSetWallHeight={onSetWallHeight}
+            onSetHouseOverlap={onSetHouseOverlap}
           />
         </div>
       )}

@@ -1,12 +1,13 @@
-// PropsPanel — the right sidebar. Layer + Object inspection, plus (when a pack
-// is loaded) a Palette panel: convert a terrain object's autotile type and
-// manually replace the palette bound to the selected object.
+// PropsPanel — the right sidebar. Layer + Object inspection, plus palette
+// selection via a shared modal picker backed by the loaded pack.
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { DECO_ROLES, displayName, isLocked, roleOf, type Layer, type LiteObject, type LiteType } from "../model";
 import { colorForRole, rgbaCss } from "../generated/roleColors";
-import { mappingCell, PaletteMode, type Palette, type PackRuntime } from "../pack/types";
-import { roleTreeDistance, type Bindings } from "../pack/compile";
+import type { Palette, PackRuntime } from "../pack/types";
+import type { Bindings } from "../pack/compile";
+import { PalettePickerModal, type PalettePickerRequest } from "./PalettePickerModal";
+import { PaletteSwatch } from "./PaletteSwatch";
 
 // Friendly object-type names (the engine TYPE → a word a map-maker reads).
 const TYPE_LABEL: Record<LiteObject["type"], string> = {
@@ -39,6 +40,7 @@ export interface PropsPanelProps {
   onSetPalette: (id: number, hash: string | null) => void;
   onSetHouseSlot: (id: number, slot: "wall" | "roof" | number, hash: string | null) => void;
   onSetWallHeight: (id: number, height: number) => void;
+  onSetHouseOverlap: (id: number, overlap: number) => void;
 }
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
@@ -50,78 +52,65 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
   );
 }
 
-// A small atlas-cropped preview of a palette (its size[w,h] tile block).
-function PaletteSwatch({ pack, palette, px = 40 }: { pack: PackRuntime; palette: Palette; px?: number }) {
-  const ref = useRef<HTMLCanvasElement>(null);
-  useEffect(() => {
-    const cv = ref.current;
-    const ctx = cv?.getContext("2d");
-    if (!cv || !ctx) return;
-    const [bx, by] = mappingCell(palette.mapping, 0, 0);
-    const tr = palette.tileResolution;
-    const sw = palette.size[0] * tr, sh = palette.size[1] * tr;
-    const f = Math.min(px / sw, px / sh);
-    const dw = Math.max(1, Math.round(sw * f)), dh = Math.max(1, Math.round(sh * f));
-    ctx.clearRect(0, 0, px, px);
-    ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(pack.atlas, bx, by, sw, sh, Math.floor((px - dw) / 2), Math.floor((px - dh) / 2), dw, dh);
-  }, [pack, palette, px]);
-  return <canvas ref={ref} width={px} height={px} className="pal-sw" />;
+function paletteSummary(p: Palette | null): string {
+  if (!p) return "Auto";
+  return p.style ? `${p.role} · ${p.style}` : p.role;
 }
 
-// Reusable palette grid for one role/slot: in-range candidates (or 全部), with
-// the current one highlighted, an Auto reset, and a click → onPick(hash).
-function PalettePicker({ pack, label, role, currentHash, hasOverride, onPick, onAuto }: {
-  pack: PackRuntime; label: string; role: string; currentHash: string | undefined;
-  hasOverride: boolean; onPick: (hash: string) => void; onAuto: () => void;
+function PaletteField({
+  pack,
+  label,
+  current,
+  hasOverride,
+  onChange,
+  onAuto,
+}: {
+  pack: PackRuntime;
+  label: string;
+  current: Palette | null;
+  hasOverride: boolean;
+  onChange: () => void;
+  onAuto: () => void;
 }) {
-  const [showAll, setShowAll] = useState(false);
-  const ranked = useMemo(() => {
-    const arr = pack.palettes.map((p) => ({ p, d: roleTreeDistance(role, p.role) }));
-    const list = showAll ? arr : arr.filter((x) => x.d <= 2);
-    list.sort((a, b) => a.d - b.d || a.p.role.localeCompare(b.p.role) || a.p.style.localeCompare(b.p.style));
-    return list;
-  }, [pack, role, showAll]);
-
   return (
-    <div className="pal-picker">
+    <div className="pal-field">
       <div className="pal-picker-head">
         <span className="prop-label">{label}</span>
+        <button className="pal-auto" onClick={onChange}>Change...</button>
         <button className="pal-auto" disabled={!hasOverride} onClick={onAuto} title="恢复按 role 自动选">Auto</button>
-        <label className="pal-all"><input type="checkbox" checked={showAll} onChange={(e) => setShowAll(e.target.checked)} /> 全部</label>
       </div>
-      <div className="pal-grid">
-        {ranked.map(({ p, d }) => (
-          <button
-            key={p.hash}
-            className={`pal-cell${p.hash === currentHash ? " sel" : ""}`}
-            title={`${p.role}${p.style ? " · " + p.style : ""} · ${PaletteMode[p.mode] ?? p.mode}${d > 0 ? ` · d${d}` : ""}`}
-            onClick={() => onPick(p.hash)}
-          >
-            <PaletteSwatch pack={pack} palette={p} />
-          </button>
-        ))}
-        {ranked.length === 0 && <span className="prop-empty">无同类 palette（勾「全部」看所有）</span>}
+      <div className="pal-current">
+        {current ? <PaletteSwatch pack={pack} palette={current} px={36} /> : <div className="pal-placeholder">Auto</div>}
+        <span className="pal-current-text" title={paletteSummary(current)}>{paletteSummary(current)}</span>
       </div>
     </div>
   );
 }
 
-// House inspector: wall-height stepper + per-slot palette pickers (wall/roof/door/window/chimney).
-function HouseSlots({ o, pack, bindings, onSetHouseSlot, onSetWallHeight }: {
-  o: LiteObject; pack: PackRuntime; bindings: Bindings | null;
+// House inspector: wall-height/overlap steppers + per-slot palette controls.
+function HouseSlots({ o, pack, bindings, paletteByHash, onOpenPalettePicker, onSetHouseSlot, onSetWallHeight, onSetHouseOverlap }: {
+  o: LiteObject; pack: PackRuntime; bindings: Bindings | null; paletteByHash: Map<string, Palette>;
+  onOpenPalettePicker: (request: PalettePickerRequest) => void;
   onSetHouseSlot: (id: number, slot: "wall" | "roof" | number, hash: string | null) => void;
   onSetWallHeight: (id: number, height: number) => void;
+  onSetHouseOverlap: (id: number, overlap: number) => void;
 }) {
   const h = o.house!;
   const b = bindings?.get(o.id);
   const hb = b && b.kind === "house" ? b : null;
   const maxWallH = Math.max(1, o.rect[3] - 1);
-  const slots: { label: string; role: string; key: "wall" | "roof" | number; cur?: string; over: boolean }[] = [
-    { label: "Wall", role: "building/house_wall", key: "wall", cur: h.wall ?? hb?.wall?.hash, over: !!h.wall },
-    { label: "Roof", role: "building/house_roof", key: "roof", cur: h.roof ?? hb?.roof?.hash, over: !!h.roof },
+  const maxOverlap = Math.max(0, o.rect[3] - h.wallHeight);
+  const pick = (hash?: string) => (hash ? paletteByHash.get(hash) ?? null : null);
+  const slots: { label: string; role: string; key: "wall" | "roof" | number; currentHash?: string; current: Palette | null; over: boolean }[] = [
+    { label: "Wall", role: "building/house_wall", key: "wall", currentHash: h.wall ?? hb?.wall?.hash, current: pick(h.wall) ?? hb?.wall ?? null, over: !!h.wall },
+    { label: "Roof", role: "building/house_roof", key: "roof", currentHash: h.roof ?? hb?.roof?.hash, current: pick(h.roof) ?? hb?.roof ?? null, over: !!h.roof },
     ...["Door", "Window", "Chimney"].map((label, i) => ({
-      label, role: DECO_ROLES[i], key: i, cur: h.deco[i].palette ?? hb?.deco[i]?.hash, over: !!h.deco[i].palette,
+      label,
+      role: DECO_ROLES[i],
+      key: i,
+      currentHash: h.deco[i].palette ?? hb?.deco[i]?.hash,
+      current: pick(h.deco[i].palette) ?? hb?.deco[i] ?? null,
+      over: !!h.deco[i].palette,
     })),
   ];
   return (
@@ -132,21 +121,38 @@ function HouseSlots({ o, pack, bindings, onSetHouseSlot, onSetWallHeight }: {
           onChange={(e) => onSetWallHeight(o.id, Math.max(1, Math.min(maxWallH, parseInt(e.target.value, 10) || 1)))}
         />
       </Row>
+      <Row label="Overlap">
+        <input
+          className="prop-num" type="number" min={0} max={maxOverlap} value={Math.max(0, h.overlap)}
+          onChange={(e) => onSetHouseOverlap(o.id, Math.max(0, Math.min(maxOverlap, parseInt(e.target.value, 10) || 0)))}
+        />
+      </Row>
       <div className="prop-hint">拖动门/窗在房子范围内移动</div>
       {slots.map((sl) => (
-        <PalettePicker
-          key={sl.label} pack={pack} label={sl.label} role={sl.role} currentHash={sl.cur} hasOverride={sl.over}
-          onPick={(hash) => onSetHouseSlot(o.id, sl.key, hash)} onAuto={() => onSetHouseSlot(o.id, sl.key, null)}
+        <PaletteField
+          key={sl.label} pack={pack} label={sl.label} hasOverride={sl.over}
+          current={sl.current}
+          onChange={() => onOpenPalettePicker({
+            title: `Select ${sl.label} Palette`,
+            role: sl.role,
+            currentHash: sl.currentHash,
+            hasOverride: sl.over,
+            onPick: (hash) => onSetHouseSlot(o.id, sl.key, hash),
+            onAuto: () => onSetHouseSlot(o.id, sl.key, null),
+          })}
+          onAuto={() => onSetHouseSlot(o.id, sl.key, null)}
         />
       ))}
     </>
   );
 }
 
-function ObjectBody({ o, pack, bindings, onSetVisible, onToggleLock, onRename, onSetObjectType, onSetPalette, onSetHouseSlot, onSetWallHeight }: {
+function ObjectBody({ o, pack, bindings, paletteByHash, onOpenPalettePicker, onSetVisible, onToggleLock, onRename, onSetObjectType, onSetPalette, onSetHouseSlot, onSetWallHeight, onSetHouseOverlap }: {
   o: LiteObject;
   pack: PackRuntime | null;
   bindings: Bindings | null;
+  paletteByHash: Map<string, Palette>;
+  onOpenPalettePicker: (request: PalettePickerRequest) => void;
   onSetVisible: (visible: boolean) => void;
   onToggleLock: () => void;
   onRename: (id: number, name: string) => void;
@@ -154,6 +160,7 @@ function ObjectBody({ o, pack, bindings, onSetVisible, onToggleLock, onRename, o
   onSetPalette: (id: number, hash: string | null) => void;
   onSetHouseSlot: (id: number, slot: "wall" | "roof" | number, hash: string | null) => void;
   onSetWallHeight: (id: number, height: number) => void;
+  onSetHouseOverlap: (id: number, overlap: number) => void;
 }) {
   const shown = displayName(o);
   const rgb = colorForRole(roleOf(o));
@@ -170,6 +177,9 @@ function ObjectBody({ o, pack, bindings, onSetVisible, onToggleLock, onRename, o
     : b.kind === "house" ? b.wall?.hash
     : b.palette.hash;
   const currentHash = o.tags["web.palette"] ?? boundHash;
+  const currentPalette = (o.tags["web.palette"] ? paletteByHash.get(o.tags["web.palette"]) : undefined)
+    ?? (boundHash ? paletteByHash.get(boundHash) : undefined)
+    ?? null;
 
   return (
     <>
@@ -204,10 +214,31 @@ function ObjectBody({ o, pack, bindings, onSetVisible, onToggleLock, onRename, o
 
       {/* palette: house slots, or single-object override */}
       {pack && (o.type === "HOUSE" && o.house
-        ? <HouseSlots o={o} pack={pack} bindings={bindings} onSetHouseSlot={onSetHouseSlot} onSetWallHeight={onSetWallHeight} />
-        : <PalettePicker
-            pack={pack} label="Palette" role={roleOf(o)} currentHash={currentHash} hasOverride={!!o.tags["web.palette"]}
-            onPick={(h) => onSetPalette(o.id, h)} onAuto={() => onSetPalette(o.id, null)} />
+        ? <HouseSlots
+            o={o}
+            pack={pack}
+            bindings={bindings}
+            paletteByHash={paletteByHash}
+            onOpenPalettePicker={onOpenPalettePicker}
+            onSetHouseSlot={onSetHouseSlot}
+            onSetWallHeight={onSetWallHeight}
+            onSetHouseOverlap={onSetHouseOverlap}
+          />
+        : <PaletteField
+            pack={pack}
+            label="Palette"
+            current={currentPalette}
+            hasOverride={!!o.tags["web.palette"]}
+            onChange={() => onOpenPalettePicker({
+              title: "Select Palette",
+              role: roleOf(o),
+              currentHash,
+              hasOverride: !!o.tags["web.palette"],
+              onPick: (h) => onSetPalette(o.id, h),
+              onAuto: () => onSetPalette(o.id, null),
+            })}
+            onAuto={() => onSetPalette(o.id, null)}
+          />
       )}
 
       <div className="prop-checks">
@@ -222,9 +253,20 @@ function ObjectBody({ o, pack, bindings, onSetVisible, onToggleLock, onRename, o
   );
 }
 
-export function PropsPanel({ layer, objects, pack, bindings, onToggleLayerVisible, onSetObjectsVisible, onToggleLock, onRename, onSetObjectType, onSetPalette, onSetHouseSlot, onSetWallHeight }: PropsPanelProps) {
+export function PropsPanel({ layer, objects, pack, bindings, onToggleLayerVisible, onSetObjectsVisible, onToggleLock, onRename, onSetObjectType, onSetPalette, onSetHouseSlot, onSetWallHeight, onSetHouseOverlap }: PropsPanelProps) {
   const primary = objects[0] ?? null;
   const allVisible = objects.length > 0 && objects.every((o) => o.enabled);
+  const paletteByHash = useMemo(() => new Map((pack?.palettes ?? []).map((p) => [p.hash, p])), [pack]);
+  const [picker, setPicker] = useState<PalettePickerRequest | null>(null);
+
+  const onClosePicker = useCallback(() => setPicker(null), []);
+  const onOpenPalettePicker = useCallback((request: PalettePickerRequest) => {
+    setPicker({
+      ...request,
+      onPick: (hash) => { request.onPick(hash); setPicker(null); },
+      onAuto: () => { request.onAuto(); setPicker(null); },
+    });
+  }, []);
 
   return (
     <aside className="props">
@@ -271,6 +313,8 @@ export function PropsPanel({ layer, objects, pack, bindings, onToggleLayerVisibl
             o={primary}
             pack={pack}
             bindings={bindings}
+            paletteByHash={paletteByHash}
+            onOpenPalettePicker={onOpenPalettePicker}
             onSetVisible={onSetObjectsVisible}
             onToggleLock={onToggleLock}
             onRename={onRename}
@@ -278,9 +322,11 @@ export function PropsPanel({ layer, objects, pack, bindings, onToggleLayerVisibl
             onSetPalette={onSetPalette}
             onSetHouseSlot={onSetHouseSlot}
             onSetWallHeight={onSetWallHeight}
+            onSetHouseOverlap={onSetHouseOverlap}
           />
         ) : null}
       </section>
+      <PalettePickerModal pack={pack} request={picker} onClose={onClosePicker} />
     </aside>
   );
 }

@@ -179,6 +179,12 @@ export function setWallHeightCommand(map: LiteTileMap, id: number, before: numbe
   return { label: "Wall height", do: () => set(after), undo: () => set(before) };
 }
 
+/** Change a house's wall/roof overlap rows. */
+export function setHouseOverlapCommand(map: LiteTileMap, id: number, before: number, after: number): Command {
+  const set = (v: number) => { const o = findObject(map, id); if (o?.house) o.house.overlap = v; };
+  return { label: "House overlap", do: () => set(after), undo: () => set(before) };
+}
+
 export interface TerrainSnapshot {
   terrain: TerrainMatrix;
   rect: Rect;

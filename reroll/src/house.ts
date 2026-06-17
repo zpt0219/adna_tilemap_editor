@@ -17,7 +17,7 @@ export function wallHeightOf(house: HouseData, h: number): number {
 export function regionForPart(house: HouseData, rect: Rect, part: 0 | 1): Rect {
   const [ox, oy, w, h] = rect;
   const wallH = wallHeightOf(house, h);
-  const overlap = house.overlap < 0 ? 0 : house.overlap; // auto(-1) → 0 for v1
+  const overlap = clamp(house.overlap, 0, Math.max(0, h - wallH));
   if (part === 0) {
     const wallTop = Math.max(0, h - wallH - overlap); // wall extends up behind the roof
     return [ox, oy + wallTop, w, h - wallTop];
@@ -66,5 +66,5 @@ export function defaultDecoCells(w: number, h: number, wallH: number): HouseDeco
 /** build fresh HouseData for a w×h footprint. */
 export function makeHouse(w: number, h: number): HouseData {
   const wallHeight = Math.max(1, Math.floor(h / 2));
-  return { wallHeight, overlap: 0, deco: defaultDecoCells(w, h, wallHeight) };
+  return { wallHeight, overlap: 1, deco: defaultDecoCells(w, h, wallHeight) };
 }

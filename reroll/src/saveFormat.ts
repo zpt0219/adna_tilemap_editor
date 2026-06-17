@@ -12,6 +12,7 @@ export const WEB_SAVE_VERSION = 1;
 
 export interface WebSaveHouse {
   wallHeight: number;
+  overlap: number;
   wall?: string;
   roof?: string;
   decorations: { slot: number; cell: Vec2; palette?: string }[];
@@ -74,6 +75,7 @@ function objectJson(o: LiteObject): WebSaveObject {
         const h = o.house;
         out.house = {
           wallHeight: h.wallHeight,
+          overlap: h.overlap,
           ...(h.wall ? { wall: h.wall } : {}),
           ...(h.roof ? { roof: h.roof } : {}),
           decorations: h.deco.map((d, slot) => ({ slot, cell: [d.cell[0], d.cell[1]] as Vec2, ...(d.palette ? { palette: d.palette } : {}) })),

@@ -32,7 +32,7 @@ export interface HouseDeco {
  *  overrides; unset = resolved by role at compile time. */
 export interface HouseData {
   wallHeight: number;  // rows from the bottom (roof height = rect.h - wallHeight)
-  overlap: number;     // wall rows backing transparent roof eaves (-1 = auto; 0 = none)
+  overlap: number;     // wall rows extending up behind the roof (0 = none)
   wall?: string;
   roof?: string;
   deco: HouseDeco[];   // length DECO_COUNT: [door, window, chimney]
