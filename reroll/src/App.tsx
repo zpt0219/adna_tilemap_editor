@@ -10,11 +10,12 @@ import { clearDraft, loadDraft, saveDraft } from "./draft";
 import { downloadJson } from "./download";
 import { colorForRole } from "./generated/roleColors";
 import { CanvasView, type BrushState } from "./components/CanvasView";
-import { PaletteSwatch } from "./components/PaletteSwatch";
+import { PalettePickerModal, type PaletteCreateRequest } from "./components/PalettePickerModal";
 import { PropsPanel } from "./components/PropsPanel";
 import { loadPackFromUrl } from "./pack/loadPack";
 import { compileMap } from "./pack/compile";
 import { PaletteMode, type Palette, type PackRuntime } from "./pack/types";
+import { isStructureMode } from "./pack/slice";
 import type { RenderMode } from "./render";
 import { generateDecorations } from "./house";
 import { createObjectForRole, type CreateKind } from "./objectFactory";
@@ -53,6 +54,10 @@ interface CreatePaletteChoice {
   role: string;
 }
 
+const HOUSE_CREATE_ROLE = "building/house";
+const HOUSE_WALL_ROLE = "building/house_wall";
+const HOUSE_ROOF_ROLE = "building/house_roof";
+
 function dropSideFromEvent(e: ReactDragEvent<HTMLDivElement>): DropSide {
   const rect = e.currentTarget.getBoundingClientRect();
   return e.clientY < rect.top + rect.height / 2 ? "before" : "after";
@@ -70,6 +75,14 @@ function reorderWithinLayer(ids: number[], sourceId: number, targetId: number, s
 
 function sameOrder(a: number[], b: number[]): boolean {
   return a.length === b.length && a.every((v, i) => v === b[i]);
+}
+
+function sortCreateChoices<T extends CreatePaletteChoice>(choices: T[]): T[] {
+  return choices.slice().sort((a, b) =>
+    a.kind.localeCompare(b.kind)
+    || a.role.localeCompare(b.role)
+    || a.palette.style.localeCompare(b.palette.style)
+    || a.palette.hash.localeCompare(b.palette.hash));
 }
 
 function uniqueName(existing: Set<string>, base: string): string {
@@ -117,11 +130,10 @@ export default function App() {
   const [pack, setPack] = useState<PackRuntime | null>(null);
   const [renderMode, setRenderMode] = useState<RenderMode>("mixed");
   const [packVersion, setPackVersion] = useState(0);
+  const [layersWidth, setLayersWidth] = useState(() => Number(localStorage.getItem("reroll_layers_w")) || 280);
   // draggable width of the right props panel (px), persisted
   const [propsWidth, setPropsWidth] = useState(() => Number(localStorage.getItem("reroll_props_w")) || 240);
   const [selected, setSelected] = useState<Set<number>>(new Set());
-  // anchor for Shift-range selection (the last plainly-picked / Ctrl-toggled id)
-  const [anchorId, setAnchorId] = useState<number | null>(null);
   // one-shot Marquee tool armed (docs/SELECTION_MODEL.md); LMB box-selects, then pops back
   const [marquee, setMarquee] = useState(false);
   const [brushSize, setBrushSize] = useState(3);
@@ -133,8 +145,12 @@ export default function App() {
   const [dropTarget, setDropTarget] = useState<DropTarget | null>(null);
   const [createKind, setCreateKind] = useState<CreateKind>("fixed_rect");
   const [createPaletteHash, setCreatePaletteHash] = useState("");
+  const [createHouseWallHash, setCreateHouseWallHash] = useState("");
+  const [createHouseRoofHash, setCreateHouseRoofHash] = useState("");
   const [createArmed, setCreateArmed] = useState(false);
+  const [createModalOpen, setCreateModalOpen] = useState(false);
   const [clipboard, setClipboard] = useState<ObjectClipboard | null>(null);
+  const [anchorId, setAnchorId] = useState<number | null>(null);
   const undo = useRef(new UndoStack());
   const stroke = useRef<{ id: number; before: TerrainSnapshot; dirty: boolean } | null>(null);
   const decoDrag = useRef<{ id: number; index: number; before: [number, number] } | null>(null);
@@ -172,9 +188,10 @@ export default function App() {
 
   const toggleExpand = useCallback((id: number) => {
     setExpanded((prev) => {
-      const n = new Set(prev);
-      if (n.has(id)) n.delete(id); else n.add(id);
-      return n;
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
     });
   }, []);
 
@@ -218,8 +235,25 @@ export default function App() {
     return () => { window.removeEventListener("drop", onDrop); window.removeEventListener("dragover", onDragOver); };
   }, [loadFile]);
 
+  // drag the layers|canvas divider to resize the left panel
+  const startLayersResize = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    const onMove = (ev: MouseEvent) =>
+      setLayersWidth(Math.min(420, Math.max(220, ev.clientX)));
+    const onUp = () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+  }, []);
+
   // drag the canvas|props divider to resize the right panel
-  const startResize = useCallback((e: React.MouseEvent) => {
+  const startPropsResize = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     const onMove = (ev: MouseEvent) =>
       setPropsWidth(Math.min(560, Math.max(180, window.innerWidth - ev.clientX)));
@@ -234,6 +268,7 @@ export default function App() {
     document.body.style.cursor = "col-resize";
     document.body.style.userSelect = "none";
   }, []);
+  useEffect(() => { localStorage.setItem("reroll_layers_w", String(layersWidth)); }, [layersWidth]);
   useEffect(() => { localStorage.setItem("reroll_props_w", String(propsWidth)); }, [propsWidth]);
 
   // autosave the edit session to localStorage (debounced) — only after a real
@@ -320,7 +355,7 @@ export default function App() {
   // --- selection (single-layer; docs/SELECTION_MODEL.md) ---
   const revealLayer = useCallback((layerId: number) => {
     setActiveLayerId(layerId);
-    setExpanded((p) => new Set(p).add(layerId));
+    setExpanded((prev) => new Set(prev).add(layerId));
   }, []);
 
   // Replace selection with a single object (switch active layer, set anchor).
@@ -344,10 +379,8 @@ export default function App() {
       return next;
     });
     setAnchorId(id);
-    setExpanded((p) => new Set(p).add(ly.id));
   }, [map, activeLayerId, selectSingle]);
 
-  // Shift-range from anchor to id within one layer's object order (replace).
   const selectRange = useCallback((id: number) => {
     if (!map) return;
     const ly = layerOfObject(map, id);
@@ -357,7 +390,7 @@ export default function App() {
     if (ai < 0 || ti < 0) { selectSingle(id); return; }
     const [lo, hi] = ai <= ti ? [ai, ti] : [ti, ai];
     setSelected(new Set(ly.objects.slice(lo, hi + 1).map((o) => o.id)));
-    revealLayer(ly.id); // anchor unchanged so the range can grow/shrink
+    revealLayer(ly.id);
   }, [map, anchorId, activeLayerId, selectSingle, revealLayer]);
 
   // RMB pick: plain = single, Ctrl = toggle. Empty click is a no-op.
@@ -366,7 +399,6 @@ export default function App() {
     if (additive) toggleSelect(id); else selectSingle(id);
   }, [toggleSelect, selectSingle]);
 
-  // Panel row click with modifiers.
   const onObjectClick = useCallback((id: number, mods: { ctrl: boolean; shift: boolean }) => {
     if (mods.shift) selectRange(id);
     else if (mods.ctrl) toggleSelect(id);
@@ -513,6 +545,7 @@ export default function App() {
     const after = generateDecorations(o.house, o.rect, hb.deco, seed);
     if (JSON.stringify(before) !== JSON.stringify(after)) run(setHouseDecorationsCommand(map, id, before, after, "Generate decorations"));
   }, [map, bindings, run]);
+
   const onObjectDragStart = useCallback((layerId: number, objectId: number) => (e: ReactDragEvent<HTMLDivElement>) => {
     e.dataTransfer.effectAllowed = "move";
     e.dataTransfer.setData("text/plain", `${layerId}:${objectId}`);
@@ -548,7 +581,6 @@ export default function App() {
     setDragging(null);
     setDropTarget(null);
   }, []);
-
   const nextObjectId = useCallback((cur: LiteTileMap) => {
     let maxId = -1;
     for (const layer of cur.layers) for (const obj of layer.objects) maxId = Math.max(maxId, obj.id);
@@ -635,7 +667,6 @@ export default function App() {
     run(createObjectsCommand(map, snapshots));
     setSelected(new Set(newIds));
     setAnchorId(newIds[0] ?? null);
-    setExpanded((prev) => new Set(prev).add(active.layer.id));
   }, [collectActiveLayerSelection, cloneSelectionIntoSnapshots, map, run]);
 
   const canPaste = !!(map && activeLayerId != null && clipboard && clipboard.entries.length > 0 && clipboard.layerId === activeLayerId);
@@ -659,7 +690,6 @@ export default function App() {
     run(createObjectsCommand(map, snapshots));
     setSelected(new Set(newIds));
     setAnchorId(newIds[0] ?? null);
-    setExpanded((prev) => new Set(prev).add(activeLayerId));
     setClipboard((prev) => prev && prev.layerId === activeLayerId ? { ...prev, pasteCount: prev.pasteCount + 1 } : prev);
   }, [map, activeLayerId, clipboard, cloneSelectionIntoSnapshots, run]);
 
@@ -672,66 +702,195 @@ export default function App() {
       if (roleRoot(palette.role) !== activeRoot) continue;
       for (const kind of paletteCreateKinds(palette)) out.push({ kind, palette, role: palette.role });
     }
-    out.sort((a, b) =>
-      a.kind.localeCompare(b.kind)
-      || a.role.localeCompare(b.role)
-      || a.palette.style.localeCompare(b.palette.style)
-      || a.palette.hash.localeCompare(b.palette.hash));
-    return out;
+    return sortCreateChoices(out);
+  }, [pack, activeRoot]);
+  const houseWallChoices = useMemo(() => {
+    if (!pack || activeRoot !== "building") return [] as CreatePaletteChoice[];
+    const out: CreatePaletteChoice[] = [];
+    for (const palette of pack.palettes) {
+      if (!isStructureMode(palette.mode)) continue;
+      if (palette.role !== HOUSE_WALL_ROLE && !(palette.role === HOUSE_CREATE_ROLE && palette.mode === PaletteMode.CLIFF)) continue;
+      out.push({ kind: "house", palette, role: palette.role });
+    }
+    return sortCreateChoices(out);
+  }, [pack, activeRoot]);
+  const houseRoofChoices = useMemo(() => {
+    if (!pack || activeRoot !== "building") return [] as CreatePaletteChoice[];
+    const out: CreatePaletteChoice[] = [];
+    for (const palette of pack.palettes) {
+      if (!isStructureMode(palette.mode)) continue;
+      if (palette.role !== HOUSE_ROOF_ROLE) continue;
+      out.push({ kind: "house", palette, role: palette.role });
+    }
+    return sortCreateChoices(out);
   }, [pack, activeRoot]);
   const createKindOptions = useMemo(
     () => {
       const seen = new Set(createPaletteChoices.map((choice) => choice.kind));
+      if (houseWallChoices.length > 0 && houseRoofChoices.length > 0) seen.add("house");
       const order = activeRoot === "building" ? BUILDING_KIND_ORDER : DEFAULT_KIND_ORDER;
       return order.filter((kind) => seen.has(kind));
     },
-    [createPaletteChoices, activeRoot],
+    [createPaletteChoices, houseWallChoices, houseRoofChoices, activeRoot],
   );
   const createPaletteOptions = useMemo(
     () => createPaletteChoices.filter((choice) => choice.kind === createKind),
     [createPaletteChoices, createKind],
   );
   const selectedCreateChoice = useMemo(
-    () => createPaletteOptions.find((choice) => choice.palette.hash === createPaletteHash) ?? null,
-    [createPaletteOptions, createPaletteHash],
+    () => createKind === "house" ? null : createPaletteOptions.find((choice) => choice.palette.hash === createPaletteHash) ?? null,
+    [createKind, createPaletteOptions, createPaletteHash],
+  );
+  const selectedCreateHouseWall = useMemo(
+    () => houseWallChoices.find((choice) => choice.palette.hash === createHouseWallHash) ?? null,
+    [houseWallChoices, createHouseWallHash],
+  );
+  const selectedCreateHouseRoof = useMemo(
+    () => houseRoofChoices.find((choice) => choice.palette.hash === createHouseRoofHash) ?? null,
+    [houseRoofChoices, createHouseRoofHash],
   );
 
   useEffect(() => {
     if (createKindOptions.length === 0) {
       setCreateArmed(false);
       setCreatePaletteHash("");
+      setCreateHouseWallHash("");
+      setCreateHouseRoofHash("");
       return;
     }
     setCreateKind((prev) => (createKindOptions.includes(prev) ? prev : createKindOptions[0]));
   }, [createKindOptions]);
 
   useEffect(() => {
+    if (createKind === "house") return;
     if (createPaletteOptions.length === 0) {
       setCreatePaletteHash("");
       setCreateArmed(false);
+      setCreateModalOpen(false);
       return;
     }
     setCreatePaletteHash((prev) => createPaletteOptions.some((choice) => choice.palette.hash === prev) ? prev : createPaletteOptions[0].palette.hash);
-  }, [createPaletteOptions]);
+  }, [createKind, createPaletteOptions]);
+
+  useEffect(() => {
+    if (createKind !== "house") return;
+    if (houseWallChoices.length === 0 || houseRoofChoices.length === 0) {
+      setCreateArmed(false);
+      setCreateModalOpen(false);
+      return;
+    }
+    setCreateHouseWallHash((prev) => houseWallChoices.some((choice) => choice.palette.hash === prev) ? prev : houseWallChoices[0].palette.hash);
+    setCreateHouseRoofHash((prev) => houseRoofChoices.some((choice) => choice.palette.hash === prev) ? prev : houseRoofChoices[0].palette.hash);
+  }, [createKind, houseWallChoices, houseRoofChoices]);
 
   useEffect(() => {
     if (createArmed) setMarquee(false);
   }, [createArmed]);
 
+  useEffect(() => {
+    if (!createArmed) return;
+    if (createKind === "house") {
+      if (!selectedCreateHouseWall || !selectedCreateHouseRoof) setCreateArmed(false);
+      return;
+    }
+    if (!selectedCreateChoice) setCreateArmed(false);
+  }, [createArmed, createKind, selectedCreateChoice, selectedCreateHouseWall, selectedCreateHouseRoof]);
+
+  const openCreateModal = useCallback(() => {
+    if (!activeLayer || createKindOptions.length === 0) return;
+    setMarquee(false);
+    setCreateArmed(false);
+    setCreateModalOpen(true);
+  }, [activeLayer, createKindOptions]);
+
+  const createPickerRequest = useMemo<PaletteCreateRequest | null>(() => {
+    if (!createModalOpen || !activeLayer || createKindOptions.length === 0) return null;
+    return {
+      mode: "create",
+      title: "Create Object",
+      subtitle: `${activeLayer.name} · ${activeRoot || "layer role"}`,
+      kindOptions: createKindOptions.map((kind) => ({ kind, label: CREATE_KIND_LABEL[kind] })),
+      selectedKind: createKind,
+      onSelectKind: (kind) => setCreateKind(kind as CreateKind),
+      onConfirm: () => {
+        if (createKind === "house") {
+          if (!selectedCreateHouseWall || !selectedCreateHouseRoof) return;
+        } else if (!selectedCreateChoice) return;
+        setCreateModalOpen(false);
+        setCreateArmed(true);
+      },
+      ...(createKind === "house"
+        ? {
+            selectionMode: "house" as const,
+            houseSlots: [
+              {
+                key: "wall",
+                label: "Wall Palette",
+                role: HOUSE_WALL_ROLE,
+                currentHash: createHouseWallHash,
+                choices: houseWallChoices.map((choice) => ({ kind: choice.kind, role: choice.role, palette: choice.palette })),
+                onPick: (hash: string) => setCreateHouseWallHash(hash),
+              },
+              {
+                key: "roof",
+                label: "Roof Palette",
+                role: HOUSE_ROOF_ROLE,
+                currentHash: createHouseRoofHash,
+                choices: houseRoofChoices.map((choice) => ({ kind: choice.kind, role: choice.role, palette: choice.palette })),
+                onPick: (hash: string) => setCreateHouseRoofHash(hash),
+              },
+            ],
+          }
+        : {
+            selectionMode: "single" as const,
+            choices: createPaletteChoices.map((choice) => ({ kind: choice.kind, role: choice.role, palette: choice.palette })),
+            currentHash: createPaletteHash,
+            onPick: (hash: string) => setCreatePaletteHash(hash),
+          }),
+      confirmDisabled: createKind === "house" ? !selectedCreateHouseWall || !selectedCreateHouseRoof : !selectedCreateChoice,
+      confirmLabel: "Place",
+    };
+  }, [createModalOpen, activeLayer, activeRoot, createKindOptions, createKind, createPaletteChoices, createPaletteHash, selectedCreateChoice, createHouseWallHash, createHouseRoofHash, houseWallChoices, houseRoofChoices, selectedCreateHouseWall, selectedCreateHouseRoof]);
+
   const onCreateAt = useCallback((tx: number, ty: number) => {
-    if (!map || !activeLayer || !selectedCreateChoice || !createKindOptions.includes(createKind)) return;
+    if (!map || !activeLayer || !createKindOptions.includes(createKind)) return;
     const id = nextObjectId(map);
-    const created = createObjectForRole(map, id, selectedCreateChoice.role, createKind, tx, ty, {
-      paletteHash: selectedCreateChoice.palette.hash,
-      size: selectedCreateChoice.palette.size,
-      style: selectedCreateChoice.palette.style,
-    });
+    const created = createKind === "house"
+      ? (() => {
+          if (!selectedCreateHouseWall || !selectedCreateHouseRoof) return null;
+          const width = Math.max(2, selectedCreateHouseWall.palette.size[0], selectedCreateHouseRoof.palette.size[0]);
+          const height = Math.max(2, selectedCreateHouseWall.palette.size[1] + selectedCreateHouseRoof.palette.size[1] - 1);
+          return createObjectForRole(map, id, HOUSE_CREATE_ROLE, createKind, tx, ty, {
+            houseWallHash: selectedCreateHouseWall.palette.hash,
+            houseRoofHash: selectedCreateHouseRoof.palette.hash,
+            size: [width, height],
+            style: selectedCreateHouseRoof.palette.style || selectedCreateHouseWall.palette.style,
+          });
+        })()
+      : (() => {
+          if (!selectedCreateChoice) return null;
+          return createObjectForRole(map, id, selectedCreateChoice.role, createKind, tx, ty, {
+            paletteHash: selectedCreateChoice.palette.hash,
+            size: selectedCreateChoice.palette.size,
+            style: selectedCreateChoice.palette.style,
+          });
+        })();
+    if (!created) return;
     run(createObjectCommand(map, activeLayer.id, created));
     setSelected(new Set([id]));
     setAnchorId(id);
-    setExpanded((prev) => new Set(prev).add(activeLayer.id));
     setCreateArmed(false);
-  }, [map, activeLayer, selectedCreateChoice, createKind, createKindOptions, nextObjectId, run]);
+  }, [map, activeLayer, selectedCreateChoice, selectedCreateHouseWall, selectedCreateHouseRoof, createKind, createKindOptions, nextObjectId, run]);
+
+  const createPlacementLabel = useMemo(() => {
+    if (createKind === "house") {
+      if (!selectedCreateHouseWall || !selectedCreateHouseRoof) return "";
+      const wall = selectedCreateHouseWall.palette.style || "wall";
+      const roof = selectedCreateHouseRoof.palette.style || "roof";
+      return `house (${wall} / ${roof})`;
+    }
+    return selectedCreateChoice ? (selectedCreateChoice.palette.style || selectedCreateChoice.role) : "";
+  }, [createKind, selectedCreateChoice, selectedCreateHouseWall, selectedCreateHouseRoof]);
 
   useEffect(() => {
       const onKey = (e: KeyboardEvent) => {
@@ -764,7 +923,7 @@ export default function App() {
       }
       if (!e.metaKey && !e.ctrlKey && !e.altKey && map) {
         if (e.key.toLowerCase() === "m") { e.preventDefault(); setMarquee((m) => !m); }
-        else if (e.key === "Escape") { setMarquee(false); setCreateArmed(false); }
+        else if (e.key === "Escape") { setMarquee(false); setCreateArmed(false); setCreateModalOpen(false); }
       }
     };
     window.addEventListener("keydown", onKey);
@@ -848,57 +1007,26 @@ export default function App() {
           <button onClick={loadSample}>试用样例</button>
         </div>
       ) : (
-        <div className="main" style={{ "--props-w": `${propsWidth}px` } as CSSProperties}>
+        <div className="main" style={{ "--layers-w": `${layersWidth}px`, "--props-w": `${propsWidth}px` } as CSSProperties}>
           <aside className="layers">
             <div className="layers-head">
               <span className="legend-title">Layers</span>
+              <div className="layers-actions">
+                <button
+                  className={createArmed ? "active" : ""}
+                  disabled={!activeLayer || createKindOptions.length === 0}
+                  onClick={openCreateModal}
+                  title="选择类型和 palette，然后点击地图放置"
+                >
+                  Add Obj
+                </button>
+                <button disabled={selected.size === 0} onClick={onDuplicateSelection} title="复制当前对象/组">Dup Obj</button>
+                <button disabled={selected.size === 0} onClick={onDeleteSelection} title="删除当前对象/组">Del Obj</button>
+              </div>
             </div>
-            {activeLayer && (
-              <div className="create-panel">
-                <div className="create-head">
-                  <span className="legend-title">Palette Create</span>
-                  <button
-                    className={createArmed ? "active" : ""}
-                    disabled={!selectedCreateChoice || createKindOptions.length === 0}
-                    onClick={() => {
-                      setMarquee(false);
-                      setCreateArmed((v) => !v);
-                    }}
-                  >
-                    {createArmed ? "Cancel" : "Place"}
-                  </button>
-                </div>
-                <div className="seg create-kind">
-                  {createKindOptions.map((kind) => (
-                    <button key={kind} className={createKind === kind ? "active" : ""} onClick={() => setCreateKind(kind)}>
-                      {CREATE_KIND_LABEL[kind]}
-                    </button>
-                  ))}
-                </div>
-                <div className="pal-grid create-palette-grid">
-                  {createPaletteOptions.map((choice) => (
-                    <button
-                      key={choice.palette.hash}
-                      className={`pal-cell${createPaletteHash === choice.palette.hash ? " sel" : ""}`}
-                      title={`${choice.palette.style || choice.role.split("/").slice(-1)[0] || "palette"} · ${CREATE_KIND_LABEL[choice.kind]}`}
-                      onClick={() => setCreatePaletteHash(choice.palette.hash)}
-                    >
-                      <PaletteSwatch pack={pack!} palette={choice.palette} />
-                    </button>
-                  ))}
-                  {createPaletteOptions.length === 0 && <span className="prop-empty">No palette choices for this layer</span>}
-                </div>
-                {selectedCreateChoice && (
-                  <div className="create-meta">
-                    <div className="create-style">{selectedCreateChoice.palette.style || "untagged"}</div>
-                    <div className="create-size">{selectedCreateChoice.palette.size[0]} × {selectedCreateChoice.palette.size[1]} · {CREATE_KIND_LABEL[selectedCreateChoice.kind]}</div>
-                  </div>
-                )}
-                <div className="prop-hint">
-                  {createArmed
-                    ? `Click map to place ${selectedCreateChoice?.palette.style || selectedCreateChoice?.role || "object"}`
-                    : `Choose a palette thumbnail first; role/style will follow the selected palette`}
-                </div>
+            {createArmed && createPlacementLabel && (
+              <div className="prop-hint layer-hint">
+                Click map to place {createPlacementLabel}. Press Esc to cancel.
               </div>
             )}
             {map.layers.map((ly) => {
@@ -952,6 +1080,7 @@ export default function App() {
               );
             })}
           </aside>
+          <div className="resizer left-resizer" onMouseDown={startLayersResize} title="拖动调整左栏宽度" />
           <CanvasView
             map={map}
             version={version}
@@ -982,7 +1111,7 @@ export default function App() {
             onMarquee={onMarquee}
             onMarqueeDone={() => setMarquee(false)}
           />
-          <div className="resizer" onMouseDown={startResize} title="拖动调整右栏宽度" />
+          <div className="resizer right-resizer" onMouseDown={startPropsResize} title="拖动调整右栏宽度" />
           <PropsPanel
             layer={activeLayer}
             objects={selObjs}
@@ -1001,6 +1130,7 @@ export default function App() {
             onRemoveHouseDecoration={onRemoveHouseDecoration}
             onGenerateHouseDecorations={onGenerateHouseDecorations}
           />
+          <PalettePickerModal pack={pack} request={createPickerRequest} onClose={() => setCreateModalOpen(false)} />
         </div>
       )}
     </div>

@@ -6,6 +6,8 @@ interface CreateOptions {
   paletteHash?: string;
   size?: [number, number];
   style?: string;
+  houseWallHash?: string;
+  houseRoofHash?: string;
 }
 
 function nextName(map: LiteTileMap, role: string): string {
@@ -71,13 +73,16 @@ export function createObjectForRole(
   }
   if (kind === "house") {
     const rect: [number, number, number, number] = [x, y, Math.max(2, pw), Math.max(2, ph)];
+    const house = makeHouse(rect[2], rect[3]);
+    if (options.houseWallHash) house.wall = options.houseWallHash;
+    if (options.houseRoofHash) house.roof = options.houseRoofHash;
     return {
       id,
       type: "HOUSE",
       rect,
       enabled: true,
       tags,
-      house: makeHouse(rect[2], rect[3]),
+      house,
     };
   }
   return {

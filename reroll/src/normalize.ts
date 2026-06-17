@@ -38,7 +38,6 @@ export function normalizeToCategories(map: LiteTileMap): LiteTileMap {
   const layers: Layer[] = [];
   for (const root of topRoleOrder) {
     const objects = byRoot.get(root) ?? [];
-    if (objects.length === 0) continue;
     layers.push(layerForRoot(root, nextLayer++, objects));
   }
   return { ...map, layers };

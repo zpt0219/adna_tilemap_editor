@@ -323,22 +323,38 @@ button.danger:hover {
 
 /* --- layers sidebar --- */
 .layers {
-  width: 200px;
+  width: var(--layers-w, 280px);
   background: var(--panel);
   border-right: 1px solid var(--border);
   padding: 12px;
   overflow-y: auto;
   font-size: 12px;
   flex: none;
+  min-width: 0;
 }
 .layers-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 10px;
   margin-bottom: 8px;
 }
 .layers-head .legend-title { margin-bottom: 0; }
-.layers-head .seg button { padding: 2px 7px; }
+.layers-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.layers-actions button {
+  padding: 2px 7px;
+  white-space: nowrap;
+}
+.layer-hint {
+  margin: 0 0 10px;
+  line-height: 1.35;
+}
 .create-panel {
   margin: 0 0 12px;
   padding: 10px;
@@ -573,6 +589,11 @@ button.danger:hover {
   padding: 10px 16px 0;
   margin-bottom: 10px;
 }
+.pal-kind-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
 .pal-modal-grid {
   grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
   gap: 8px;
@@ -580,6 +601,33 @@ button.danger:hover {
   margin: 0 16px 16px;
   padding: 10px;
   overflow-y: auto;
+}
+.pal-create-sections {
+  display: grid;
+  gap: 14px;
+  padding: 0 16px 16px;
+  overflow-y: auto;
+}
+.pal-create-section {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel-2);
+  overflow: hidden;
+}
+.pal-create-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 12px 0;
+}
+.pal-create-current {
+  min-width: 180px;
+  max-width: 280px;
+}
+.pal-create-grid {
+  margin: 10px;
+  max-height: 240px;
 }
 .pal-modal-cell {
   display: flex;
@@ -597,6 +645,11 @@ button.danger:hover {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+.pal-modal-foot {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0 16px 16px;
 }
 
 /* house inspector */
