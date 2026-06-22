@@ -1249,7 +1249,9 @@ export default function App() {
                           <option value="gb_pocket">Game Boy Pocket 灰色</option>
                           <option value="gb_light">Game Boy Light 背光</option>
                           <option value="pico8">PICO-8 像素画色板</option>
-                          <option value="nes">FC 红白机红蓝色板</option>
+                          <option value="nes">FC 红白机 (NES 64色)</option>
+                          <option value="sfc_sprite">SFC/超任 角色精灵色板 (16色)</option>
+                          <option value="sfc_bg">SFC/超任 背景色板 (256色)</option>
                           <option value="pc98">PC-9801 复古色板</option>
                           <option value="msx">MSX1 色板</option>
                           <option value="c64">Commodore 64 色板</option>
