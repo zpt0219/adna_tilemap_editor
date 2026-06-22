@@ -181,7 +181,7 @@ export function CanvasView({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<View>({ scale: 8, offX: 0, offY: 0 });
-  const hitRef = useRef<HitGrid>(buildHitGrid(map));
+  const hitRef = useRef<HitGrid>(buildHitGrid(map, pack && bindings ? { pack, bindings, renderMode } : null));
   // Cached static scene (KRAFT + objects + terrain); blitted every frame. Only
   // re-rendered when map data changes: a full re-render for structural edits, or
   // a dirty-rect region update for paint strokes (cf. desktop dirty_region_).
@@ -272,7 +272,7 @@ export function CanvasView({
   }, [scheduleDraw]);
 
   useEffect(() => {
-    hitRef.current = buildHitGrid(map);
+    hitRef.current = buildHitGrid(map, rctxRef.current);
     sceneScaleRef.current = pack ? sceneScaleForPack(map, pack.tileResolution) : sceneScaleFor(map);
     sceneFullDirtyRef.current = true;
     sceneRectDirtyRef.current = null;
@@ -285,9 +285,10 @@ export function CanvasView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [map]);
 
-  useEffect(() => { hitRef.current = buildHitGrid(map); sceneFullDirtyRef.current = true; scheduleDraw(); /* eslint-disable-line */ }, [version]);
+  useEffect(() => { hitRef.current = buildHitGrid(map, rctxRef.current); sceneFullDirtyRef.current = true; scheduleDraw(); /* eslint-disable-line */ }, [version]);
   // pack loaded / bindings recompiled / render-mode toggled → rescale + full re-render
   useEffect(() => {
+    hitRef.current = buildHitGrid(map, rctxRef.current);
     sceneScaleRef.current = pack ? sceneScaleForPack(map, pack.tileResolution) : sceneScaleFor(map);
     sceneFullDirtyRef.current = true;
     scheduleDraw();

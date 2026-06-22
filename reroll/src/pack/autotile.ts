@@ -1,11 +1,12 @@
 // autotile.ts — pick the right atlas tile per cell for matrix auto-tile modes.
 // Ported from src/util/int16_matrix.cpp (getCellNeighborBitTwoCorner/TwoEdge) +
 // src/core/palette.cpp (NEIGHBOR_MATRIX tables, iterateValidCell) + misc.cpp
-// (Dir4/Corner4 bit values). The engine renders terrain with borderAsConnected
-// = false and presence test `value >= threshold`; our TerrainMatrix encodes
-// present=0 / empty=-1, so threshold 0 and "out-of-bounds ⇒ empty" match it.
+// (Dir4/Corner4 bit values). Our TerrainMatrix encodes present=0 / empty=-1, so
+// threshold 0 matches the engine; `borderAsConnected` controls whether
+// out-of-bounds counts as filled when computing the neighbor mask.
 
 import type { TerrainMatrix } from "../model";
+import type { LiteType } from "../model";
 import type { Rect } from "../model";
 import { mappingCell, PaletteMode, type Palette } from "./types";
 import { blitTile } from "./blit";
@@ -29,34 +30,40 @@ const TWO_CORNER_MATRIX = [
   [0, 2, 5, 8],
 ];
 
-/** present iff in-bounds and the cell value ≥ 0 (0=present, -1=empty);
- *  out-of-bounds ⇒ not present (borderAsConnected=false). Local matrix coords. */
-function present(t: TerrainMatrix, c: number, r: number): boolean {
-  if (c < 0 || r < 0 || c >= t.w || r >= t.h) return false;
+/** present iff in-bounds and the cell value ≥ 0 (0=present, -1=empty).
+ *  When `borderAsConnected`, out-of-bounds counts as filled. Local matrix coords. */
+function present(t: TerrainMatrix, c: number, r: number, borderAsConnected: boolean): boolean {
+  if (c < 0 || r < 0 || c >= t.w || r >= t.h) return borderAsConnected;
   return t.data[r * t.w + c] >= 0;
 }
 
-function bitsTwoEdge(t: TerrainMatrix, c: number, r: number): number {
+function bitsTwoEdge(t: TerrainMatrix, c: number, r: number, borderAsConnected: boolean): number {
   let b = 0;
-  if (present(t, c, r - 1)) b |= UP;
-  if (present(t, c + 1, r)) b |= RIGHT;
-  if (present(t, c, r + 1)) b |= DOWN;
-  if (present(t, c - 1, r)) b |= LEFT;
+  if (present(t, c, r - 1, borderAsConnected)) b |= UP;
+  if (present(t, c + 1, r, borderAsConnected)) b |= RIGHT;
+  if (present(t, c, r + 1, borderAsConnected)) b |= DOWN;
+  if (present(t, c - 1, r, borderAsConnected)) b |= LEFT;
   return b;
 }
 
-function bitsTwoCorner(t: TerrainMatrix, c: number, r: number): number {
+function bitsTwoCorner(t: TerrainMatrix, c: number, r: number, borderAsConnected: boolean): number {
   let mask = 0;
-  if (present(t, c, r - 1)) mask |= UP;
-  if (present(t, c + 1, r)) mask |= RIGHT;
-  if (present(t, c, r + 1)) mask |= DOWN;
-  if (present(t, c - 1, r)) mask |= LEFT;
+  if (present(t, c, r - 1, borderAsConnected)) mask |= UP;
+  if (present(t, c + 1, r, borderAsConnected)) mask |= RIGHT;
+  if (present(t, c, r + 1, borderAsConnected)) mask |= DOWN;
+  if (present(t, c - 1, r, borderAsConnected)) mask |= LEFT;
   let bits = 0;
-  if ((mask & UP_RIGHT) === UP_RIGHT && present(t, c + 1, r - 1)) bits |= C_TR;
-  if ((mask & RIGHT_DOWN) === RIGHT_DOWN && present(t, c + 1, r + 1)) bits |= C_BR;
-  if ((mask & LEFT_DOWN) === LEFT_DOWN && present(t, c - 1, r + 1)) bits |= C_BL;
-  if ((mask & UP_LEFT) === UP_LEFT && present(t, c - 1, r - 1)) bits |= C_TL;
+  if ((mask & UP_RIGHT) === UP_RIGHT && present(t, c + 1, r - 1, borderAsConnected)) bits |= C_TR;
+  if ((mask & RIGHT_DOWN) === RIGHT_DOWN && present(t, c + 1, r + 1, borderAsConnected)) bits |= C_BR;
+  if ((mask & LEFT_DOWN) === LEFT_DOWN && present(t, c - 1, r + 1, borderAsConnected)) bits |= C_BL;
+  if ((mask & UP_LEFT) === UP_LEFT && present(t, c - 1, r - 1, borderAsConnected)) bits |= C_TL;
   return bits;
+}
+
+export function terrainNeighborBits(type: LiteType, t: TerrainMatrix, c: number, r: number, borderAsConnected = false): number {
+  return type === "TERRAIN_2_CORNER"
+    ? bitsTwoCorner(t, c, r, borderAsConnected)
+    : bitsTwoEdge(t, c, r, borderAsConnected);
 }
 
 /** 16-entry inverse LUT: bits → atlas (x,y), stored as [x0,y0,…] (2 ints/bit). */
@@ -80,10 +87,10 @@ export function isMatrixAutotile(mode: number): boolean {
 
 /** Atlas (x,y) for a single auto-tile cell (for per-tile y-sorted drawing), or
  *  null if the mode isn't matrix-autotile / the cell maps nowhere. */
-export function autotileCellAtlas(palette: Palette, t: TerrainMatrix, c: number, r: number): [number, number] | null {
+export function autotileCellAtlas(palette: Palette, t: TerrainMatrix, c: number, r: number, borderAsConnected = false): [number, number] | null {
   if (!isMatrixAutotile(palette.mode)) return null;
   const lut = (palette.lut ??= buildAutotileLUT(palette));
-  const bits = palette.mode === PaletteMode.TWO_CORNER ? bitsTwoCorner(t, c, r) : bitsTwoEdge(t, c, r);
+  const bits = palette.mode === PaletteMode.TWO_CORNER ? bitsTwoCorner(t, c, r, borderAsConnected) : bitsTwoEdge(t, c, r, borderAsConnected);
   const ax = lut[bits * 2];
   return ax < 0 ? null : [ax, lut[bits * 2 + 1]];
 }
@@ -100,6 +107,7 @@ export function drawAutotile(
   t: TerrainMatrix,
   s: number,
   clip: Rect | null,
+  borderAsConnected = false,
 ): boolean {
   if (!isMatrixAutotile(palette.mode)) return false;
   const lut = (palette.lut ??= buildAutotileLUT(palette));
@@ -115,7 +123,7 @@ export function drawAutotile(
   for (let r = r0; r < r1; r++)
     for (let c = c0; c < c1; c++) {
       if (t.data[r * t.w + c] < 0) continue; // empty
-      const bits = bitsOf(t, c, r);
+      const bits = bitsOf(t, c, r, borderAsConnected);
       const ax = lut[bits * 2];
       if (ax < 0) continue; // no tile mapped for this configuration
       blitTile(ctx, atlas, ax, lut[bits * 2 + 1], tr, t.ox + c, t.oy + r, s);

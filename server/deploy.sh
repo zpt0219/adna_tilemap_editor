@@ -16,10 +16,14 @@ echo "==> building reroll"
 echo "==> building tagger"
 ( cd "$REPO/tagger" && npm ci && npm run build )
 
+echo "==> building refiner"
+( cd "$REPO/refiner" && npm ci && npm run build )
+
 echo "==> publishing to $WEBROOT"
-sudo mkdir -p "$WEBROOT/reroll" "$WEBROOT/tagger"
+sudo mkdir -p "$WEBROOT/reroll" "$WEBROOT/tagger" "$WEBROOT/refiner"
 sudo rsync -a --delete "$REPO/reroll/dist/"  "$WEBROOT/reroll/"
 sudo rsync -a --delete "$REPO/tagger/dist/"  "$WEBROOT/tagger/"
+sudo rsync -a --delete "$REPO/refiner/dist/"  "$WEBROOT/refiner/"
 sudo cp "$REPO/server/index.html" "$WEBROOT/index.html"
 sudo chown -R www-data:www-data "$WEBROOT"
 

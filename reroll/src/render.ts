@@ -36,6 +36,10 @@ const paletteEmptyMaskCache = new WeakMap<Palette, boolean[]>();
 let tileProbeCanvas: HTMLCanvasElement | null = null;
 let tileProbeCtx: CanvasRenderingContext2D | null = null;
 
+function borderAsConnected(o: LiteObject): boolean {
+  return o.tags["borderAsConnected"] === "true";
+}
+
 export interface View {
   scale: number;
   offX: number;
@@ -257,6 +261,10 @@ interface YSortItem {
   draw: (ctx: CanvasRenderingContext2D) => void;
 }
 
+function frgStampTopLeft(baseX: number, baseY: number, palette: Palette): [number, number] {
+  return [baseX, baseY - palette.size[1] + 1];
+}
+
 const overlapsClip = (clip: Rect | null, x: number, y: number, w: number, h: number): boolean =>
   !clip || rectsOverlap([x, y, w, h], clip);
 
@@ -289,9 +297,10 @@ function emitVerticalItems(items: YSortItem[], ord: number, o: LiteObject, s: nu
         if (vi < 0) continue;
         const v = b.variants[vi];
         if (!v) continue;
-        const x = t.ox + c, y = t.oy + r, ph = v.size[1];
-        if (!overlapsClip(clip, x, y, v.size[0], ph)) continue;
-        items.push({ footY: y + ph, ord, x, draw: (ctx) => blitFixedRect(ctx, atlas, v, x, y, s) });
+        const baseX = t.ox + c, baseY = t.oy + r;
+        const [x, y] = frgStampTopLeft(baseX, baseY, v);
+        if (!overlapsClip(clip, x, y, v.size[0], v.size[1])) continue;
+        items.push({ footY: baseY + 1, ord, x: baseX, draw: (ctx) => blitFixedRect(ctx, atlas, v, x, y, s) });
       }
     return;
   }
@@ -302,7 +311,7 @@ function emitVerticalItems(items: YSortItem[], ord: number, o: LiteObject, s: nu
         if (t.data[r * t.w + c] < 0) continue;
         const x = t.ox + c, y = t.oy + r;
         if (!overlapsClip(clip, x, y, 1, 1)) continue;
-        const a = autotileCellAtlas(b.palette, t, c, r);
+        const a = autotileCellAtlas(b.palette, t, c, r, borderAsConnected(o));
         if (!a) continue;
         items.push({ footY: y + 1, ord, x, draw: (ctx) => blitTile(ctx, atlas, a[0], a[1], tr, x, y, s) });
       }
@@ -444,7 +453,7 @@ function drawObjectReal(ctx: CanvasRenderingContext2D, o: LiteObject, s: number,
     blitFrg(ctx, o, b.variants, b.cellVariant, rctx.pack, s, clip);
     return true;
   }
-  if (b.kind === "auto" && o.terrain && drawAutotile(ctx, rctx.pack.atlas, b.palette, o.terrain, s, clip)) {
+  if (b.kind === "auto" && o.terrain && drawAutotile(ctx, rctx.pack.atlas, b.palette, o.terrain, s, clip, borderAsConnected(o))) {
     return true;
   }
   return rctx.renderMode === "real"; // unsupported mode (e.g. NINE_PATCH/CLIFF) — suppress colour in real mode
@@ -473,7 +482,10 @@ function blitFrg(
       const vi = cellVariant[r * t.w + c];
       if (vi < 0) continue;
       const v = variants[vi];
-      if (v) blitFixedRect(ctx, pack.atlas, v, t.ox + c, t.oy + r, s);
+      if (v) {
+        const [x, y] = frgStampTopLeft(t.ox + c, t.oy + r, v);
+        blitFixedRect(ctx, pack.atlas, v, x, y, s);
+      }
     }
 }
 
@@ -606,29 +618,227 @@ export interface HitGrid {
   height: number;
 }
 
-export function buildHitGrid(map: LiteTileMap): HitGrid {
+interface YSortHitItem {
+  footY: number;
+  ord: number;
+  x: number;
+  obj: LiteObject;
+  stamp: (owner: Int32Array, width: number, height: number, idx: number) => void;
+}
+
+function stampRect(owner: Int32Array, width: number, height: number, rect: Rect, idx: number): void {
+  const x0 = Math.max(0, rect[0]);
+  const y0 = Math.max(0, rect[1]);
+  const x1 = Math.min(width, rect[0] + rect[2]);
+  const y1 = Math.min(height, rect[1] + rect[3]);
+  for (let ty = y0; ty < y1; ty++) {
+    const base = ty * width;
+    for (let tx = x0; tx < x1; tx++) owner[base + tx] = idx;
+  }
+}
+
+function stampAbstractObject(owner: Int32Array, width: number, height: number, idx: number, o: LiteObject): void {
+  if (o.terrain) {
+    const t = o.terrain;
+    for (let i = 0; i < t.data.length; i++) {
+      if (t.data[i] !== 0) continue;
+      const tx = t.ox + (i % t.w);
+      const ty = t.oy + Math.floor(i / t.w);
+      if (tx >= 0 && ty >= 0 && tx < width && ty < height) owner[ty * width + tx] = idx;
+    }
+    return;
+  }
+  if (o.type === "DUNGEON" && o.borderPoints && o.borderPoints.length > 2) {
+    rasterPolygon(o.borderPoints, idx, (tx, ty, i) => {
+      if (tx >= 0 && ty >= 0 && tx < width && ty < height) owner[ty * width + tx] = i;
+    });
+    return;
+  }
+  stampRect(owner, width, height, o.rect, idx);
+}
+
+function stampRenderedObject(owner: Int32Array, width: number, height: number, idx: number, o: LiteObject, rctx: RenderCtx): void {
+  const b = rctx.bindings.get(o.id);
+  if (!b) {
+    if (rctx.renderMode !== "real") stampAbstractObject(owner, width, height, idx, o);
+    return;
+  }
+  if (b.kind === "fixed") {
+    stampPaletteTiles(owner, width, height, rctx.pack.atlas, b.palette, o.rect[0], o.rect[1], idx);
+    return;
+  }
+  if (b.kind === "slice") {
+    stampRect(owner, width, height, o.rect, idx);
+    return;
+  }
+  if (b.kind === "house") {
+    stampRect(owner, width, height, o.rect, idx);
+    return;
+  }
+  if (b.kind === "auto" && o.terrain) {
+    const t = o.terrain;
+    for (let i = 0; i < t.data.length; i++) {
+      if (t.data[i] !== 0) continue;
+      const tx = t.ox + (i % t.w);
+      const ty = t.oy + Math.floor(i / t.w);
+      if (tx >= 0 && ty >= 0 && tx < width && ty < height) owner[ty * width + tx] = idx;
+    }
+    return;
+  }
+  if (b.kind === "frg" && o.terrain) {
+    const t = o.terrain;
+    for (let r = 0; r < t.h; r++) {
+      for (let c = 0; c < t.w; c++) {
+        const vi = b.cellVariant[r * t.w + c];
+        if (vi < 0) continue;
+        const v = b.variants[vi];
+        if (!v) continue;
+        const [x, y] = frgStampTopLeft(t.ox + c, t.oy + r, v);
+        stampPaletteTiles(owner, width, height, rctx.pack.atlas, v, x, y, idx);
+      }
+    }
+    return;
+  }
+  if (rctx.renderMode !== "real") stampAbstractObject(owner, width, height, idx, o);
+}
+
+function emitVerticalHitItems(items: YSortHitItem[], ord: number, o: LiteObject, rctx: RenderCtx): void {
+  const b = rctx.bindings.get(o.id);
+  if (!b) {
+    if (rctx.renderMode !== "real") items.push({
+      footY: o.rect[1] + o.rect[3],
+      ord,
+      x: o.rect[0],
+      obj: o,
+      stamp: (owner, width, height, idx) => stampAbstractObject(owner, width, height, idx, o),
+    });
+    return;
+  }
+  if (b.kind === "fixed") {
+    items.push({
+      footY: o.rect[1] + b.palette.size[1],
+      ord,
+      x: o.rect[0],
+      obj: o,
+      stamp: (owner, width, height, idx) => stampPaletteTiles(owner, width, height, rctx.pack.atlas, b.palette, o.rect[0], o.rect[1], idx),
+    });
+    return;
+  }
+  if (b.kind === "slice" || b.kind === "house") {
+    items.push({
+      footY: o.rect[1] + o.rect[3],
+      ord,
+      x: o.rect[0],
+      obj: o,
+      stamp: (owner, width, height, idx) => stampRect(owner, width, height, o.rect, idx),
+    });
+    return;
+  }
+  if (b.kind === "frg" && o.terrain) {
+    const t = o.terrain;
+    for (let r = 0; r < t.h; r++) {
+      for (let c = 0; c < t.w; c++) {
+        const vi = b.cellVariant[r * t.w + c];
+        if (vi < 0) continue;
+        const v = b.variants[vi];
+        if (!v) continue;
+        items.push({
+          footY: t.oy + r + 1,
+          ord,
+          x: t.ox + c,
+          obj: o,
+          stamp: (owner, width, height, idx) => {
+            const [x, y] = frgStampTopLeft(t.ox + c, t.oy + r, v);
+            stampPaletteTiles(owner, width, height, rctx.pack.atlas, v, x, y, idx);
+          },
+        });
+      }
+    }
+    return;
+  }
+  if (b.kind === "auto" && o.terrain) {
+    const t = o.terrain;
+    for (let r = 0; r < t.h; r++) {
+      for (let c = 0; c < t.w; c++) {
+        if (t.data[r * t.w + c] < 0) continue;
+        items.push({
+          footY: t.oy + r + 1,
+          ord,
+          x: t.ox + c,
+          obj: o,
+          stamp: (owner, width, height, idx) => stampRect(owner, width, height, [t.ox + c, t.oy + r, 1, 1], idx),
+        });
+      }
+    }
+    return;
+  }
+  if (rctx.renderMode !== "real") items.push({
+    footY: o.rect[1] + o.rect[3],
+    ord,
+    x: o.rect[0],
+    obj: o,
+    stamp: (owner, width, height, idx) => stampAbstractObject(owner, width, height, idx, o),
+  });
+}
+
+export function buildHitGrid(map: LiteTileMap, rctx: RenderCtx | null = null): HitGrid {
   const { width, height } = map;
   const owner = new Int32Array(width * height).fill(-1);
   const objects: LiteObject[] = [];
-  const set = (tx: number, ty: number, idx: number) => {
-    if (tx >= 0 && ty >= 0 && tx < width && ty < height) owner[ty * width + tx] = idx;
-  };
-  for (const o of eachVisibleDrawOrder(map)) {
-    const idx = objects.length;
-    objects.push(o);
-    if (o.terrain) {
-      const t = o.terrain;
-      for (let i = 0; i < t.data.length; i++) {
-        if (t.data[i] === 0) set(t.ox + (i % t.w), t.oy + Math.floor(i / t.w), idx);
-      }
-    } else if (o.type === "DUNGEON" && o.borderPoints && o.borderPoints.length > 2) {
-      rasterPolygon(o.borderPoints, idx, set);
-    } else {
-      const [x, y, w, h] = o.rect;
-      for (let ty = y; ty < y + h; ty++) for (let tx = x; tx < x + w; tx++) set(tx, ty, idx);
+  if (!rctx || rctx.renderMode === "blueprint") {
+    for (const o of eachVisibleDrawOrder(map)) {
+      const idx = objects.length;
+      objects.push(o);
+      stampAbstractObject(owner, width, height, idx, o);
+    }
+    return { objects, owner, width, height };
+  }
+  for (const layer of map.layers) {
+    if (!layer.enabled || layer.vertical) continue;
+    for (const o of layer.objects) {
+      if (!o.enabled) continue;
+      const idx = objects.length;
+      objects.push(o);
+      stampRenderedObject(owner, width, height, idx, o, rctx);
     }
   }
+  const items: YSortHitItem[] = [];
+  let ord = 0;
+  for (const layer of map.layers) {
+    if (!layer.enabled || !layer.vertical) continue;
+    for (const o of layer.objects) {
+      if (!o.enabled) continue;
+      emitVerticalHitItems(items, ord++, o, rctx);
+    }
+  }
+  items.sort((a, b) => a.footY - b.footY || a.ord - b.ord || a.x - b.x);
+  for (const item of items) {
+    const idx = objects.length;
+    objects.push(item.obj);
+    item.stamp(owner, width, height, idx);
+  }
   return { objects, owner, width, height };
+}
+
+function stampPaletteTiles(
+  owner: Int32Array,
+  width: number,
+  height: number,
+  atlas: CanvasImageSource,
+  palette: Palette,
+  ox: number,
+  oy: number,
+  idx: number,
+): void {
+  const isEmpty = paletteCellEmptyFn(atlas, palette);
+  for (let row = 0; row < palette.size[1]; row++) {
+    for (let col = 0; col < palette.size[0]; col++) {
+      if (isEmpty(col, row)) continue;
+      const tx = ox + col;
+      const ty = oy + row;
+      if (tx >= 0 && ty >= 0 && tx < width && ty < height) owner[ty * width + tx] = idx;
+    }
+  }
 }
 
 function rasterPolygon(points: [number, number][], idx: number, set: (tx: number, ty: number, i: number) => void): void {

@@ -6,6 +6,7 @@ import { PaletteSwatch } from "./PaletteSwatch";
 export interface PaletteAssignRequest {
   title: string;
   role: string | null;
+  allowedModes?: PaletteMode[];
   currentHash?: string;
   hasOverride: boolean;
   onPick: (hash: string) => void;
@@ -100,7 +101,7 @@ export function PalettePickerModal({
   const assignChoices = useMemo(() => {
     if (!pack || !assignRequest) return [];
     const arr = pack.palettes
-      .filter((p) => assignRequest.role ? true : p.mode === PaletteMode.FIXED_RECT)
+      .filter((p) => assignRequest.allowedModes ? assignRequest.allowedModes.includes(p.mode) : (assignRequest.role ? true : p.mode === PaletteMode.FIXED_RECT))
       .map((p) => ({ p, d: assignRequest.role ? roleTreeDistance(assignRequest.role, p.role) : 0 }));
     const list = showAll || !assignRequest.role ? arr : arr.filter((x) => x.d <= 2);
     list.sort((a, b) => a.d - b.d || a.p.role.localeCompare(b.p.role) || a.p.style.localeCompare(b.p.style));

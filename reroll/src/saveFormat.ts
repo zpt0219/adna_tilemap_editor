@@ -6,9 +6,10 @@
 
 import type { LiteObject, LiteTileMap, Layer } from "./model";
 import type { Vec2 } from "./types";
+import { DEFAULT_FRG_NOISE_CONFIG, noiseConfigFromTags } from "./terrainNoise";
 
 export const WEB_SAVE_FORMAT = "adna-web-lite";
-export const WEB_SAVE_VERSION = 2;
+export const WEB_SAVE_VERSION = 3;
 
 export interface WebSaveHouse {
   wallHeight: number;
@@ -25,6 +26,7 @@ export interface WebSaveObject {
   tags?: Record<string, string>;
   cells?: Vec2[];
   points?: Vec2[];
+  frg?: { placementMode: string; noise: { seed: number; scale: number; range: [number, number] }; cells: { palette: string; weight: number }[] };
   house?: WebSaveHouse;
 }
 
@@ -66,6 +68,14 @@ function objectJson(o: LiteObject): WebSaveObject {
     case "TERRAIN_2_EDGE":
     case "FIXED_RECT_GROUP":
       out.cells = terrainCells(o);
+      if (o.frg) {
+        const noise = noiseConfigFromTags(o.tags, "web.frg", DEFAULT_FRG_NOISE_CONFIG);
+        out.frg = {
+          placementMode: o.frg.placementMode,
+          noise,
+          cells: o.frg.cells.map((cell) => ({ palette: cell.palette, weight: cell.weight })),
+        };
+      }
       break;
     case "DUNGEON":
       if (o.borderPoints) out.points = o.borderPoints.map((p) => [p[0], p[1]] as Vec2);

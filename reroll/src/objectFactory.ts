@@ -1,4 +1,4 @@
-import type { LiteObject, LiteTileMap } from "./model";
+import { DEFAULT_FRG_PLACEMENT_MODE, type LiteObject, type LiteTileMap } from "./model";
 import { makeHouse } from "./house";
 
 export type CreateKind = "terrain_area" | "terrain_line" | "fixed_rect" | "fixed_rect_group" | "house";
@@ -38,7 +38,7 @@ export function createObjectForRole(
     "web.baseName": role.split("/").slice(-1)[0] || role,
   };
   if (options.style) tags["blueprint.style"] = options.style;
-  if (options.paletteHash && kind !== "house") tags["web.palette"] = options.paletteHash;
+  if (options.paletteHash && kind !== "house" && kind !== "fixed_rect_group") tags["web.palette"] = options.paletteHash;
   if (kind === "terrain_area") {
     return {
       id,
@@ -68,6 +68,7 @@ export function createObjectForRole(
       rect: [x, y, w, h],
       enabled: true,
       tags,
+      ...(options.paletteHash ? { frg: { cells: [{ palette: options.paletteHash, weight: 100 }], placementMode: DEFAULT_FRG_PLACEMENT_MODE } } : {}),
       terrain: { ox: x, oy: y, w, h, data: new Int16Array(w * h) },
     };
   }

@@ -33,6 +33,25 @@ export interface HouseDecoration {
   palette?: string;
 }
 
+export interface FrgCellData {
+  palette: string;
+  weight: number;
+}
+
+export type FrgPlacementMode =
+  | "free"
+  | "base_collision"
+  | "y_sorted_stacking"
+  | "row_no_overlap"
+  | "full_collision";
+
+export const DEFAULT_FRG_PLACEMENT_MODE: FrgPlacementMode = "free";
+
+export interface FrgData {
+  cells: FrgCellData[];
+  placementMode: FrgPlacementMode;
+}
+
 /** A composite house (desktop NineSliceHouseObject port): wall + roof nine-slice
  *  bands and a dynamic list of FIXED_RECT decorations. `wall`/`roof` and each
  *  decoration palette are optional hash overrides; unset = role-resolved. */
@@ -73,6 +92,8 @@ export interface LiteObject {
   terrain?: TerrainMatrix;
   /** present for DUNGEON — absolute polygon points */
   borderPoints?: Vec2[];
+  /** present for FIXED_RECT_GROUP when cell palettes/weights are explicit */
+  frg?: FrgData;
   /** present for HOUSE — wall/roof bands + decoration slots */
   house?: HouseData;
 }
@@ -262,6 +283,12 @@ export function cloneObjectDeep(o: LiteObject, id = o.id): LiteObject {
   };
   if (o.terrain) next.terrain = { ...o.terrain, data: new Int16Array(o.terrain.data) };
   if (o.borderPoints) next.borderPoints = o.borderPoints.map(([x, y]) => [x, y] as Vec2);
+  if (o.frg) {
+    next.frg = {
+      placementMode: o.frg.placementMode,
+      cells: o.frg.cells.map((cell) => ({ ...cell })),
+    };
+  }
   if (o.house) {
     next.house = {
       ...o.house,

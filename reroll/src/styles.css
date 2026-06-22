@@ -524,6 +524,48 @@ button.danger:hover {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.frg-cell-list {
+  display: grid;
+  gap: 6px;
+}
+.frg-cell-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 72px auto;
+  gap: 8px;
+  align-items: center;
+  padding: 6px;
+  background: var(--panel-2);
+  border-radius: 6px;
+}
+.frg-cell-current {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+.frg-cell-text {
+  min-width: 0;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.frg-weight {
+  width: 72px;
+}
+.frg-mode-select {
+  width: 100%;
+  background: #161a20;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 5px 8px;
+  font: inherit;
+}
+.frg-mode-select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
 .pal-placeholder {
   width: 36px;
   height: 36px;
@@ -650,6 +692,118 @@ button.danger:hover {
   display: flex;
   justify-content: flex-end;
   padding: 0 16px 16px;
+}
+.noise-modal {
+  width: min(520px, 100%);
+}
+.noise-modal-body {
+  padding: 8px 16px 16px;
+}
+.noise-seed-row,
+.noise-scale-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.noise-scale-slider {
+  flex: 1 1 auto;
+}
+.noise-scale-value {
+  min-width: 56px;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: right;
+}
+.bitwise-modal {
+  width: min(760px, 100%);
+}
+.bitwise-summary {
+  display: grid;
+  gap: 8px;
+  padding: 12px 16px 0;
+}
+.bitwise-target {
+  padding: 10px 12px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.bitwise-label {
+  color: var(--muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.bitwise-target-main {
+  margin-top: 4px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.bitwise-target-sub,
+.bitwise-note,
+.bitwise-source-sub {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.bitwise-tree {
+  padding: 12px 16px 16px;
+  overflow-y: auto;
+}
+.bitwise-layer-group + .bitwise-layer-group {
+  margin-top: 6px;
+}
+.bitwise-layer-row {
+  border-radius: 8px;
+}
+.bitwise-tree .layer-row.active {
+  background: #253145;
+}
+.bitwise-obj-row {
+  cursor: pointer;
+  gap: 10px;
+  padding-right: 8px;
+  color: var(--text);
+}
+.bitwise-obj-row.hidden {
+  color: var(--muted);
+  text-decoration: none;
+}
+.bitwise-obj-row .obj-name {
+  color: inherit;
+}
+.bitwise-obj-main {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+  flex: 1;
+}
+.bitwise-obj-meta {
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.bitwise-source-badge {
+  flex: 0 0 auto;
+  padding: 2px 8px;
+  color: var(--muted);
+  background: #1b2027;
+  border-radius: 999px;
+  font-size: 11px;
+}
+.bitwise-source-badge.overlap {
+  color: #d7f5d3;
+  background: #214227;
+}
+.bitwise-foot {
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.bitwise-warn {
+  margin-right: auto;
 }
 
 /* house inspector */

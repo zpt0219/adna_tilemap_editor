@@ -3,10 +3,13 @@
 // at init, resolve by id in do/undo — never re-read live selection).
 
 import {
+  DEFAULT_FRG_PLACEMENT_MODE,
   cloneTerrain,
   cloneObjectDeep,
   findLayer,
   findObject,
+  type FrgCellData,
+  type FrgPlacementMode,
   isLocked,
   translateObject,
   type HouseDecoration,
@@ -86,6 +89,28 @@ export function resizeObjectCommand(map: LiteTileMap, id: number, before: Rect, 
     o.rect = [...r];
   };
   return { label: "Resize", do: () => set(after), undo: () => set(before) };
+}
+
+export function setObjectRectCommand(
+  map: LiteTileMap,
+  id: number,
+  beforeRect: Rect,
+  afterRect: Rect,
+  beforeTerrain?: TerrainMatrix,
+  afterTerrain?: TerrainMatrix,
+): Command {
+  const set = (rect: Rect, terrain?: TerrainMatrix) => {
+    const o = findObject(map, id);
+    if (!o) return;
+    if (terrain) o.terrain = cloneTerrain(terrain);
+    if (o.type === "HOUSE" && o.house) o.house = resizeHouse(o.house, o.rect, rect);
+    o.rect = [...rect];
+  };
+  return {
+    label: "Set rect",
+    do: () => set(afterRect, afterTerrain),
+    undo: () => set(beforeRect, beforeTerrain),
+  };
 }
 
 function setLock(map: LiteTileMap, id: number, locked: boolean): void {
@@ -211,6 +236,32 @@ export function setHouseOverlapCommand(map: LiteTileMap, id: number, before: num
   return { label: "Roof overlap", do: () => set(after), undo: () => set(before) };
 }
 
+export function setFrgCellsCommand(map: LiteTileMap, id: number, before: FrgCellData[], after: FrgCellData[], label: string): Command {
+  const set = (cells: FrgCellData[]) => {
+    const o = findObject(map, id);
+    if (!o || o.type !== "FIXED_RECT_GROUP") return;
+    const placementMode = o.frg?.placementMode ?? DEFAULT_FRG_PLACEMENT_MODE;
+    o.frg = { cells: cells.map((cell) => ({ ...cell })), placementMode };
+  };
+  return {
+    label,
+    do: () => set(after),
+    undo: () => set(before),
+  };
+}
+
+export function setFrgPlacementModeCommand(map: LiteTileMap, id: number, before: FrgPlacementMode, after: FrgPlacementMode): Command {
+  const set = (placementMode: FrgPlacementMode) => {
+    const o = findObject(map, id);
+    if (!o || o.type !== "FIXED_RECT_GROUP") return;
+    o.frg = {
+      cells: (o.frg?.cells ?? []).map((cell) => ({ ...cell })),
+      placementMode,
+    };
+  };
+  return { label: "FRG placement mode", do: () => set(after), undo: () => set(before) };
+}
+
 export function createObjectCommand(map: LiteTileMap, layerId: number, object: LiteObject): Command {
   const snapshot = cloneObjectDeep(object);
   const add = () => {
@@ -295,6 +346,71 @@ export function paintTerrainCommand(
     if (o) { o.terrain = cloneTerrain(s.terrain); o.rect = [...s.rect]; }
   };
   return { label: "Paint terrain", do: () => restore(after), undo: () => restore(before) };
+}
+
+export function randomizeTerrainCommand(
+  map: LiteTileMap,
+  id: number,
+  before: TerrainSnapshot,
+  after: TerrainSnapshot,
+  beforeTags: Record<string, string>,
+  afterTags: Record<string, string>,
+): Command {
+  const restore = (snapshot: TerrainSnapshot, tags: Record<string, string>) => {
+    const o = findObject(map, id);
+    if (!o) return;
+    o.terrain = cloneTerrain(snapshot.terrain);
+    o.rect = [...snapshot.rect];
+    o.tags = { ...tags };
+  };
+  return {
+    label: "Rand terrain",
+    do: () => restore(after, afterTags),
+    undo: () => restore(before, beforeTags),
+  };
+}
+
+export function bitwiseObjectCommand(
+  map: LiteTileMap,
+  id: number,
+  before: TerrainSnapshot,
+  after: TerrainSnapshot,
+  label: string,
+): Command {
+  const restore = (snapshot: TerrainSnapshot) => {
+    const o = findObject(map, id);
+    if (!o) return;
+    o.terrain = cloneTerrain(snapshot.terrain);
+    o.rect = [...snapshot.rect];
+  };
+  return {
+    label,
+    do: () => restore(after),
+    undo: () => restore(before),
+  };
+}
+
+export function terrainMutationWithTagsCommand(
+  map: LiteTileMap,
+  id: number,
+  before: TerrainSnapshot,
+  after: TerrainSnapshot,
+  beforeTags: Record<string, string>,
+  afterTags: Record<string, string>,
+  label: string,
+): Command {
+  const restore = (snapshot: TerrainSnapshot, tags: Record<string, string>) => {
+    const o = findObject(map, id);
+    if (!o) return;
+    o.terrain = cloneTerrain(snapshot.terrain);
+    o.rect = [...snapshot.rect];
+    o.tags = { ...tags };
+  };
+  return {
+    label,
+    do: () => restore(after, afterTags),
+    undo: () => restore(before, beforeTags),
+  };
 }
 
 // --- layer commands (document state -> undoable; active-layer highlight is not) ---

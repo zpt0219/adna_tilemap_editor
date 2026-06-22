@@ -2,13 +2,15 @@ import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, 
 import { parseBlueprint } from "./blueprint";
 import { blueprintToLite } from "./convert";
 import { normalizeToCategories } from "./normalize";
-import { assignUniqueObjectNames, cloneObjectDeep, cloneTerrain, displayName, findLayer, findObject, isLocked, layerOfObject, roleOf, setTerrainCell, translateObject, type HouseDecorationKind, type LiteObject, type LiteTileMap, type Rect } from "./model";
-import { UndoStack, createObjectCommand, createObjectsCommand, deleteObjectsCommand, moveHouseDecoCommand, moveObjectCommand, moveObjectsCommand, paintTerrainCommand, renameObjectCommand, reorderLayerObjectsCommand, resizeObjectCommand, setHouseDecoPaletteCommand, setHouseDecorationsCommand, setHouseOverlapCommand, setHouseSlotPaletteCommand, setObjectsEnabledCommand, setObjectPaletteCommand, setObjectTypeCommand, setWallHeightCommand, toggleLayerEnabledCommand, toggleObjectEnabledCommand, type Command, type LayerObjectSnapshot, type TerrainSnapshot } from "./commands";
+import { DEFAULT_FRG_PLACEMENT_MODE, assignUniqueObjectNames, cloneObjectDeep, cloneTerrain, displayName, findLayer, findObject, isLocked, layerOfObject, roleOf, setTerrainCell, translateObject, type FrgCellData, type FrgPlacementMode, type HouseDecorationKind, type LiteObject, type LiteTileMap, type Rect } from "./model";
+import { UndoStack, bitwiseObjectCommand, createObjectCommand, createObjectsCommand, deleteObjectsCommand, moveHouseDecoCommand, moveObjectCommand, moveObjectsCommand, paintTerrainCommand, randomizeTerrainCommand, renameObjectCommand, reorderLayerObjectsCommand, resizeObjectCommand, setFrgCellsCommand, setFrgPlacementModeCommand, setHouseDecoPaletteCommand, setHouseDecorationsCommand, setHouseOverlapCommand, setHouseSlotPaletteCommand, setObjectRectCommand, setObjectsEnabledCommand, setObjectPaletteCommand, setObjectTypeCommand, setWallHeightCommand, terrainMutationWithTagsCommand, toggleLayerEnabledCommand, toggleObjectEnabledCommand, type Command, type LayerObjectSnapshot, type TerrainSnapshot } from "./commands";
 import type { LiteType } from "./model";
 import { liteToWebSave } from "./saveFormat";
 import { clearDraft, loadDraft, saveDraft } from "./draft";
 import { downloadJson } from "./download";
 import { colorForRole } from "./generated/roleColors";
+import { applyBitwiseObjectOp, dilateTerrainMatrix, erodeTerrainMatrix, fillTerrainMatrix, flipTerrainMatrix, hasBitwiseOverlap, isBitwiseSupported, keepBorderTerrainMatrix, removeZeroLikeDesktop, terrainMatrixEquals, type BitwiseObjectOp } from "./bitwise";
+import { BitwiseObjectModal } from "./components/BitwiseObjectModal";
 import { CanvasView, type BrushState } from "./components/CanvasView";
 import { PalettePickerModal, type PaletteCreateRequest } from "./components/PalettePickerModal";
 import { PropsPanel } from "./components/PropsPanel";
@@ -20,8 +22,10 @@ import type { RenderMode } from "./render";
 import { generateDecorations } from "./house";
 import { createObjectForRole, type CreateKind } from "./objectFactory";
 import { createKindsForRole, roleRoot } from "./roleTree";
+import { applyNoiseConfig, applyTerrainNoiseConfig, regenerateTerrainByNoise, type TerrainNoiseConfig } from "./terrainNoise";
 
 const isTerrain = (o: LiteObject | null) => !!o && (o.type === "TERRAIN_2_CORNER" || o.type === "TERRAIN_2_EDGE");
+const borderAsConnected = (o: LiteObject) => o.tags["borderAsConnected"] === "true";
 
 type DropSide = "before" | "after";
 
@@ -122,6 +126,47 @@ function paletteCreateKinds(palette: Palette): CreateKind[] {
   return roleKinds.filter((kind) => paletteSupportsKind(palette.mode, kind));
 }
 
+function rectEquals(a: Rect, b: Rect): boolean {
+  return a[0] === b[0] && a[1] === b[1] && a[2] === b[2] && a[3] === b[3];
+}
+
+function cloneTerrainForRect(terrain: TerrainSnapshot["terrain"]): TerrainSnapshot["terrain"] {
+  return cloneTerrain(terrain);
+}
+
+function terrainAabb(terrain: TerrainSnapshot["terrain"]): Rect | null {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (let row = 0; row < terrain.h; row++) {
+    for (let col = 0; col < terrain.w; col++) {
+      if (terrain.data[row * terrain.w + col] < 0) continue;
+      const wx = terrain.ox + col;
+      const wy = terrain.oy + row;
+      minX = Math.min(minX, wx);
+      minY = Math.min(minY, wy);
+      maxX = Math.max(maxX, wx);
+      maxY = Math.max(maxY, wy);
+    }
+  }
+  if (maxX < minX || maxY < minY) return null;
+  return [minX, minY, maxX - minX + 1, maxY - minY + 1];
+}
+
+function resizeTerrainToRect(terrain: TerrainSnapshot["terrain"], rect: Rect): TerrainSnapshot["terrain"] {
+  const next = { ox: rect[0], oy: rect[1], w: rect[2], h: rect[3], data: new Int16Array(rect[2] * rect[3]).fill(-1) };
+  for (let row = 0; row < terrain.h; row++) {
+    for (let col = 0; col < terrain.w; col++) {
+      if (terrain.data[row * terrain.w + col] < 0) continue;
+      const wx = terrain.ox + col;
+      const wy = terrain.oy + row;
+      const nx = wx - next.ox;
+      const ny = wy - next.oy;
+      if (nx < 0 || ny < 0 || nx >= next.w || ny >= next.h) continue;
+      next.data[ny * next.w + nx] = terrain.data[row * terrain.w + col];
+    }
+  }
+  return next;
+}
+
 export default function App() {
   const [map, setMap] = useState<LiteTileMap | null>(null);
   const [error, setError] = useState("");
@@ -149,11 +194,14 @@ export default function App() {
   const [createHouseRoofHash, setCreateHouseRoofHash] = useState("");
   const [createArmed, setCreateArmed] = useState(false);
   const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [bitwiseTargetId, setBitwiseTargetId] = useState<number | null>(null);
+  const [bitwiseSourceId, setBitwiseSourceId] = useState<number | null>(null);
   const [clipboard, setClipboard] = useState<ObjectClipboard | null>(null);
   const [anchorId, setAnchorId] = useState<number | null>(null);
   const undo = useRef(new UndoStack());
   const stroke = useRef<{ id: number; before: TerrainSnapshot; dirty: boolean } | null>(null);
   const decoDrag = useRef<{ id: number; index: number; before: [number, number] } | null>(null);
+  const terrainNoisePreview = useRef<{ id: number; before: TerrainSnapshot; beforeTags: Record<string, string> } | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const saveTimer = useRef<number | null>(null);
 
@@ -178,6 +226,7 @@ export default function App() {
     setClipboard(null);
     setActiveLayerId(lite.layers[0]?.id ?? null);
     setExpanded(new Set());
+    terrainNoisePreview.current = null;
     setVersion(0);
     setError("");
   }, []);
@@ -224,6 +273,18 @@ export default function App() {
   // bind a palette to each object by role (also recompiled on edits — type
   // conversion / palette override change the bindings; version bumps on every command)
   const bindings = useMemo(() => (map && pack ? compileMap(map, pack) : null), [map, pack, version]);
+  const effectiveFrgCells = useCallback((o: LiteObject): FrgCellData[] => {
+    if (o.type !== "FIXED_RECT_GROUP") return [];
+    if (o.frg) return o.frg.cells.map((cell) => ({ ...cell }));
+    const binding = bindings?.get(o.id);
+    if (binding?.kind === "frg") return binding.variants.map((palette) => ({ palette: palette.hash, weight: 100 }));
+    const override = o.tags["web.palette"];
+    return override ? [{ palette: override, weight: 100 }] : [];
+  }, [bindings]);
+  const effectiveFrgPlacementMode = useCallback((o: LiteObject): FrgPlacementMode => {
+    if (o.type !== "FIXED_RECT_GROUP") return DEFAULT_FRG_PLACEMENT_MODE;
+    return o.frg?.placementMode ?? DEFAULT_FRG_PLACEMENT_MODE;
+  }, []);
   // invalidate the cached scene when bindings / render mode change
   useEffect(() => { setPackVersion((v) => v + 1); }, [bindings, renderMode]);
 
@@ -439,6 +500,184 @@ export default function App() {
     if (map && selected.size) run(setObjectsEnabledCommand(map, [...selected], visible));
   }, [map, selected, run]);
 
+  const onSetRectToMap = useCallback((id: number) => {
+    if (!map) return;
+    const o = findObject(map, id);
+    if (!o) return;
+    const beforeRect = [...o.rect] as Rect;
+    const afterRect: Rect = [0, 0, map.width, map.height];
+    if (rectEquals(beforeRect, afterRect)) return;
+    const beforeTerrain = o.terrain ? cloneTerrainForRect(o.terrain) : undefined;
+    const afterTerrain = o.terrain ? resizeTerrainToRect(o.terrain, afterRect) : undefined;
+    run(setObjectRectCommand(map, id, beforeRect, afterRect, beforeTerrain, afterTerrain));
+  }, [map, run]);
+
+  const onSetRectToAabb = useCallback((id: number) => {
+    if (!map) return;
+    const o = findObject(map, id);
+    if (!o) return;
+    const beforeRect = [...o.rect] as Rect;
+    const afterRect = o.terrain ? terrainAabb(o.terrain) : beforeRect;
+    if (!afterRect || rectEquals(beforeRect, afterRect)) return;
+    const beforeTerrain = o.terrain ? cloneTerrainForRect(o.terrain) : undefined;
+    const afterTerrain = o.terrain ? resizeTerrainToRect(o.terrain, afterRect) : undefined;
+    run(setObjectRectCommand(map, id, beforeRect, afterRect, beforeTerrain, afterTerrain));
+  }, [map, run]);
+
+  const commitRandomizeTerrain = useCallback((id: number, config: TerrainNoiseConfig, previewBase?: { before: TerrainSnapshot; beforeTags: Record<string, string> }) => {
+    if (!map) return;
+    const o = findObject(map, id);
+    if (!o?.terrain || !(o.type === "TERRAIN_2_CORNER" || o.type === "TERRAIN_2_EDGE")) return;
+    const before: TerrainSnapshot = previewBase?.before ?? { terrain: cloneTerrain(o.terrain), rect: [...o.rect] as Rect };
+    const beforeTags = previewBase?.beforeTags ?? { ...o.tags };
+    const after: TerrainSnapshot = { terrain: regenerateTerrainByNoise(before.terrain, config), rect: [...before.rect] as Rect };
+    const afterTags = applyTerrainNoiseConfig(beforeTags, config);
+    if (terrainMatrixEquals(before.terrain, after.terrain) && JSON.stringify(beforeTags) === JSON.stringify(afterTags)) return;
+    run(randomizeTerrainCommand(map, id, before, after, beforeTags, afterTags));
+  }, [map, run]);
+
+  const onRandomizeTerrain = useCallback((id: number, config: TerrainNoiseConfig) => {
+    terrainNoisePreview.current = null;
+    commitRandomizeTerrain(id, config);
+  }, [commitRandomizeTerrain]);
+
+  const onPreviewTerrainNoise = useCallback((id: number, config: TerrainNoiseConfig) => {
+    if (!map) return;
+    const o = findObject(map, id);
+    if (!o?.terrain || !(o.type === "TERRAIN_2_CORNER" || o.type === "TERRAIN_2_EDGE")) return;
+    let preview = terrainNoisePreview.current;
+    if (!preview || preview.id !== id) {
+      preview = {
+        id,
+        before: { terrain: cloneTerrain(o.terrain), rect: [...o.rect] as Rect },
+        beforeTags: { ...o.tags },
+      };
+      terrainNoisePreview.current = preview;
+    }
+    o.terrain = regenerateTerrainByNoise(preview.before.terrain, config);
+    o.rect = [...preview.before.rect];
+    o.tags = applyTerrainNoiseConfig(preview.beforeTags, config);
+    setVersion((v) => v + 1);
+  }, [map]);
+
+  const onCancelTerrainNoisePreview = useCallback(() => {
+    if (!map) return;
+    const preview = terrainNoisePreview.current;
+    if (!preview) return;
+    const o = findObject(map, preview.id);
+    terrainNoisePreview.current = null;
+    if (!o) return;
+    o.terrain = cloneTerrain(preview.before.terrain);
+    o.rect = [...preview.before.rect];
+    o.tags = { ...preview.beforeTags };
+    setVersion((v) => v + 1);
+  }, [map]);
+
+  const onCommitTerrainNoisePreview = useCallback((id: number, config: TerrainNoiseConfig) => {
+    const preview = terrainNoisePreview.current;
+    terrainNoisePreview.current = null;
+    if (preview && preview.id === id) {
+      commitRandomizeTerrain(id, config, { before: preview.before, beforeTags: preview.beforeTags });
+      return;
+    }
+    commitRandomizeTerrain(id, config);
+  }, [commitRandomizeTerrain]);
+
+  const onSetTerrainBorderAsConnected = useCallback((id: number, enabled: boolean) => {
+    if (!map) return;
+    const o = findObject(map, id);
+    if (!o || !(o.type === "TERRAIN_2_CORNER" || o.type === "TERRAIN_2_EDGE")) return;
+    const before = { ...o.tags };
+    const after = { ...o.tags };
+    if (enabled) after.borderAsConnected = "true";
+    else delete after.borderAsConnected;
+    if (JSON.stringify(before) === JSON.stringify(after)) return;
+    run({
+      label: "Border as connected",
+      do: () => {
+        const target = findObject(map, id);
+        if (target) target.tags = { ...after };
+      },
+      undo: () => {
+        const target = findObject(map, id);
+        if (target) target.tags = { ...before };
+      },
+    });
+  }, [map, run]);
+
+  const onRunMorph = useCallback((id: number, mode: "dilate" | "erode" | "erode_dilate" | "dilate_erode", dilate: TerrainNoiseConfig, erode: TerrainNoiseConfig) => {
+    if (!map) return;
+    const o = findObject(map, id);
+    if (!isBitwiseSupported(o)) return;
+    const before: TerrainSnapshot = { terrain: cloneTerrain(o.terrain), rect: [...o.rect] as Rect };
+    const beforeTags = { ...o.tags };
+    const connected = borderAsConnected(o);
+    let nextTerrain = cloneTerrain(o.terrain);
+    switch (mode) {
+      case "dilate":
+        nextTerrain = dilateTerrainMatrix(nextTerrain, dilate, connected);
+        break;
+      case "erode":
+        nextTerrain = erodeTerrainMatrix(nextTerrain, erode, connected);
+        break;
+      case "erode_dilate":
+        nextTerrain = erodeTerrainMatrix(nextTerrain, erode, connected);
+        nextTerrain = dilateTerrainMatrix(nextTerrain, dilate, connected);
+        break;
+      case "dilate_erode":
+        nextTerrain = dilateTerrainMatrix(nextTerrain, dilate, connected);
+        nextTerrain = erodeTerrainMatrix(nextTerrain, erode, connected);
+        break;
+    }
+    const afterTags = applyNoiseConfig(applyNoiseConfig(o.tags, "web.dilate", dilate), "web.erode", erode);
+    if (terrainMatrixEquals(before.terrain, nextTerrain) && JSON.stringify(beforeTags) === JSON.stringify(afterTags)) return;
+    const after: TerrainSnapshot = { terrain: nextTerrain, rect: [...o.rect] as Rect };
+    const label = mode === "dilate" ? "Dilate"
+      : mode === "erode" ? "Erode"
+      : mode === "erode_dilate" ? "Erode then dilate"
+      : "Dilate then erode";
+    run(terrainMutationWithTagsCommand(map, id, before, after, beforeTags, afterTags, label));
+  }, [map, run]);
+
+  const onOpenBitwise = useCallback((id: number) => {
+    if (!map) return;
+    const target = findObject(map, id);
+    if (!isBitwiseSupported(target)) return;
+    setBitwiseTargetId(id);
+  }, [map]);
+
+  const onInitBitwise = useCallback((id: number, filled: boolean) => {
+    if (!map) return;
+    const target = findObject(map, id);
+    if (!isBitwiseSupported(target)) return;
+    const before: TerrainSnapshot = { terrain: cloneTerrain(target.terrain), rect: [...target.rect] as Rect };
+    const afterTerrain = fillTerrainMatrix(target.terrain, filled);
+    if (terrainMatrixEquals(before.terrain, afterTerrain)) return;
+    const after: TerrainSnapshot = { terrain: afterTerrain, rect: [...target.rect] as Rect };
+    run(bitwiseObjectCommand(map, id, before, after, filled ? "Init full" : "Init empty"));
+  }, [map, run]);
+
+  const onRunBitwiseQuickOp = useCallback((id: number, op: "keep_border" | "flip" | "remove_zero") => {
+    if (!map) return;
+    const target = findObject(map, id);
+    if (!isBitwiseSupported(target)) return;
+    const before: TerrainSnapshot = { terrain: cloneTerrain(target.terrain), rect: [...target.rect] as Rect };
+    const afterTerrain = op === "keep_border"
+      ? keepBorderTerrainMatrix(target.terrain)
+      : op === "flip"
+        ? flipTerrainMatrix(target.terrain)
+        : removeZeroLikeDesktop(target.terrain, target.type, borderAsConnected(target));
+    if (terrainMatrixEquals(before.terrain, afterTerrain)) return;
+    const after: TerrainSnapshot = { terrain: afterTerrain, rect: [...target.rect] as Rect };
+    const label = op === "keep_border" ? "Keep border" : op === "flip" ? "Flip" : "Remove zero";
+    run(bitwiseObjectCommand(map, id, before, after, label));
+  }, [map, run]);
+
+  const onCloseBitwise = useCallback(() => {
+    setBitwiseTargetId(null);
+    setBitwiseSourceId(null);
+  }, []);
+
   const onRename = useCallback((id: number, name: string) => {
     if (!map) return;
     const o = findObject(map, id);
@@ -460,6 +699,59 @@ export default function App() {
     const before = o.tags["web.palette"];
     const after = hash ?? undefined;
     if (before !== after) run(setObjectPaletteCommand(map, id, before, after));
+  }, [map, run]);
+
+  const onAddFrgCell = useCallback((id: number, paletteHash: string) => {
+    if (!map) return;
+    const o = findObject(map, id);
+    if (!o || o.type !== "FIXED_RECT_GROUP") return;
+    const before = effectiveFrgCells(o);
+    if (before.some((cell) => cell.palette === paletteHash)) return;
+    const after = [...before, { palette: paletteHash, weight: 100 }];
+    run(setFrgCellsCommand(map, id, before, after, "Add FRG cell"));
+  }, [map, run, effectiveFrgCells]);
+
+  const onRemoveFrgCell = useCallback((id: number, index: number) => {
+    if (!map) return;
+    const o = findObject(map, id);
+    if (!o || o.type !== "FIXED_RECT_GROUP") return;
+    const before = effectiveFrgCells(o);
+    if (index < 0 || index >= before.length) return;
+    const after = before.filter((_, i) => i !== index);
+    run(setFrgCellsCommand(map, id, before, after, "Delete FRG cell"));
+  }, [map, run, effectiveFrgCells]);
+
+  const onSetFrgCellWeight = useCallback((id: number, index: number, weight: number) => {
+    if (!map) return;
+    const o = findObject(map, id);
+    if (!o || o.type !== "FIXED_RECT_GROUP") return;
+    const before = effectiveFrgCells(o);
+    if (index < 0 || index >= before.length) return;
+    const nextWeight = Math.max(0, Math.round(weight));
+    if (before[index].weight === nextWeight) return;
+    const after = before.map((cell, i) => (i === index ? { ...cell, weight: nextWeight } : cell));
+    run(setFrgCellsCommand(map, id, before, after, "FRG cell weight"));
+  }, [map, run, effectiveFrgCells]);
+
+  const onSetFrgPlacementMode = useCallback((id: number, placementMode: FrgPlacementMode) => {
+    if (!map) return;
+    const o = findObject(map, id);
+    if (!o || o.type !== "FIXED_RECT_GROUP") return;
+    const before = effectiveFrgPlacementMode(o);
+    if (before === placementMode) return;
+    run(setFrgPlacementModeCommand(map, id, before, placementMode));
+  }, [map, run, effectiveFrgPlacementMode]);
+
+  const onApplyFrgNoise = useCallback((id: number, config: TerrainNoiseConfig) => {
+    if (!map) return;
+    const o = findObject(map, id);
+    if (!o || o.type !== "FIXED_RECT_GROUP" || !o.terrain) return;
+    const before: TerrainSnapshot = { terrain: cloneTerrain(o.terrain), rect: [...o.rect] as Rect };
+    const beforeTags = { ...o.tags };
+    const afterTags = applyNoiseConfig(o.tags, "web.frg", config);
+    if (JSON.stringify(beforeTags) === JSON.stringify(afterTags)) return;
+    const after: TerrainSnapshot = { terrain: cloneTerrain(o.terrain), rect: [...o.rect] as Rect };
+    run(terrainMutationWithTagsCommand(map, id, before, after, beforeTags, afterTags, "FRG noise"));
   }, [map, run]);
 
   // --- house decoration drag (door/window/chimney within the house rect) ---
@@ -923,14 +1215,92 @@ export default function App() {
       }
       if (!e.metaKey && !e.ctrlKey && !e.altKey && map) {
         if (e.key.toLowerCase() === "m") { e.preventDefault(); setMarquee((m) => !m); }
-        else if (e.key === "Escape") { setMarquee(false); setCreateArmed(false); setCreateModalOpen(false); }
+        else if (e.key === "Escape") { setMarquee(false); setCreateArmed(false); setCreateModalOpen(false); onCloseBitwise(); }
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onUndo, onRedo, map, selected.size, canPaste, onCopySelection, onPasteClipboard, onDuplicateSelection, onDeleteSelection]);
+  }, [onUndo, onRedo, map, selected.size, canPaste, onCopySelection, onPasteClipboard, onDuplicateSelection, onDeleteSelection, onCloseBitwise]);
 
   const selObjs = useMemo(() => (map ? ([...selected].map((id) => findObject(map, id)).filter(Boolean) as LiteObject[]) : []), [map, selected, version]);
+  const bitwiseTarget = useMemo(() => (map && bitwiseTargetId != null ? findObject(map, bitwiseTargetId) : null), [map, bitwiseTargetId, version]);
+  const bitwiseSources = useMemo(() => {
+    if (!map || !isBitwiseSupported(bitwiseTarget)) return [] as {
+      id: number;
+      label: string;
+      layerId: number;
+      layerName: string;
+      type: LiteType;
+      role: string;
+      overlap: boolean;
+      origin: [number, number];
+      size: [number, number];
+    }[];
+    const out: {
+      id: number;
+      label: string;
+      layerId: number;
+      layerName: string;
+      type: LiteType;
+      role: string;
+      overlap: boolean;
+      origin: [number, number];
+      size: [number, number];
+    }[] = [];
+    for (const layer of map.layers) {
+      for (const obj of layer.objects) {
+        if (obj.id === bitwiseTarget.id || !isBitwiseSupported(obj)) continue;
+        out.push({
+          id: obj.id,
+          label: displayName(obj),
+          layerId: layer.id,
+          layerName: layer.name,
+          type: obj.type,
+          role: roleOf(obj),
+          overlap: hasBitwiseOverlap(bitwiseTarget.terrain, obj.terrain),
+          origin: [obj.rect[0], obj.rect[1]],
+          size: [obj.rect[2], obj.rect[3]],
+        });
+      }
+    }
+    return out;
+  }, [map, bitwiseTarget, version]);
+  useEffect(() => {
+    if (!bitwiseTargetId || bitwiseSources.length === 0) {
+      setBitwiseSourceId(null);
+      return;
+    }
+    if (bitwiseSourceId != null && bitwiseSources.some((source) => source.id === bitwiseSourceId)) return;
+    setBitwiseSourceId(bitwiseSources.find((source) => source.overlap)?.id ?? bitwiseSources[0].id);
+  }, [bitwiseTargetId, bitwiseSources, bitwiseSourceId]);
+  const onApplyBitwise = useCallback((op: BitwiseObjectOp) => {
+    if (!map || !isBitwiseSupported(bitwiseTarget) || bitwiseSourceId == null) return;
+    const source = findObject(map, bitwiseSourceId);
+    if (!isBitwiseSupported(source)) return;
+    const before: TerrainSnapshot = { terrain: cloneTerrain(bitwiseTarget.terrain), rect: [...bitwiseTarget.rect] as Rect };
+    const afterTerrain = applyBitwiseObjectOp(bitwiseTarget.terrain, source.terrain, op);
+    if (terrainMatrixEquals(before.terrain, afterTerrain)) {
+      onCloseBitwise();
+      return;
+    }
+    const after: TerrainSnapshot = { terrain: afterTerrain, rect: [...bitwiseTarget.rect] as Rect };
+    run(bitwiseObjectCommand(map, bitwiseTarget.id, before, after, `Bitwise ${op}`));
+    onCloseBitwise();
+  }, [map, bitwiseTarget, bitwiseSourceId, run, onCloseBitwise]);
+  const bitwiseRequest = useMemo(() => {
+    if (!map || !isBitwiseSupported(bitwiseTarget)) return null;
+    const targetLayer = layerOfObject(map, bitwiseTarget.id);
+    return {
+      targetLabel: displayName(bitwiseTarget),
+      targetLayerName: targetLayer?.name ?? "Unknown layer",
+      targetType: bitwiseTarget.type,
+      targetRole: roleOf(bitwiseTarget),
+      sources: bitwiseSources,
+      selectedSourceId: bitwiseSourceId,
+      onSelectSource: (id: number) => setBitwiseSourceId(id),
+      onApply: onApplyBitwise,
+    };
+  }, [map, bitwiseTarget, bitwiseSources, bitwiseSourceId, onApplyBitwise]);
   const selObj = selObjs[0] ?? null;
   const selIsTerrain = isTerrain(selObj);
   const selLocked = selObj ? isLocked(selObj) : false;
@@ -1114,15 +1484,32 @@ export default function App() {
           <div className="resizer right-resizer" onMouseDown={startPropsResize} title="拖动调整右栏宽度" />
           <PropsPanel
             layer={activeLayer}
+            mapSize={[map.width, map.height]}
             objects={selObjs}
             pack={pack}
             bindings={bindings}
             onToggleLayerVisible={onToggleLayerVisible}
             onSetObjectsVisible={onSetObjectsVisible}
             onToggleLock={onToggleLock}
+            onSetRectToMap={onSetRectToMap}
+            onSetRectToAabb={onSetRectToAabb}
+            onRandomizeTerrain={onRandomizeTerrain}
+            onPreviewTerrainNoise={onPreviewTerrainNoise}
+            onCommitTerrainNoisePreview={onCommitTerrainNoisePreview}
+            onCancelTerrainNoisePreview={onCancelTerrainNoisePreview}
+            onSetTerrainBorderAsConnected={onSetTerrainBorderAsConnected}
+            onRunMorph={onRunMorph}
+            onInitBitwise={onInitBitwise}
+            onRunBitwiseQuickOp={onRunBitwiseQuickOp}
+            onOpenBitwise={onOpenBitwise}
             onRename={onRename}
             onSetObjectType={onSetObjectType}
             onSetPalette={onSetPalette}
+            onAddFrgCell={onAddFrgCell}
+            onRemoveFrgCell={onRemoveFrgCell}
+            onSetFrgCellWeight={onSetFrgCellWeight}
+            onSetFrgPlacementMode={onSetFrgPlacementMode}
+            onApplyFrgNoise={onApplyFrgNoise}
             onSetHouseSlot={onSetHouseSlot}
             onSetWallHeight={onSetWallHeight}
             onSetHouseOverlap={onSetHouseOverlap}
@@ -1131,6 +1518,7 @@ export default function App() {
             onGenerateHouseDecorations={onGenerateHouseDecorations}
           />
           <PalettePickerModal pack={pack} request={createPickerRequest} onClose={() => setCreateModalOpen(false)} />
+          <BitwiseObjectModal request={bitwiseRequest} onClose={onCloseBitwise} />
         </div>
       )}
     </div>

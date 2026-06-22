@@ -3,13 +3,14 @@
 // and src/command/commands_blueprint.cpp compileLayer's FRG branch). MVP style
 // ranking only (no MiniLM cosine): prefer palettes sharing a style word.
 
-import { eachObject, roleOf, type LiteObject, type LiteTileMap, type LiteType } from "../model";
+import { DEFAULT_FRG_PLACEMENT_MODE, type FrgPlacementMode, eachObject, roleOf, type LiteObject, type LiteTileMap, type LiteType } from "../model";
 import { decorationRole } from "../house";
 import { PaletteMode, type Palette, type PackRuntime } from "./types";
-import { assignFrgCells } from "./frg";
+import { assignPlacedFrgCells } from "./frg";
 import { hashString, mulberry32 } from "./rng";
 import { isMatrixAutotile } from "./autotile";
 import { isStructureMode } from "./slice";
+import { DEFAULT_FRG_NOISE_CONFIG, noiseConfigFromTags } from "../terrainNoise";
 
 // Within a role-distance tier the engine picks by style only, but it renders
 // each object by its OWN geometry — so a terrain-area object needs an auto-tile
@@ -102,6 +103,34 @@ export type Bindings = Map<number, Binding>;
 const objSeed = (o: LiteObject): number =>
   hashString(`${o.tags["web.name"] ?? ""}|${roleOf(o)}|${o.tags["blueprint.style"] ?? ""}`);
 
+function resolveFrgCells(
+  o: LiteObject,
+  byHash: Map<string, Palette>,
+  palettes: Palette[],
+): { variants: Palette[]; weights: number[]; explicit: boolean; placementMode: FrgPlacementMode } {
+  if (o.frg) {
+    const variants: Palette[] = [];
+    const weights: number[] = [];
+    for (const cell of o.frg.cells) {
+      const palette = byHash.get(cell.palette);
+      if (!palette) continue;
+      variants.push(palette);
+      weights.push(Math.max(0, Math.round(cell.weight)));
+    }
+    return { variants, weights, explicit: true, placementMode: o.frg.placementMode ?? DEFAULT_FRG_PLACEMENT_MODE };
+  }
+  const role = roleOf(o);
+  const style = o.tags["blueprint.style"] ?? "";
+  const override = o.tags["web.palette"] ? byHash.get(o.tags["web.palette"]) : undefined;
+  const variants = override ? [override] : resolvePalettesForRole(palettes, role, style, 6);
+  return {
+    variants,
+    weights: variants.map(() => 100),
+    explicit: false,
+    placementMode: DEFAULT_FRG_PLACEMENT_MODE,
+  };
+}
+
 function bindingKind(mode: number): "auto" | "slice" | "fixed" {
   if (isMatrixAutotile(mode)) return "auto";
   if (isStructureMode(mode)) return "slice";
@@ -133,7 +162,7 @@ export function compileMap(map: LiteTileMap, pack: PackRuntime): Bindings {
   for (const o of eachObject(map)) {
     const role = roleOf(o);
     const override = o.tags["web.palette"] ? byHash.get(o.tags["web.palette"]) : undefined;
-    if (!role && !override) continue;
+    if (!role && !override && !(o.type === "FIXED_RECT_GROUP" && o.frg)) continue;
     const style = o.tags["blueprint.style"] ?? "";
     const seed = objSeed(o);
 
@@ -155,9 +184,22 @@ export function compileMap(map: LiteTileMap, pack: PackRuntime): Bindings {
     }
 
     if (o.type === "FIXED_RECT_GROUP" && o.terrain) {
-      const variants = override ? [override] : resolvePalettesForRole(pack.palettes, role, style, 6);
-      if (variants.length === 0) continue;
-      out.set(o.id, { kind: "frg", variants, cellVariant: assignFrgCells(o.terrain, variants.length, seed) });
+      const frg = resolveFrgCells(o, byHash, pack.palettes);
+      const noise = noiseConfigFromTags(o.tags, "web.frg", DEFAULT_FRG_NOISE_CONFIG);
+      if (frg.explicit) {
+        out.set(o.id, {
+          kind: "frg",
+          variants: frg.variants,
+          cellVariant: assignPlacedFrgCells(o.terrain, frg.variants, frg.weights, frg.placementMode, noise),
+        });
+        continue;
+      }
+      if (frg.variants.length === 0) continue;
+      out.set(o.id, {
+        kind: "frg",
+        variants: frg.variants,
+        cellVariant: assignPlacedFrgCells(o.terrain, frg.variants, frg.weights, frg.placementMode, noise),
+      });
       continue;
     }
     const palette = override ?? resolvePaletteForRole(pack.palettes, role, style, seed, o.type);
