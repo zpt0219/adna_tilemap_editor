@@ -1244,18 +1244,18 @@ export default function App() {
                           <option value="none">不限色 (None)</option>
                           <option value="auto">自动聚类 (K-Means Auto)</option>
                           <option value="fixed">自定义色板 (Fixed Palette)</option>
-                          <option value="mono">黑白双色 (Monochrome)</option>
-                          <option value="gb_legacy">Game Boy 掌机经典</option>
-                          <option value="gb_pocket">Game Boy Pocket 灰色</option>
-                          <option value="gb_light">Game Boy Light 背光</option>
-                          <option value="pico8">PICO-8 像素画色板</option>
+                          <option value="mono">黑白双色 (Monochrome 2色)</option>
+                          <option value="gb_legacy">Game Boy 经典绿 (4色)</option>
+                          <option value="gb_pocket">Game Boy Pocket 灰度 (4色)</option>
+                          <option value="gb_light">Game Boy Light 蓝绿背光 (4色)</option>
+                          <option value="pico8">PICO-8 官方色板 (16色)</option>
                           <option value="nes">FC 红白机 (NES 64色)</option>
                           <option value="sfc_sprite">SFC/超任 角色精灵色板 (16色)</option>
                           <option value="sfc_bg">SFC/超任 背景色板 (256色)</option>
-                          <option value="pc98">PC-9801 复古色板</option>
-                          <option value="msx">MSX1 色板</option>
-                          <option value="c64">Commodore 64 色板</option>
-                          <option value="arne16">Arne16 复古色板</option>
+                          <option value="pc98">PC-9801 复古色板 (16色)</option>
+                          <option value="msx">MSX1 色板 (15色)</option>
+                          <option value="c64">Commodore 64 色板 (16色)</option>
+                          <option value="arne16">Arne16 经典复古色板 (16色)</option>
                         </select>
                       </div>
 
