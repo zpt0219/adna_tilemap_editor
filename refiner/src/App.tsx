@@ -708,6 +708,32 @@ export default function App() {
     setSliderPos(pct);
   };
 
+  useEffect(() => {
+    const handleGlobalMove = (e: MouseEvent) => {
+      if (!isDraggingRef.current) return;
+      handleSliderMove(e.clientX);
+    };
+    const handleGlobalTouchMove = (e: TouchEvent) => {
+      if (!isDraggingRef.current || !e.touches[0]) return;
+      handleSliderMove(e.touches[0].clientX);
+    };
+    const handleGlobalUp = () => {
+      isDraggingRef.current = false;
+    };
+
+    window.addEventListener("mousemove", handleGlobalMove);
+    window.addEventListener("touchmove", handleGlobalTouchMove);
+    window.addEventListener("mouseup", handleGlobalUp);
+    window.addEventListener("touchend", handleGlobalUp);
+
+    return () => {
+      window.removeEventListener("mousemove", handleGlobalMove);
+      window.removeEventListener("touchmove", handleGlobalTouchMove);
+      window.removeEventListener("mouseup", handleGlobalUp);
+      window.removeEventListener("touchend", handleGlobalUp);
+    };
+  }, []);
+
   // Export & Download Single Image
   const handleDownload = (scale: number = 1) => {
     if (!activeItem || !activeItem.processedResult?.result) return;
@@ -1496,11 +1522,15 @@ export default function App() {
                                 height: activeItem.processedResult.result.height * zoomScale,
                               }
                         }
-                        onMouseMove={(e) => isDraggingRef.current && handleSliderMove(e.clientX)}
-                        onTouchMove={(e) => isDraggingRef.current && e.touches[0] && handleSliderMove(e.touches[0].clientX)}
-                        onMouseLeave={() => { isDraggingRef.current = false; }}
-                        onMouseUp={() => { isDraggingRef.current = false; }}
-                        onTouchEnd={() => { isDraggingRef.current = false; }}
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          isDraggingRef.current = true;
+                          handleSliderMove(e.clientX);
+                        }}
+                        onTouchStart={(e) => {
+                          isDraggingRef.current = true;
+                          if (e.touches[0]) handleSliderMove(e.touches[0].clientX);
+                        }}
                       >
                         <canvas
                           ref={originalCanvasRef}
@@ -1527,8 +1557,6 @@ export default function App() {
                         <div
                           className="compare-slider-bar"
                           style={{ left: `${sliderPos}%` }}
-                          onMouseDown={(e) => { e.preventDefault(); isDraggingRef.current = true; }}
-                          onTouchStart={() => { isDraggingRef.current = true; }}
                         >
                           <div className="compare-slider-handle">↔</div>
                         </div>
