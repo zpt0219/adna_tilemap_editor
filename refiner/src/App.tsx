@@ -26,7 +26,8 @@ function rgbToHex(rgb: RGB): string {
 }
 
 interface RefinerSettings {
-  gridDetectionMode: "auto" | "hint" | "force" | "off";
+  gridDetectionMode: "auto" | "hint" | "force" | "ratio" | "off";
+  pixelRatio: number;
   detectionQuantStep: number;
   sampleWindow: number;
   forcePixelsW: string;
@@ -57,6 +58,7 @@ interface RefinerSettings {
 
 const DEFAULT_SETTINGS: RefinerSettings = {
   gridDetectionMode: "auto",
+  pixelRatio: 1,
   detectionQuantStep: 64,
   sampleWindow: 3,
   forcePixelsW: "",
@@ -481,7 +483,9 @@ export default function App() {
       sampleWindow: settings.sampleWindow,
     };
 
-    if (settings.gridDetectionMode === "force") {
+    if (settings.gridDetectionMode === "ratio") {
+      options.pixelRatio = settings.pixelRatio;
+    } else if (settings.gridDetectionMode === "force") {
       const w = parseInt(settings.forcePixelsW);
       const h = parseInt(settings.forcePixelsH);
       if (!isNaN(w) && w > 0 && !isNaN(h) && h > 0) {
@@ -957,11 +961,33 @@ export default function App() {
                           onChange={(e) => updateSetting("gridDetectionMode", e.target.value as any)}
                         >
                           <option value="auto">自动对齐 (Auto Grid)</option>
+                          <option value="ratio">像素合并比例 (Pixel Ratio)</option>
                           <option value="hint">参考像素 + 自动 (Pixel + Auto)</option>
                           <option value="force">强制像素 (Pixel Only)</option>
                           <option value="off">不重建 (Off 1:1)</option>
                         </select>
                       </div>
+
+                      {settings.gridDetectionMode === "ratio" && (
+                        <div className="form-group">
+                          <div className="label-wrapper">
+                            <span>合并像素比例 Merge Ratio</span>
+                          </div>
+                          <select
+                            className="form-select"
+                            value={settings.pixelRatio}
+                            onChange={(e) => updateSetting("pixelRatio", parseInt(e.target.value))}
+                          >
+                            <option value="1">1 → 1 (不合并)</option>
+                            <option value="2">2 → 1 (2x2 合并)</option>
+                            <option value="3">3 → 1 (3x3 合并)</option>
+                            <option value="4">4 → 1 (4x4 合并)</option>
+                            <option value="5">5 → 1 (5x5 合并)</option>
+                            <option value="6">6 → 1 (6x6 合并)</option>
+                            <option value="8">8 → 1 (8x8 合并)</option>
+                          </select>
+                        </div>
+                      )}
 
                       {settings.gridDetectionMode === "force" && (
                         <div className="form-row">

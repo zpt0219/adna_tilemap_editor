@@ -285,6 +285,7 @@ export type ProcessOptions = DetectOptions & {
 	 */
 	forcePixelsW?: number;
 	forcePixelsH?: number;
+	pixelRatio?: number;
 	/**
 	 * Use the specified pixel size (W x H) as a "hint" to start automatic grid estimation with a precise search from its neighborhood.
 	 * Unlike full pixel specification (forcePixelsW/H), automatic detection is still performed.
@@ -407,6 +408,7 @@ const normalizeProcessOptions = (
 	postRemoveBackground: boolean;
 	forcePixelsW?: number;
 	forcePixelsH?: number;
+	pixelRatio?: number;
 	hintPixelsW?: number;
 	hintPixelsH?: number;
 	bgRemovalScope: BackgroundRemovalScope;
@@ -464,6 +466,7 @@ const normalizeProcessOptions = (
 		raw.forcePixelsH,
 		PROCESS_RANGES.forcePixelsH,
 	);
+	const pixelRatio = raw.pixelRatio;
 	const hintPixelsW = clampOptionalInt(
 		raw.hintPixelsW,
 		PROCESS_RANGES.forcePixelsW,
@@ -525,6 +528,7 @@ const normalizeProcessOptions = (
 		postRemoveBackground,
 		forcePixelsW,
 		forcePixelsH,
+		pixelRatio,
 		hintPixelsW,
 		hintPixelsH,
 		bgRemovalScope,
@@ -1679,6 +1683,8 @@ export const processImage = (
 	const sourceAspectRatio = o.keepAspectRatio ? getAspectRatio(img) : 0;
 	const trimAlphaThreshold = o.trimAlphaThreshold;
 
+
+
 	// force: Trim with content BBox -> Force convert to specified pixel size (W x H) (no auto-detection)
 	if (o.forcePixelsW !== undefined && o.forcePixelsH !== undefined) {
 		const bgTol = o.backgroundTolerance;
@@ -2089,7 +2095,27 @@ export const processImage = (
 
 	let grid: PixelGrid | null = null;
 
-	if (autoGridFromTrimmed && maskedForDebugOrAuto) {
+	if (o.pixelRatio !== undefined && o.pixelRatio > 0) {
+		const outW = Math.max(1, Math.round(working.width / o.pixelRatio));
+		const outH = Math.max(1, Math.round(working.height / o.pixelRatio));
+		const cellW = working.width / outW;
+		const cellH = working.height / outH;
+		grid = {
+			cellW,
+			cellH,
+			offsetX: 0,
+			offsetY: 0,
+			outW,
+			outH,
+			cropX: 0,
+			cropY: 0,
+			cropW: working.width,
+			cropH: working.height,
+			score: 1.0,
+		};
+	}
+
+	if (!grid && autoGridFromTrimmed && maskedForDebugOrAuto) {
 		log("Auto grid from trimmed mode");
 		const b = findOpaqueBounds(maskedForDebugOrAuto, trimAlphaThreshold);
 		if (b) {
