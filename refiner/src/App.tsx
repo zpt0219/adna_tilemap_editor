@@ -1532,8 +1532,16 @@ export default function App() {
                           if (e.touches[0]) handleSliderMove(e.touches[0].clientX);
                         }}
                       >
+                        {/* Comparison Labels */}
+                        <div className="compare-label compare-label-left">
+                          原图 (Original)
+                        </div>
+                        <div className="compare-label compare-label-right">
+                          优化后 (Refined)
+                        </div>
+
                         <canvas
-                          ref={originalCanvasRef}
+                          ref={processedCanvasRef}
                           className="viewport-canvas compare-bottom-layer"
                           style={{ width: "100%", height: "100%" }}
                         />
@@ -1542,7 +1550,7 @@ export default function App() {
                           style={{ width: `${sliderPos}%` }}
                         >
                           <canvas
-                            ref={processedCanvasRef}
+                            ref={originalCanvasRef}
                             className="viewport-canvas"
                             style={
                               zoomScale === "fit"
