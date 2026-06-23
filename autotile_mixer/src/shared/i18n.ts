@@ -21,7 +21,8 @@ export const TRANSLATIONS = {
     clearPlayground: "清空画板",
     downloadPng: "导出 Tileset PNG",
     langBtn: "🌐 English",
-    showGrid: "显示网格辅助线"
+    showGrid: "显示网格辅助线",
+    easingFunc: "边缘渐变缓动函数"
   },
   en: {
     title: "Terrain Autotile Previewer",
@@ -45,7 +46,8 @@ export const TRANSLATIONS = {
     clearPlayground: "Clear Canvas",
     downloadPng: "Export Tileset PNG",
     langBtn: "🌐 简体中文",
-    showGrid: "Show Grid Lines"
+    showGrid: "Show Grid Lines",
+    easingFunc: "Border Easing Function"
   }
 };
 

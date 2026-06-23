@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './App.css';
 import { TRANSLATIONS, type Lang } from './shared/i18n';
-import { blendTilePixels, type RenderParams } from './utils/tiles';
+import { blendTilePixels, type RenderParams, EASING_FUNCTIONS } from './utils/tiles';
 
 const COLS = 16;
 const ROWS = 10;
@@ -163,6 +163,9 @@ export default function App() {
   // Smoothness (gradient transition width) config
   const [smoothness, setSmoothness] = useState(0.15);
 
+  // Easing function configuration (defaults to 'linear')
+  const [easing, setEasing] = useState<string>('linear');
+
   // Zoom config (integer scale factor for visual canvas sizes)
   const [zoom, setZoom] = useState(2);
 
@@ -273,6 +276,7 @@ export default function App() {
     const params: RenderParams = {
       tileSize,
       smoothness,
+      easing,
     };
 
     const cols = isWang ? 4 : 5;
@@ -334,7 +338,7 @@ export default function App() {
         ctx.stroke();
       }
     }
-  }, [isWang, tileSize, showGrid, imgAData, imgBData, smoothness]);
+  }, [isWang, tileSize, showGrid, imgAData, imgBData, smoothness, easing]);
 
   // Re-draw playground
   useEffect(() => {
@@ -395,7 +399,7 @@ export default function App() {
         ctx.stroke();
       }
     }
-  }, [wangVertices, isWang, tileSize, showGrid, imgAData, imgBData, smoothness]);
+  }, [wangVertices, isWang, tileSize, showGrid, imgAData, imgBData, smoothness, easing]);
 
   // Painting interaction logic
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -591,6 +595,23 @@ export default function App() {
                   onChange={(e) => setSmoothness(parseFloat(e.target.value))}
                   className="slider-input"
                 />
+              </div>
+
+              <div className="slider-group" style={{ marginTop: '4px' }}>
+                <div className="slider-header" style={{ marginBottom: '6px' }}>
+                  <span className="slider-name">{t.easingFunc}</span>
+                </div>
+                <select 
+                  className="text-input"
+                  value={easing}
+                  onChange={(e) => setEasing(e.target.value)}
+                >
+                  {Object.keys(EASING_FUNCTIONS).map((key) => (
+                    <option key={key} value={key}>
+                      {key}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className="slider-group" style={{ marginTop: '4px' }}>
