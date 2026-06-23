@@ -1,5 +1,6 @@
 export interface RenderParams {
   tileSize: number;
+  smoothness: number;
 }
 
 // ===========================================================================
@@ -41,8 +42,8 @@ const BLOB_CORNERS: [number, number, number, number][] = [
   [1, 0, 0, 0], // 8: Outer BR
   [0, 1, 1, 1], // 9: Inner TL
   [1, 0, 1, 1], // 10: Inner TR
-  [1, 1, 0, 1], // 11: Inner BL
-  [1, 1, 1, 0], // 12: Inner BR
+  [1, 1, 0, 1], // 11: Inner BR
+  [1, 1, 1, 0], // 12: Inner BL
   [0, 0, 0, 0], // 13: Background
 ];
 
@@ -52,11 +53,27 @@ const BLOB_CORNERS: [number, number, number, number][] = [
 export function blendTilePixels(
   tileIndex: number,
   isWang: boolean,
+  imgAData: ImageData | null,
+  imgBData: ImageData | null,
   params: RenderParams
 ): ImageData {
-  const { tileSize } = params;
+  const { tileSize, smoothness } = params;
 
   const outData = new ImageData(tileSize, tileSize);
+
+  const getSourcePixel = (data: ImageData | null, px: number, py: number) => {
+    if (!data) return { r: 255, g: 255, b: 255, a: 0 };
+    const x = ((px % data.width) + data.width) % data.width;
+    const y = ((py % data.height) + data.height) % data.height;
+    const idx = (y * data.width + x) * 4;
+    return {
+      r: data.data[idx],
+      g: data.data[idx + 1],
+      b: data.data[idx + 2],
+      a: data.data[idx + 3],
+    };
+  };
+
   const corners = isWang ? getWangCorners(tileIndex) : BLOB_CORNERS[tileIndex] ?? [0, 0, 0, 0] as [number, number, number, number];
 
   for (let y = 0; y < tileSize; y++) {
@@ -68,17 +85,42 @@ export function blendTilePixels(
       // Base Weight via bilinear interpolation
       const baseWeight = calculateWangBaseWeight(tx, ty, corners);
 
-      // Evaluate grass ratio (hardcoded 0.5 threshold)
-      const isGrass = baseWeight > 0.5;
+      // Soft transition factor (grassRatio)
+      let grassRatio = 0.5;
+      if (smoothness <= 0) {
+        grassRatio = baseWeight > 0.5 ? 1.0 : 0.0;
+      } else {
+        const low = 0.5 - smoothness / 2;
+        const high = 0.5 + smoothness / 2;
+        const t = Math.max(0, Math.min(1, (baseWeight - low) / (high - low)));
+        grassRatio = t * t * (3 - 2 * t); // smoothstep
+      }
 
-      // Color mapping: Grass is Green, Dirt is Brown
-      const color = isGrass ? [34, 197, 94, 255] : [120, 53, 15, 255];
+      // Blend source textures (Alpha-aware blending where Grass sits on top of Dirt)
+      const pixelA = getSourcePixel(imgAData, x, y);
+      const pixelB = getSourcePixel(imgBData, x, y);
+
+      const alphaA = (pixelA.a / 255.0) * grassRatio;
+      const alphaB = pixelB.a / 255.0;
+
+      const outAlpha = alphaA + alphaB * (1.0 - alphaA);
+
+      let outR = 0;
+      let outG = 0;
+      let outB = 0;
+
+      if (outAlpha > 0) {
+        outR = Math.round((pixelA.r * alphaA + pixelB.r * alphaB * (1.0 - alphaA)) / outAlpha);
+        outG = Math.round((pixelA.g * alphaA + pixelB.g * alphaB * (1.0 - alphaA)) / outAlpha);
+        outB = Math.round((pixelA.b * alphaA + pixelB.b * alphaB * (1.0 - alphaA)) / outAlpha);
+      }
+      const outA = Math.round(outAlpha * 255.0);
 
       const outIdx = (y * tileSize + x) * 4;
-      outData.data[outIdx] = color[0];
-      outData.data[outIdx + 1] = color[1];
-      outData.data[outIdx + 2] = color[2];
-      outData.data[outIdx + 3] = color[3];
+      outData.data[outIdx] = outR;
+      outData.data[outIdx + 1] = outG;
+      outData.data[outIdx + 2] = outB;
+      outData.data[outIdx + 3] = outA;
     }
   }
 

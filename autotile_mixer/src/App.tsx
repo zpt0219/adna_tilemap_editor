@@ -33,10 +33,108 @@ const BLOB_INVERSE_LAYOUT = [
   12, // 8: Outer BR
   9,  // 9: Inner TL
   8,  // 10: Inner TR
-  3,  // 11: Inner BL
-  4,  // 12: Inner BR
+  3,  // 11: Inner BR
+  4,  // 12: Inner BL
   13  // 13: Background
 ];
+
+// Map each of the 16 Wang corner configurations to the corresponding 14 Blob tile index
+const WANG_TO_BLOB = [
+  13, // 0:  [0,0,0,0] -> Background
+  7,  // 1:  [0,0,0,1] -> Outer BL
+  5,  // 2:  [0,0,1,0] -> Outer TL
+  3,  // 3:  [0,0,1,1] -> Edge Left
+  6,  // 4:  [0,1,0,0] -> Outer TR
+  0,  // 5:  [0,1,0,1] -> Diagonal NE+SW (fallback to Center)
+  1,  // 6:  [0,1,1,0] -> Edge Top
+  9,  // 7:  [0,1,1,1] -> Inner TL
+  8,  // 8:  [1,0,0,0] -> Outer BR
+  2,  // 9:  [1,0,0,1] -> Edge Bottom
+  0,  // 10: [1,0,1,0] -> Diagonal NW+SE (fallback to Center)
+  12, // 11: [1,0,1,1] -> Inner BL
+  4,  // 12: [1,1,0,0] -> Edge Right
+  11, // 13: [1,1,0,1] -> Inner BR
+  10, // 14: [1,1,1,0] -> Inner TR
+  0   // 15: [1,1,1,1] -> Center
+];
+
+function imageDataToURL(imageData: ImageData): string {
+  const canvas = document.createElement('canvas');
+  canvas.width = imageData.width;
+  canvas.height = imageData.height;
+  const ctx = canvas.getContext('2d');
+  if (ctx) {
+    ctx.putImageData(imageData, 0, 0);
+    return canvas.toDataURL();
+  }
+  return '';
+}
+
+function generateDefaultTexture(type: 'grass' | 'dirt', size: number): ImageData {
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return new ImageData(size, size);
+  
+  if (type === 'grass') {
+    ctx.fillStyle = '#16a34a'; // Grass base green
+    ctx.fillRect(0, 0, size, size);
+    
+    // Add texture detail pixels
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const rand = Math.random();
+        if (rand < 0.15) {
+          ctx.fillStyle = '#15803d'; // darker
+          ctx.fillRect(x, y, 1, 1);
+        } else if (rand > 0.85) {
+          ctx.fillStyle = '#22c55e'; // lighter
+          ctx.fillRect(x, y, 1, 1);
+        }
+      }
+    }
+    
+    // Add small pixel grass clumps
+    ctx.fillStyle = '#4ade80';
+    const clumps = Math.floor(size * size * 0.015);
+    for (let i = 0; i < clumps; i++) {
+      const gx = Math.floor(Math.random() * (size - 2));
+      const gy = Math.floor(Math.random() * (size - 3)) + 2;
+      ctx.fillRect(gx, gy, 1, 1);
+      ctx.fillRect(gx + 1, gy - 1, 1, 2);
+    }
+  } else {
+    ctx.fillStyle = '#78350f'; // Dirt base brown
+    ctx.fillRect(0, 0, size, size);
+    
+    // Add texture details
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const rand = Math.random();
+        if (rand < 0.2) {
+          ctx.fillStyle = '#451a03'; // dark brown
+          ctx.fillRect(x, y, 1, 1);
+        } else if (rand > 0.8) {
+          ctx.fillStyle = '#9a3412'; // light brown
+          ctx.fillRect(x, y, 1, 1);
+        }
+      }
+    }
+    
+    // Add pixel stones
+    ctx.fillStyle = '#a16207';
+    const stones = Math.floor(size * size * 0.008);
+    for (let i = 0; i < stones; i++) {
+      const sx = Math.floor(Math.random() * (size - 1));
+      const sy = Math.floor(Math.random() * (size - 1));
+      ctx.fillRect(sx, sy, 2, 1);
+      ctx.fillRect(sx, sy + 1, 1, 1);
+    }
+  }
+  
+  return ctx.getImageData(0, 0, size, size);
+}
 
 export default function App() {
   const [lang, setLang] = useState<Lang>(() => {
@@ -48,18 +146,27 @@ export default function App() {
   // Tileset Type: true = Wang 16, false = Blob 14
   const [isWang, setIsWang] = useState(true);
 
+  // Textures state
+  const [imgAData, setImgAData] = useState<ImageData | null>(null);
+  const [imgBData, setImgBData] = useState<ImageData | null>(null);
+  const [imgAUrl, setImgAUrl] = useState<string>('');
+  const [imgBUrl, setImgBUrl] = useState<string>('');
+  const [hasUploadedA, setHasUploadedA] = useState(false);
+  const [hasUploadedB, setHasUploadedB] = useState(false);
+
   // Grid helper
   const [showGrid, setShowGrid] = useState(true);
 
   // Tile size config
   const [tileSize, setTileSize] = useState(32);
 
-  // Interactive playground state
-  const [blobCells, setBlobCells] = useState<number[][]>(() =>
-    Array(ROWS).fill(null).map(() => Array(COLS).fill(0))
-  );
-  
-  // For Wang tileset, vertices are (ROWS+1) x (COLS+1)
+  // Smoothness (gradient transition width) config
+  const [smoothness, setSmoothness] = useState(0.15);
+
+  // Zoom config (integer scale factor for visual canvas sizes)
+  const [zoom, setZoom] = useState(2);
+
+  // Interactive playground state (both Wang & Blob share corner-based vertices)
   const [wangVertices, setWangVertices] = useState<number[][]>(() =>
     Array(ROWS + 1).fill(null).map(() => Array(COLS + 1).fill(0))
   );
@@ -72,11 +179,90 @@ export default function App() {
   const playgroundCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const cleanSheetCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
+  // Input file refs
+  const fileInputARef = useRef<HTMLInputElement | null>(null);
+  const fileInputBRef = useRef<HTMLInputElement | null>(null);
+
   // Handle language toggle
   const toggleLang = () => {
     const next = lang === 'zh' ? 'en' : 'zh';
     setLang(next);
     localStorage.setItem('adna_lang', next);
+  };
+
+  // Generate presets on start or when tileSize changes (if not uploaded)
+  useEffect(() => {
+    if (!hasUploadedA) {
+      const defaultA = generateDefaultTexture('grass', tileSize);
+      setImgAData(defaultA);
+      setImgAUrl(imageDataToURL(defaultA));
+    }
+  }, [tileSize, hasUploadedA]);
+
+  useEffect(() => {
+    if (!hasUploadedB) {
+      const defaultB = generateDefaultTexture('dirt', tileSize);
+      setImgBData(defaultB);
+      setImgBUrl(imageDataToURL(defaultB));
+    }
+  }, [tileSize, hasUploadedB]);
+
+  // Read uploaded images
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, target: 'A' | 'B') => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    loadImgFile(file, target);
+  };
+
+  const loadImgFile = (file: File, target: 'A' | 'B') => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(img, 0, 0);
+        const data = ctx.getImageData(0, 0, img.width, img.height);
+        if (target === 'A') {
+          setImgAData(data);
+          setImgAUrl(url);
+          setHasUploadedA(true);
+        } else {
+          setImgBData(data);
+          setImgBUrl(url);
+          setHasUploadedB(true);
+        }
+      }
+    };
+    img.src = url;
+  };
+
+  const usePreset = (target: 'A' | 'B') => {
+    if (target === 'A') {
+      setHasUploadedA(false);
+      const defaultA = generateDefaultTexture('grass', tileSize);
+      setImgAData(defaultA);
+      setImgAUrl(imageDataToURL(defaultA));
+    } else {
+      setHasUploadedB(false);
+      const defaultB = generateDefaultTexture('dirt', tileSize);
+      setImgBData(defaultB);
+      setImgBUrl(imageDataToURL(defaultB));
+    }
+  };
+
+  const swapTextures = () => {
+    setImgAData(imgBData);
+    setImgBData(imgAData);
+
+    setImgAUrl(imgBUrl);
+    setImgBUrl(imgAUrl);
+
+    const tempHasUploaded = hasUploadedA;
+    setHasUploadedA(hasUploadedB);
+    setHasUploadedB(tempHasUploaded);
   };
 
   // Re-generate tileset sheet on state changes
@@ -86,6 +272,7 @@ export default function App() {
 
     const params: RenderParams = {
       tileSize,
+      smoothness,
     };
 
     const cols = isWang ? 4 : 5;
@@ -114,6 +301,8 @@ export default function App() {
       const tileData = blendTilePixels(
         tileIdx,
         isWang,
+        imgAData,
+        imgBData,
         params
       );
       cleanCtx.putImageData(tileData, col * tileSize, row * tileSize);
@@ -145,7 +334,7 @@ export default function App() {
         ctx.stroke();
       }
     }
-  }, [isWang, tileSize, showGrid]);
+  }, [isWang, tileSize, showGrid, imgAData, imgBData, smoothness]);
 
   // Re-draw playground
   useEffect(() => {
@@ -179,87 +368,34 @@ export default function App() {
       }
     };
 
-    if (isWang) {
-      // Wang rendering
-      for (let r = 0; r < ROWS; r++) {
-        for (let c = 0; c < COLS; c++) {
-          const nw = wangVertices[r]?.[c] ?? 0;
-          const ne = wangVertices[r]?.[c + 1] ?? 0;
-          const se = wangVertices[r + 1]?.[c + 1] ?? 0;
-          const sw = wangVertices[r + 1]?.[c] ?? 0;
-          const tileIdx = (nw << 3) | (sw << 2) | (se << 1) | ne;
-          drawTileFromSheet(tileIdx, c, r);
-        }
-      }
-
-      // Overlap vertices dots
-      for (let r = 0; r <= ROWS; r++) {
-        for (let c = 0; c <= COLS; c++) {
-          const val = wangVertices[r]?.[c] ?? 0;
-          ctx.beginPath();
-          ctx.arc(c * tileSize, r * tileSize, 3.5, 0, Math.PI * 2);
-          ctx.fillStyle = val === 1 ? '#22c55e' : '#78350f';
-          ctx.strokeStyle = '#fff';
-          ctx.lineWidth = 1;
-          ctx.fill();
-          ctx.stroke();
-        }
-      }
-    } else {
-      // Blob rendering
-      const getCellVal = (c: number, r: number) => {
-        if (c < 0 || c >= COLS || r < 0 || r >= ROWS) return 0;
-        return blobCells[r][c];
-      };
-
-      for (let r = 0; r < ROWS; r++) {
-        for (let c = 0; c < COLS; c++) {
-          const selfState = getCellVal(c, r);
-          if (selfState === 0) {
-            drawTileFromSheet(13, c, r); // Background tile
-          } else {
-            const t = getCellVal(c, r - 1) === 1;
-            const b = getCellVal(c, r + 1) === 1;
-            const l = getCellVal(c - 1, r) === 1;
-            const right = getCellVal(c + 1, r) === 1;
-            const tl = getCellVal(c - 1, r - 1) === 1;
-            const tr = getCellVal(c + 1, r - 1) === 1;
-            const bl = getCellVal(c - 1, r + 1) === 1;
-            const br = getCellVal(c + 1, r + 1) === 1;
-
-            let tileIdx = 0;
-
-            if (!t && !l && b && right) {
-              tileIdx = 5;
-            } else if (!t && !right && b && l) {
-              tileIdx = 6;
-            } else if (!b && !l && t && right) {
-              tileIdx = 7;
-            } else if (!b && !right && t && l) {
-              tileIdx = 8;
-            } else if (!t && l && right && b) {
-              tileIdx = 1;
-            } else if (!b && l && right && t) {
-              tileIdx = 2;
-            } else if (!l && t && b && right) {
-              tileIdx = 3;
-            } else if (!right && t && b && l) {
-              tileIdx = 4;
-            } else if (t && b && l && right) {
-              if (!tl) tileIdx = 9;
-              else if (!tr) tileIdx = 10;
-              else if (!bl) tileIdx = 11;
-              else if (!br) tileIdx = 12;
-              else tileIdx = 0; // Center
-            } else {
-              tileIdx = 0; // fallback to center
-            }
-            drawTileFromSheet(tileIdx, c, r);
-          }
-        }
+    // Both modes use corner-based (vertex) rendering
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        const nw = wangVertices[r]?.[c] ?? 0;
+        const ne = wangVertices[r]?.[c + 1] ?? 0;
+        const se = wangVertices[r + 1]?.[c + 1] ?? 0;
+        const sw = wangVertices[r + 1]?.[c] ?? 0;
+        const wangTileIdx = (nw << 3) | (sw << 2) | (se << 1) | ne;
+        
+        const finalTileIdx = isWang ? wangTileIdx : WANG_TO_BLOB[wangTileIdx];
+        drawTileFromSheet(finalTileIdx, c, r);
       }
     }
-  }, [blobCells, wangVertices, isWang, tileSize, showGrid]);
+
+    // Overlap vertices dots for painting guide
+    for (let r = 0; r <= ROWS; r++) {
+      for (let c = 0; c <= COLS; c++) {
+        const val = wangVertices[r]?.[c] ?? 0;
+        ctx.beginPath();
+        ctx.arc(c * tileSize, r * tileSize, 3.5, 0, Math.PI * 2);
+        ctx.fillStyle = val === 1 ? '#22c55e' : '#78350f';
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 1;
+        ctx.fill();
+        ctx.stroke();
+      }
+    }
+  }, [wangVertices, isWang, tileSize, showGrid, imgAData, imgBData, smoothness]);
 
   // Painting interaction logic
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -302,37 +438,20 @@ export default function App() {
   };
 
   const paintPixel = (px: number, py: number, val: number) => {
-    if (isWang) {
-      // Paint nearest vertex
-      const vx = Math.round(px / tileSize);
-      const vy = Math.round(py / tileSize);
-      if (vx >= 0 && vx <= COLS && vy >= 0 && vy <= ROWS) {
-        setWangVertices(prev => {
-          const next = prev.map(row => [...row]);
-          next[vy][vx] = val;
-          return next;
-        });
-      }
-    } else {
-      // Paint cell
-      const cx = Math.floor(px / tileSize);
-      const cy = Math.floor(py / tileSize);
-      if (cx >= 0 && cx < COLS && cy >= 0 && cy < ROWS) {
-        setBlobCells(prev => {
-          const next = prev.map(row => [...row]);
-          next[cy][cx] = val;
-          return next;
-        });
-      }
+    // Both modes paint on vertices
+    const vx = Math.round(px / tileSize);
+    const vy = Math.round(py / tileSize);
+    if (vx >= 0 && vx <= COLS && vy >= 0 && vy <= ROWS) {
+      setWangVertices(prev => {
+        const next = prev.map(row => [...row]);
+        next[vy][vx] = val;
+        return next;
+      });
     }
   };
 
   const clearPlayground = () => {
-    if (isWang) {
-      setWangVertices(Array(ROWS + 1).fill(null).map(() => Array(COLS + 1).fill(0)));
-    } else {
-      setBlobCells(Array(ROWS).fill(null).map(() => Array(COLS).fill(0)));
-    }
+    setWangVertices(Array(ROWS + 1).fill(null).map(() => Array(COLS + 1).fill(0)));
   };
 
   const downloadTileset = () => {
@@ -366,6 +485,73 @@ export default function App() {
       <main className="main-grid">
         {/* Sidebar Controls */}
         <aside className="sidebar">
+          {/* Section: Textures */}
+          <section className="panel-card">
+            <h2 className="panel-title">{t.terrainA} / {t.terrainB}</h2>
+            <div className="textures-grid">
+              <div className="texture-box">
+                <span className="texture-label">Terrain A (Grass)</span>
+                <div 
+                  className="dropzone" 
+                  onClick={() => fileInputARef.current?.click()}
+                >
+                  <input 
+                    type="file" 
+                    ref={fileInputARef} 
+                    style={{ display: 'none' }} 
+                    accept="image/*"
+                    onChange={(e) => handleFileChange(e, 'A')}
+                  />
+                  {imgAUrl ? (
+                    <img src={imgAUrl} alt="Terrain A" className="preview-thumb" />
+                  ) : (
+                    <div style={{ fontSize: '20px' }}>🌱</div>
+                  )}
+                  <span className="dropzone-text">{t.dropzoneA}</span>
+                </div>
+                {hasUploadedA && (
+                  <button className="btn-preset" onClick={() => usePreset('A')}>
+                    {t.placeholderA}
+                  </button>
+                )}
+              </div>
+
+              <button className="btn-swap" onClick={swapTextures} title="Swap Terrains">
+                ⇄
+              </button>
+
+              <div className="texture-box">
+                <span className="texture-label">Terrain B (Dirt)</span>
+                <div 
+                  className="dropzone" 
+                  onClick={() => fileInputBRef.current?.click()}
+                >
+                  <input 
+                    type="file" 
+                    ref={fileInputBRef} 
+                    style={{ display: 'none' }} 
+                    accept="image/*"
+                    onChange={(e) => handleFileChange(e, 'B')}
+                  />
+                  {imgBUrl ? (
+                    <img src={imgBUrl} alt="Terrain B" className="preview-thumb" />
+                  ) : (
+                    <div style={{ fontSize: '20px' }}>🧱</div>
+                  )}
+                  <span className="dropzone-text">{t.dropzoneB}</span>
+                </div>
+                {hasUploadedB && (
+                  <button className="btn-preset" onClick={() => usePreset('B')}>
+                    {t.placeholderB}
+                  </button>
+                )}
+              </div>
+            </div>
+            <p style={{ margin: '12px 0 0 0', fontSize: '11px', color: 'var(--muted)' }}>
+              {t.recommendSize}
+            </p>
+          </section>
+
           {/* Section: Type & Options */}
           <section className="panel-card">
             <h2 className="panel-title">{t.tilesetType}</h2>
@@ -396,6 +582,19 @@ export default function App() {
 
               <div className="slider-group" style={{ marginTop: '4px' }}>
                 <div className="slider-header" style={{ marginBottom: '6px' }}>
+                  <span className="slider-name">{t.smoothness}</span>
+                  <span className="slider-val">{smoothness.toFixed(2)}</span>
+                </div>
+                <input 
+                  type="range" min="0.0" max="1.0" step="0.01" 
+                  value={smoothness} 
+                  onChange={(e) => setSmoothness(parseFloat(e.target.value))}
+                  className="slider-input"
+                />
+              </div>
+
+              <div className="slider-group" style={{ marginTop: '4px' }}>
+                <div className="slider-header" style={{ marginBottom: '6px' }}>
                   <span className="slider-name">{t.tileSize}</span>
                   <span className="slider-val">{tileSize} px</span>
                 </div>
@@ -419,9 +618,32 @@ export default function App() {
         <div className="content-area">
           {/* Tileset Sheet Preview */}
           <section className="panel-card preview-card">
-            <h2 className="panel-title" style={{ alignSelf: 'flex-start' }}>{t.tilesetPreview}</h2>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '16px' }}>
+              <h2 className="panel-title" style={{ margin: 0 }}>{t.tilesetPreview}</h2>
+              <div className="scale-selector">
+                <span className="scale-label" style={{ fontSize: '11px', color: 'var(--muted)', fontWeight: 600 }}>SCALE:</span>
+                <div className="scale-tabs">
+                  {[1, 2, 3, 4, 6, 8].map((s) => (
+                    <button
+                      key={s}
+                      className={`scale-tab-btn ${zoom === s ? 'active' : ''}`}
+                      onClick={() => setZoom(s)}
+                    >
+                      {s}x
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
             <div className="canvas-container">
-              <canvas ref={tilesetCanvasRef} className="tileset-canvas" />
+              <canvas 
+                ref={tilesetCanvasRef} 
+                className="tileset-canvas" 
+                style={{
+                  width: `${(isWang ? 4 : 5) * tileSize * zoom}px`,
+                  height: `${(isWang ? 4 : 3) * tileSize * zoom}px`
+                }}
+              />
             </div>
             <div className="action-bar">
               <button className="btn-action" onClick={downloadTileset}>
@@ -446,6 +668,10 @@ export default function App() {
                 onMouseUp={handleMouseUp}
                 onMouseLeave={handleMouseUp}
                 onContextMenu={(e) => e.preventDefault()}
+                style={{
+                  width: `${COLS * tileSize * zoom}px`,
+                  height: `${ROWS * tileSize * zoom}px`
+                }}
               />
             </div>
             <div className="action-bar" style={{ marginTop: '16px' }}>
