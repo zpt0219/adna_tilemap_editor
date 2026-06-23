@@ -168,6 +168,9 @@ function resizeTerrainToRect(terrain: TerrainSnapshot["terrain"], rect: Rect): T
 }
 
 export default function App() {
+  const [lang, setLang] = useState<'zh' | 'en'>(() => {
+    return (localStorage.getItem('adna_lang') as 'zh' | 'en') || 'zh';
+  });
   const [map, setMap] = useState<LiteTileMap | null>(null);
   const [error, setError] = useState("");
   const [version, setVersion] = useState(0);
@@ -212,7 +215,10 @@ export default function App() {
     const draft = loadDraft(name);
     if (draft) {
       const when = new Date(draft.savedAt).toLocaleString();
-      if (confirm(`发现「${name}」上次未完成的修改（保存于 ${when}）。\n\n确定 = 继续上次进度；取消 = 放弃改动,重新打开。`)) {
+      const confirmMsg = lang === 'zh'
+        ? `发现「${name}」上次未完成的修改（保存于 ${when}）。\n\n确定 = 继续上次进度；取消 = 放弃改动,重新打开。`
+        : `Unsaved draft of "${name}" found (from ${when}).\n\nOK = continue editing; Cancel = discard draft and reload.`;
+      if (confirm(confirmMsg)) {
         lite = draft.map;
       } else {
         clearDraft(name);
@@ -1317,33 +1323,33 @@ export default function App() {
     <div className="app">
       <header className="topbar">
         <strong>Adna Web Lite Reroll</strong>
-        <span className="badge">右键选/移 · 左键涂/缩放</span>
-        <button onClick={() => fileInput.current?.click()}>打开 blueprint.json…</button>
+        <span className="badge">{lang === 'zh' ? '右键选/移 · 左键涂/缩放' : 'Right-click select/move · Left-click paint/zoom'}</span>
+        <button onClick={() => fileInput.current?.click()}>{lang === 'zh' ? '打开 blueprint.json…' : 'Open blueprint.json…'}</button>
         <input ref={fileInput} type="file" accept=".json" hidden
           onChange={(e) => e.target.files?.[0] && loadFile(e.target.files[0])} />
         {map && (
           <>
-            <button disabled={!canUndo} onClick={onUndo} title="撤销 (Cmd/Ctrl+Z)">↶ Undo</button>
-            <button disabled={!canRedo} onClick={onRedo} title="重做 (Shift+Cmd/Ctrl+Z)">↷ Redo</button>
-            <button onClick={onExport} title="导出 adna-web-lite 存档">⤓ Export</button>
-            <button disabled={selected.size === 0} onClick={onCopySelection} title="复制当前对象/组到内部剪贴板 (Cmd/Ctrl+C)">⧉ Copy</button>
+            <button disabled={!canUndo} onClick={onUndo} title={lang === 'zh' ? "撤销 (Cmd/Ctrl+Z)" : "Undo (Cmd/Ctrl+Z)"}>↶ Undo</button>
+            <button disabled={!canRedo} onClick={onRedo} title={lang === 'zh' ? "重做 (Shift+Cmd/Ctrl+Z)" : "Redo (Shift+Cmd/Ctrl+Z)"}>↷ Redo</button>
+            <button onClick={onExport} title={lang === 'zh' ? "导出 adna-web-lite 存档" : "Export Save File"}>⤓ Export</button>
+            <button disabled={selected.size === 0} onClick={onCopySelection} title={lang === 'zh' ? "复制当前对象/组到内部剪贴板 (Cmd/Ctrl+C)" : "Copy current object/group to clipboard (Cmd/Ctrl+C)"}>⧉ Copy</button>
             <button disabled={!canPaste} onClick={onPasteClipboard} title={pasteTitle}>⎘ Paste</button>
-            <button disabled={selected.size === 0} onClick={onDeleteSelection} title="删除当前对象/组 (Delete)">⌫ Delete</button>
+            <button disabled={selected.size === 0} onClick={onDeleteSelection} title={lang === 'zh' ? "删除当前对象/组 (Delete)" : "Delete current object/group (Delete)"}>⌫ Delete</button>
             <button className={marquee ? "active" : ""} onClick={() => {
               setMarquee((m) => {
                 const next = !m;
                 if (next) setCreateArmed(false);
                 return next;
               });
-            }} title="框选工具(M)：左键拖一次框选,松手自动退回">▭ Marquee</button>
+            }} title={lang === 'zh' ? "框选工具(M)：左键拖一次框选,松手自动退回" : "Marquee Selection Tool (M): drag left click to select, releases automatically"}>▭ {lang === 'zh' ? '框选' : 'Marquee'}</button>
             {pack && (
               <>
                 <span className="ts-sep" />
                 <span className="ts-label">Tiles</span>
                 <span className="seg">
-                  <button className={renderMode === "blueprint" ? "active" : ""} onClick={() => setRenderMode("blueprint")} title="抽象示意图(role 颜色)">Overlay</button>
-                  <button className={renderMode === "mixed" ? "active" : ""} onClick={() => setRenderMode("mixed")} title="已绑定的画真实图块,其余示意">Mixed</button>
-                  <button className={renderMode === "real" ? "active" : ""} onClick={() => setRenderMode("real")} title="只画真实图块">Real</button>
+                  <button className={renderMode === "blueprint" ? "active" : ""} onClick={() => setRenderMode("blueprint")} title={lang === 'zh' ? "抽象示意图(role 颜色)" : "Abstract blueprint layout (role colors)"}>Overlay</button>
+                  <button className={renderMode === "mixed" ? "active" : ""} onClick={() => setRenderMode("mixed")} title={lang === 'zh' ? "已绑定的画真实图块,其余示意" : "Mixed real tiles and blueprint layout representation"}>Mixed</button>
+                  <button className={renderMode === "real" ? "active" : ""} onClick={() => setRenderMode("real")} title={lang === 'zh' ? "只画真实图块" : "Real tiles rendering only"}>Real</button>
                 </span>
               </>
             )}
@@ -1357,24 +1363,43 @@ export default function App() {
                   ))}
                 </span>
                 <span className="seg">
-                  <button className={!brushErase ? "active" : ""} onClick={() => setBrushErase(false)}>Paint</button>
-                  <button className={brushErase ? "active" : ""} onClick={() => setBrushErase(true)}>Erase</button>
+                  <button className={!brushErase ? "active" : ""} onClick={() => setBrushErase(false)}>{lang === 'zh' ? '绘制' : 'Paint'}</button>
+                  <button className={brushErase ? "active" : ""} onClick={() => setBrushErase(true)}>{lang === 'zh' ? '擦除' : 'Erase'}</button>
                 </span>
-                {selLocked && <span className="muted small">已锁定</span>}
+                {selLocked && <span className="muted small">{lang === 'zh' ? '已锁定' : 'Locked'}</span>}
               </>
             )}
           </>
         )}
         <span className="spacer" />
-        {map && <span className="stat">{map.name}{version > 0 && <em className="muted"> · 进度已存本地</em>}</span>}
+        {map && <span className="stat">{map.name}{version > 0 && <em className="muted">{lang === 'zh' ? ' · 进度已存本地' : ' · Saved locally'}</em>}</span>}
+        <button
+          style={{
+            marginLeft: '12px',
+            background: 'rgba(255,255,255,0.06)',
+            border: '1px solid rgba(255,255,255,0.1)',
+            padding: '3px 8px',
+            borderRadius: '4px',
+            fontSize: '11px',
+            cursor: 'pointer',
+            color: 'var(--fg)'
+          }}
+          onClick={() => {
+            const nextLang = lang === 'zh' ? 'en' : 'zh';
+            setLang(nextLang);
+            localStorage.setItem('adna_lang', nextLang);
+          }}
+        >
+          🌐 {lang === 'zh' ? 'English' : '简体中文'}
+        </button>
       </header>
 
       {error && <div className="error">{error}</div>}
 
       {!map ? (
         <div className="dropzone">
-          <div>把 <code>blueprint.json</code> 拖到这里，或点「打开 blueprint.json…」</div>
-          <button onClick={loadSample}>试用样例</button>
+          <div>{lang === 'zh' ? <>把 <code>blueprint.json</code> 拖到这里，或点「打开 blueprint.json…」</> : <>Drag <code>blueprint.json</code> here, or click "Open blueprint.json..."</>}</div>
+          <button onClick={loadSample}>{lang === 'zh' ? '试用样例' : 'Try Sample'}</button>
         </div>
       ) : (
         <div className="main" style={{ "--layers-w": `${layersWidth}px`, "--props-w": `${propsWidth}px` } as CSSProperties}>

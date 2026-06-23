@@ -15,6 +15,7 @@
       font: 15px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
       display: flex; flex-direction: column; align-items: center;
       padding: 8vh 24px 6vh;
+      position: relative;
     }
     header { text-align: center; max-width: 640px; margin-bottom: 40px; }
     h1 { font-size: 34px; margin: 0 0 10px; letter-spacing: .5px; }
@@ -43,41 +44,120 @@
   </style>
 </head>
 <body>
+  <!-- Language Toggle Button -->
+  <button id="lang-btn" class="btn" style="position: absolute; top: 20px; right: 24px; z-index: 100; cursor: pointer; padding: 7px 12px; font-size: 13px;">
+    🌐 English
+  </button>
+
   <header>
     <h1><span class="tag">Adna</span> TileMap Editor</h1>
-    <p class="sub">AI 生成地图草稿的 Web 工具链 — 查看 · reroll · 地形笔刷 · 资源标注</p>
+    <p class="sub" id="site-sub">AI 生成地图草稿的 Web 工具链 — 查看 · reroll · 地形笔刷 · 资源标注</p>
   </header>
 
   <main class="cards">
     <a class="card" href="/reroll/">
       <div class="ico">🗺️</div>
       <h2>Reroll Editor</h2>
-      <p>载入 blueprint JSON，按大类层渲染、地形笔刷编辑，导出 desktop 可读存档。</p>
-      <div class="go">打开应用 →</div>
+      <p id="card1-desc">载入 blueprint JSON，按大类层渲染、地形笔刷编辑，导出 desktop 可读存档。</p>
+      <div class="go" id="card1-go">打开应用 →</div>
     </a>
     <a class="card" href="/tagger/">
       <div class="ico">🏷️</div>
       <h2>Asset Tagger</h2>
-      <p>纯浏览器的人工审核工具，给调色板做 role / style 标注，导出 final_tags.json。</p>
-      <div class="go">打开应用 →</div>
+      <p id="card2-desc">纯浏览器的人工审核工具，给调色板做 role / style 标注，导出 final_tags.json。</p>
+      <div class="go" id="card2-go">打开应用 →</div>
     </a>
     <a class="card" href="/refiner/">
       <div class="ico">✨</div>
       <h2>Pixel Refiner</h2>
-      <p>专门处理 AI 生成的像素图，进行锯齿消除、栅格重建、智能去背以及色板限制等操作。</p>
-      <div class="go">打开应用 →</div>
+      <p id="card3-desc">专门处理 AI 生成的像素图，进行锯齿消除、栅格重建、智能去背以及色板限制等操作。</p>
+      <div class="go" id="card3-go">打开应用 →</div>
+    </a>
+    <a class="card" href="/autotile_mixer/">
+      <div class="ico">🧬</div>
+      <h2>Autotile Mixer</h2>
+      <p id="card4-desc">混合噪声与插值蒙版的无缝地形拼接图集生成器，支持 2 corner wang 与 13 blob 图集。</p>
+      <div class="go" id="card4-go">打开应用 →</div>
     </a>
   </main>
 
   <footer>
     <a class="btn" href="https://github.com/zpt0219/adna_tilemap_editor" target="_blank" rel="noopener">
-      <span>⌥</span> GitHub 仓库
+      <span>⌥</span> <span id="btn-github">GitHub 仓库</span>
     </a>
     <a class="btn" href="https://zpt0219.github.io/adna_tilemap_editor/" target="_blank" rel="noopener">
-      <span>🌐</span> GitHub Pages 镜像
+      <span>🌐</span> <span id="btn-pages">GitHub Pages 镜像</span>
     </a>
   </footer>
 
-  <p class="dim">self-hosted · nginx · 东京</p>
+  <p class="dim" id="footer-dim">self-hosted · nginx · 东京</p>
+
+  <script>
+    const TRANSLATIONS = {
+      zh: {
+        sub: "AI 生成地图草稿的 Web 工具链 — 查看 · reroll · 地形笔刷 · 资源标注",
+        card1_desc: "载入 blueprint JSON，按大类层渲染、地形笔刷编辑，导出 desktop 可读存档。",
+        card1_go: "打开应用 →",
+        card2_desc: "纯浏览器的人工审核工具，给调色板做 role / style 标注，导出 final_tags.json。",
+        card2_go: "打开应用 →",
+        card3_desc: "专门处理 AI 生成的像素图，进行锯齿消除、栅格重建、智能去背以及色板限制等操作。",
+        card3_go: "打开应用 →",
+        card4_desc: "混合噪声与插值蒙版的无缝地形拼接图集生成器，支持 2-corner Wang 与 13+1 Blob 图集。",
+        card4_go: "打开应用 →",
+        btn_github: "GitHub 仓库",
+        btn_pages: "GitHub Pages 镜像",
+        footer_dim: "self-hosted · nginx · 东京",
+        lang_btn: "🌐 English"
+      },
+      en: {
+        sub: "Web toolchain for AI-generated map drafts — view, reroll, terrain brush, asset tagging",
+        card1_desc: "Load blueprint JSON, render layers by category, edit with terrain brushes, and export desktop-readable saves.",
+        card1_go: "Open App →",
+        card2_desc: "Pure browser labeling tool, annotate palette roles/styles, export final_tags.json.",
+        card2_go: "Open App →",
+        card3_desc: "Optimize AI-generated pixel sprites: anti-alias removal, grid detection, smart background removal, and palette color limits.",
+        card3_go: "Open App →",
+        card4_desc: "Seamless autotile tileset generator. Mix textures with distance fields and noise for 2-corner Wang and 13+1 Blob layouts.",
+        card4_go: "Open App →",
+        btn_github: "GitHub Repository",
+        btn_pages: "GitHub Pages Mirror",
+        footer_dim: "self-hosted · nginx · Tokyo",
+        lang_btn: "🌐 简体中文"
+      }
+    };
+
+    function updateLanguage(lang) {
+      document.getElementById("site-sub").textContent = TRANSLATIONS[lang].sub;
+      document.getElementById("card1-desc").textContent = TRANSLATIONS[lang].card1_desc;
+      document.getElementById("card1-go").textContent = TRANSLATIONS[lang].card1_go;
+      document.getElementById("card2-desc").textContent = TRANSLATIONS[lang].card2_desc;
+      document.getElementById("card2-go").textContent = TRANSLATIONS[lang].card2_go;
+      document.getElementById("card3-desc").textContent = TRANSLATIONS[lang].card3_desc;
+      document.getElementById("card3-go").textContent = TRANSLATIONS[lang].card3_go;
+      document.getElementById("card4-desc").textContent = TRANSLATIONS[lang].card4_desc;
+      document.getElementById("card4-go").textContent = TRANSLATIONS[lang].card4_go;
+      document.getElementById("btn-github").textContent = TRANSLATIONS[lang].btn_github;
+      document.getElementById("btn-pages").textContent = TRANSLATIONS[lang].btn_pages;
+      document.getElementById("footer-dim").textContent = TRANSLATIONS[lang].footer_dim;
+      document.getElementById("lang-btn").textContent = TRANSLATIONS[lang].lang_btn;
+      
+      // Update HTML lang attribute
+      document.documentElement.setAttribute("lang", lang);
+    }
+
+    // Initialize
+    let currentLang = localStorage.getItem("adna_lang") || "zh";
+    if (currentLang !== "zh" && currentLang !== "en") {
+      currentLang = "zh";
+    }
+    updateLanguage(currentLang);
+
+    // Event listener
+    document.getElementById("lang-btn").addEventListener("click", () => {
+      currentLang = currentLang === "zh" ? "en" : "zh";
+      localStorage.setItem("adna_lang", currentLang);
+      updateLanguage(currentLang);
+    });
+  </script>
 </body>
 </html>

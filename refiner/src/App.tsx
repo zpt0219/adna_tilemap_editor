@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { processImage, ProcessResult, ProcessOptions } from "./core/processor";
+import { translations } from "./shared/i18n";
 import { upscaleNearest } from "./core/ops";
 // Config is referenced internally by the core processor
 import { RawImage, RGB } from "./shared/types";
@@ -91,6 +92,7 @@ interface SessionItem {
   id: string;
   name: string;
   originalImage: RawImage;
+  cropRect?: { x: number; y: number; w: number; h: number };
   processedResult: ProcessResult | null;
   status: "idle" | "processing" | "success" | "error";
   error?: string;
@@ -139,6 +141,14 @@ const BUILTIN_PRESETS: { name: string; settings: RefinerSettings }[] = [
 ];
 
 export default function App() {
+  const [lang, setLang] = useState<'zh' | 'en'>(() => {
+    return (localStorage.getItem('adna_lang') as 'zh' | 'en') || 'zh';
+  });
+
+  const t = (key: keyof typeof translations['zh']) => {
+    return translations[lang][key] || translations['zh'][key] || key;
+  };
+
   const [settings, setSettings] = useState<RefinerSettings>(DEFAULT_SETTINGS);
   const [customPaletteText, setCustomPaletteText] = useState<string>("");
   const [userPresets, setUserPresets] = useState<{ name: string; settings: RefinerSettings }[]>([]);
@@ -199,7 +209,101 @@ export default function App() {
   const tilingPreviewCanvasRef = useRef<HTMLCanvasElement>(null);
   const workshopPickerCanvasRef = useRef<HTMLCanvasElement>(null);
 
+  // --- Manual Crop States & Refs ---
+  const [isCropMode, setIsCropMode] = useState<boolean>(false);
+  const [cropDragStart, setCropDragStart] = useState<{ x: number; y: number } | null>(null);
+  const [currentCropRect, setCurrentCropRect] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
+  
+  const cropCanvasRef = useRef<HTMLCanvasElement>(null);
+  const cropContainerRef = useRef<HTMLDivElement>(null);
+
   const activeItem = activeIndex >= 0 && activeIndex < sessionList.length ? sessionList[activeIndex] : null;
+
+  // Memoized cropped original image
+  const activeOriginalImage = useMemo(() => {
+    if (!activeItem) return null;
+    if (activeItem.cropRect) {
+      return cropRawImage(activeItem.originalImage, activeItem.cropRect.x, activeItem.cropRect.y, activeItem.cropRect.w, activeItem.cropRect.h);
+    }
+    return activeItem.originalImage;
+  }, [activeItem, activeItem?.cropRect]);
+
+  // Crop Mode mouse handlers
+  const handleCropMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!activeItem || !cropContainerRef.current) return;
+    e.preventDefault();
+    const rect = cropContainerRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    const imgX = Math.max(0, Math.min(activeItem.originalImage.width, Math.round((x / rect.width) * activeItem.originalImage.width)));
+    const imgY = Math.max(0, Math.min(activeItem.originalImage.height, Math.round((y / rect.height) * activeItem.originalImage.height)));
+    
+    setCropDragStart({ x: imgX, y: imgY });
+    setCurrentCropRect(null);
+  };
+
+  const handleCropMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!activeItem || !cropDragStart || !cropContainerRef.current) return;
+    const rect = cropContainerRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    const imgX = Math.max(0, Math.min(activeItem.originalImage.width, Math.round((x / rect.width) * activeItem.originalImage.width)));
+    const imgY = Math.max(0, Math.min(activeItem.originalImage.height, Math.round((y / rect.height) * activeItem.originalImage.height)));
+    
+    const minX = Math.min(cropDragStart.x, imgX);
+    const maxX = Math.max(cropDragStart.x, imgX);
+    const minY = Math.min(cropDragStart.y, imgY);
+    const maxY = Math.max(cropDragStart.y, imgY);
+    
+    setCurrentCropRect({
+      x: minX,
+      y: minY,
+      w: maxX - minX,
+      h: maxY - minY,
+    });
+  };
+
+  const handleCropMouseUp = () => {
+    setCropDragStart(null);
+    if (currentCropRect && (currentCropRect.w < 2 || currentCropRect.h < 2)) {
+      setCurrentCropRect(null);
+    }
+  };
+
+  const handleApplyCrop = () => {
+    if (!activeItem || !currentCropRect || currentCropRect.w < 2 || currentCropRect.h < 2) return;
+    
+    setSessionList((prev) => {
+      const next = [...prev];
+      next[activeIndex] = {
+        ...next[activeIndex],
+        cropRect: currentCropRect,
+        status: "processing",
+      };
+      return next;
+    });
+
+    setIsCropMode(false);
+    showToast(lang === 'zh' ? "已应用裁剪选区！" : "Crop region applied!");
+  };
+
+  const handleResetCrop = () => {
+    if (!activeItem) return;
+    setSessionList((prev) => {
+      const next = [...prev];
+      next[activeIndex] = {
+        ...next[activeIndex],
+        cropRect: undefined,
+        status: "processing",
+      };
+      return next;
+    });
+    setIsCropMode(false);
+    setCurrentCropRect(null);
+    showToast(lang === 'zh' ? "已恢复到全图尺寸！" : "Restored to full image size!");
+  };
 
   // Load user presets from localStorage
   useEffect(() => {
@@ -513,7 +617,10 @@ export default function App() {
 
     try {
       // Process synchronously since it runs fast
-      const processedResult = processImage(item.originalImage, options);
+      const sourceImg = item.cropRect
+        ? cropRawImage(item.originalImage, item.cropRect.x, item.cropRect.y, item.cropRect.w, item.cropRect.h)
+        : item.originalImage;
+      const processedResult = processImage(sourceImg, options);
       setSessionList((prev) => {
         const next = [...prev];
         next[activeIndex] = {
@@ -537,6 +644,7 @@ export default function App() {
     }
   }, [
     activeIndex,
+    activeItem?.cropRect,
     settings.gridDetectionMode,
     settings.detectionQuantStep,
     settings.sampleWindow,
@@ -615,8 +723,8 @@ export default function App() {
     }
 
     // 3. Draw raw original view
-    if (viewMode === "original" && rawOriginalCanvasRef.current && activeItem.originalImage) {
-      drawRawImageToCanvas(activeItem.originalImage, rawOriginalCanvasRef.current);
+    if (viewMode === "original" && rawOriginalCanvasRef.current && activeOriginalImage) {
+      drawRawImageToCanvas(activeOriginalImage, rawOriginalCanvasRef.current);
       if (showCellGrid && activeItem.processedResult?.grid) {
         drawCellGrid(rawOriginalCanvasRef.current, activeItem.processedResult.grid);
       }
@@ -637,7 +745,12 @@ export default function App() {
         drawGridToCanvas(sideProcessedCanvasRef.current.width, sideProcessedCanvasRef.current.height, sideProcessedCanvasRef.current);
       }
     }
-  }, [activeItem, viewMode, showCellGrid, showPixelGrid, sliderPos]);
+
+    // 6. Draw crop view image
+    if (isCropMode && cropCanvasRef.current && activeItem) {
+      drawRawImageToCanvas(activeItem.originalImage, cropCanvasRef.current);
+    }
+  }, [activeItem, viewMode, showCellGrid, showPixelGrid, sliderPos, isCropMode, activeOriginalImage]);
 
   // Render workshop canvases
   useEffect(() => {
@@ -856,7 +969,7 @@ export default function App() {
           <div className="logo-badge">R</div>
           <div className="brand-text">
             <h1>ADNA Pixel Refiner</h1>
-            <p>AI 像素图优化与裁切工具 — 去锯齿 · 栅格重建 · 自动去背</p>
+            <p>{lang === 'zh' ? 'AI 像素图优化与裁切工具 — 去锯齿 · 栅格重建 · 自动去背' : 'AI pixel sprite optimizer & tiling helper — anti-alias removal, grid detection, background removal'}</p>
           </div>
         </div>
 
@@ -866,20 +979,46 @@ export default function App() {
             className={`toggle-btn ${workshopMode === "global" ? "active" : ""}`}
             onClick={() => setWorkshopMode("global")}
           >
-            📦 全局优化 (Global Mode)
+            {t("globalProcessor")}
           </button>
           <button
             className={`toggle-btn ${workshopMode === "tile" ? "active" : ""}`}
             onClick={() => setWorkshopMode("tile")}
           >
-            🧱 瓦片工坊 (Tile Workshop)
+            {t("tileWorkshop")}
           </button>
         </div>
 
         <div className="nav-links">
-          <a href="/" className="nav-btn">← 返回主页</a>
-          <a href="/reroll/" className="nav-btn">Reroll 编辑器</a>
-          <a href="/tagger/" className="nav-btn">资源标注工具</a>
+          <a href="/" className="nav-btn">{t("backHome")}</a>
+          <a href="/reroll/" className="nav-btn">{t("rerollEditor")}</a>
+          <a href="/tagger/" className="nav-btn">{t("taggerTool")}</a>
+          <button
+            className="nav-btn"
+            style={{
+              marginLeft: '8px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px',
+              background: 'rgba(255, 255, 255, 0.08)',
+              borderRadius: '6px',
+              padding: '6px 12px',
+              fontSize: '0.75rem',
+              fontWeight: 600,
+              cursor: 'pointer',
+              color: 'var(--fg)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              transition: 'all 0.15s ease'
+            }}
+            onClick={() => {
+              const nextLang = lang === 'zh' ? 'en' : 'zh';
+              setLang(nextLang);
+              localStorage.setItem('adna_lang', nextLang);
+            }}
+            title={lang === 'zh' ? 'Switch to English' : '切换至中文'}
+          >
+            🌐 {lang === 'zh' ? 'English' : '简体中文'}
+          </button>
         </div>
       </header>
 
@@ -894,9 +1033,9 @@ export default function App() {
                 {/* Presets Manager Panel */}
                 <div className="presets-section">
                   <div className="presets-header">
-                    <span>预设配置 presets</span>
+                    <span>{t("presetsTitle")}</span>
                     {selectedPresetIndex >= BUILTIN_PRESETS.length && (
-                      <button className="text-button danger-text" onClick={handleDeletePreset} style={{background: 'none', border: 'none', color: 'var(--danger)', fontSize: '0.75rem', cursor: 'pointer'}}>删除</button>
+                      <button className="text-button danger-text" onClick={handleDeletePreset} style={{background: 'none', border: 'none', color: 'var(--danger)', fontSize: '0.75rem', cursor: 'pointer'}}>{t("deletePreset")}</button>
                     )}
                   </div>
                   <div className="preset-controls">
@@ -905,13 +1044,13 @@ export default function App() {
                       value={selectedPresetIndex}
                       onChange={handleSelectPreset}
                     >
-                      <optgroup label="内置预设 (Built-in)">
+                      <optgroup label={lang === 'zh' ? '内置预设 (Built-in)' : 'Built-in'}>
                         {BUILTIN_PRESETS.map((p, idx) => (
                           <option key={idx} value={idx}>{p.name}</option>
                         ))}
                       </optgroup>
                       {userPresets.length > 0 && (
-                        <optgroup label="我的预设 (Custom)">
+                        <optgroup label={lang === 'zh' ? '我的预设 (Custom)' : 'Custom'}>
                           {userPresets.map((p, idx) => (
                             <option key={idx + BUILTIN_PRESETS.length} value={idx + BUILTIN_PRESETS.length}>
                               {p.name}
@@ -922,19 +1061,19 @@ export default function App() {
                     </select>
                     
                     {!isSavingPreset ? (
-                      <button className="btn-small" onClick={() => setIsSavingPreset(true)}>保存</button>
+                      <button className="btn-small" onClick={() => setIsSavingPreset(true)}>{lang === 'zh' ? '保存' : 'Save'}</button>
                     ) : (
                       <div style={{display: 'flex', gap: '4px', marginTop: '6px', width: '100%'}}>
                         <input
                           type="text"
                           className="form-input"
-                          placeholder="预设名称..."
+                          placeholder={t("presetNamePlaceholder")}
                           value={presetSaveName}
                           onChange={(e) => setPresetSaveName(e.target.value)}
                           style={{padding: '4px 8px'}}
                         />
-                        <button className="btn-small accent" onClick={handleSavePreset}>确认</button>
-                        <button className="btn-small" onClick={() => setIsSavingPreset(false)}>取消</button>
+                        <button className="btn-small accent" onClick={handleSavePreset}>{lang === 'zh' ? '确认' : 'Confirm'}</button>
+                        <button className="btn-small" onClick={() => setIsSavingPreset(false)}>{lang === 'zh' ? 'Cancel' : '取消'}</button>
                       </div>
                     )}
                   </div>
@@ -946,45 +1085,45 @@ export default function App() {
                     className={`accordion-header ${accordionOpen.grid ? "active" : ""}`}
                     onClick={() => toggleAccordion("grid")}
                   >
-                    <span>🌐 栅格重建 (Grid & Resolution)</span>
+                    <span>🌐 {lang === 'zh' ? '栅格重建 (Grid & Resolution)' : 'Grid & Resolution'}</span>
                     <span>{accordionOpen.grid ? "▼" : "▶"}</span>
                   </button>
                   {accordionOpen.grid && (
                     <div className="accordion-content">
                       <div className="form-group">
                         <div className="label-wrapper">
-                          <span>检测模式 Detection Mode</span>
+                          <span>{lang === 'zh' ? '检测模式' : 'Detection Mode'}</span>
                         </div>
                         <select
                           className="form-select"
                           value={settings.gridDetectionMode}
                           onChange={(e) => updateSetting("gridDetectionMode", e.target.value as any)}
                         >
-                          <option value="auto">自动对齐 (Auto Grid)</option>
-                          <option value="ratio">像素合并比例 (Pixel Ratio)</option>
-                          <option value="hint">参考像素 + 自动 (Pixel + Auto)</option>
-                          <option value="force">强制像素 (Pixel Only)</option>
-                          <option value="off">不重建 (Off 1:1)</option>
+                          <option value="auto">{lang === 'zh' ? '自动对齐 (Auto Grid)' : 'Auto Grid'}</option>
+                          <option value="ratio">{lang === 'zh' ? '像素合并比例 (Pixel Ratio)' : 'Pixel Ratio Merge'}</option>
+                          <option value="hint">{lang === 'zh' ? '参考像素 + 自动 (Pixel + Auto)' : 'Pixel Reference + Auto'}</option>
+                          <option value="force">{lang === 'zh' ? '强制像素 (Pixel Only)' : 'Force Pixels Only'}</option>
+                          <option value="off">{lang === 'zh' ? '不重建 (Off 1:1)' : 'No Reconstruction (1:1)'}</option>
                         </select>
                       </div>
 
                       {settings.gridDetectionMode === "ratio" && (
                         <div className="form-group">
                           <div className="label-wrapper">
-                            <span>合并像素比例 Merge Ratio</span>
+                            <span>{lang === 'zh' ? '合并像素比例' : 'Merge Ratio'}</span>
                           </div>
                           <select
                             className="form-select"
                             value={settings.pixelRatio}
                             onChange={(e) => updateSetting("pixelRatio", parseInt(e.target.value))}
                           >
-                            <option value="1">1 → 1 (不合并)</option>
-                            <option value="2">2 → 1 (2x2 合并)</option>
-                            <option value="3">3 → 1 (3x3 合并)</option>
-                            <option value="4">4 → 1 (4x4 合并)</option>
-                            <option value="5">5 → 1 (5x5 合并)</option>
-                            <option value="6">6 → 1 (6x6 合并)</option>
-                            <option value="8">8 → 1 (8x8 合并)</option>
+                            <option value="1">1 → 1 ({lang === 'zh' ? '不合并' : 'No Merge'})</option>
+                            <option value="2">2 → 1 (2x2 {lang === 'zh' ? '合并' : 'Merge'})</option>
+                            <option value="3">3 → 1 (3x3 {lang === 'zh' ? '合并' : 'Merge'})</option>
+                            <option value="4">4 → 1 (4x4 {lang === 'zh' ? '合并' : 'Merge'})</option>
+                            <option value="5">5 → 1 (5x5 {lang === 'zh' ? '合并' : 'Merge'})</option>
+                            <option value="6">6 → 1 (6x6 {lang === 'zh' ? '合并' : 'Merge'})</option>
+                            <option value="8">8 → 1 (8x8 {lang === 'zh' ? '合并' : 'Merge'})</option>
                           </select>
                         </div>
                       )}
@@ -992,7 +1131,7 @@ export default function App() {
                       {settings.gridDetectionMode === "force" && (
                         <div className="form-row">
                           <div className="form-group">
-                            <label className="label-wrapper">宽 Force Width</label>
+                            <label className="label-wrapper">{lang === 'zh' ? '宽' : 'Width'} (Force Width)</label>
                             <input
                               type="number"
                               className="form-input"
@@ -1002,7 +1141,7 @@ export default function App() {
                             />
                           </div>
                           <div className="form-group">
-                            <label className="label-wrapper">高 Force Height</label>
+                            <label className="label-wrapper">{lang === 'zh' ? '高' : 'Height'} (Force Height)</label>
                             <input
                               type="number"
                               className="form-input"
@@ -1017,7 +1156,7 @@ export default function App() {
                       {settings.gridDetectionMode === "hint" && (
                         <div className="form-row">
                           <div className="form-group">
-                            <label className="label-wrapper">参考宽 Hint Width</label>
+                            <label className="label-wrapper">{lang === 'zh' ? '参考宽' : 'Hint Width'} (Hint Width)</label>
                             <input
                               type="number"
                               className="form-input"
@@ -1027,7 +1166,7 @@ export default function App() {
                             />
                           </div>
                           <div className="form-group">
-                            <label className="label-wrapper">参考高 Hint Height</label>
+                            <label className="label-wrapper">{lang === 'zh' ? '参考高' : 'Hint Height'} (Hint Height)</label>
                             <input
                               type="number"
                               className="form-input"
@@ -1043,7 +1182,7 @@ export default function App() {
                         <>
                           <div className="form-group">
                             <div className="label-wrapper">
-                              <span>特征模糊提取 Quant Step</span>
+                              <span>{lang === 'zh' ? '特征模糊提取' : 'Feature Posterize Step'} (Quant Step)</span>
                               <span className="label-val">{settings.detectionQuantStep}</span>
                             </div>
                             <input
@@ -1058,7 +1197,7 @@ export default function App() {
 
                           <div className="form-group">
                             <div className="label-wrapper">
-                              <span>中值采样窗口 Sample Window</span>
+                              <span>{lang === 'zh' ? '中值采样窗口' : 'Median Filter Window'} (Sample Window)</span>
                               <span className="label-val">{settings.sampleWindow}px</span>
                             </div>
                             <input
@@ -1078,7 +1217,7 @@ export default function App() {
                               checked={settings.fastAutoGridFromTrimmed}
                               onChange={(e) => updateSetting("fastAutoGridFromTrimmed", e.target.checked)}
                             />
-                            <span>启用快速对齐 (Fast Search Mode)</span>
+                            <span>{lang === 'zh' ? '启用快速对齐 (Fast Search Mode)' : 'Enable Fast Alignment Search'}</span>
                           </label>
                         </>
                       )}
@@ -1092,33 +1231,33 @@ export default function App() {
                     className={`accordion-header ${accordionOpen.background ? "active" : ""}`}
                     onClick={() => toggleAccordion("background")}
                   >
-                    <span>🪄 背景提取与去背 (Transparency)</span>
+                    <span>🪄 {lang === 'zh' ? '背景提取与去背 (Transparency)' : 'Background & Transparency'}</span>
                     <span>{accordionOpen.background ? "▼" : "▶"}</span>
                   </button>
                   {accordionOpen.background && (
                     <div className="accordion-content">
                       <div className="form-group">
                         <div className="label-wrapper">
-                          <span>背景采样提取 Method</span>
+                          <span>{lang === 'zh' ? '背景采样提取' : 'Background Sampler'} (Method)</span>
                         </div>
                         <select
                           className="form-select"
                           value={settings.bgExtractionMethod}
                           onChange={(e) => updateSetting("bgExtractionMethod", e.target.value as any)}
                         >
-                          <option value="none">不提取</option>
-                          <option value="top-left">左上角像素 (Top-Left)</option>
-                          <option value="bottom-left">左下角像素 (Bottom-Left)</option>
-                          <option value="top-right">右上角像素 (Top-Right)</option>
-                          <option value="bottom-right">右下角像素 (Bottom-Right)</option>
-                          <option value="rgb">指定RGB颜色 (Custom RGB)</option>
+                          <option value="none">{lang === 'zh' ? '不提取' : 'None'}</option>
+                          <option value="top-left">{lang === 'zh' ? '左上角像素 (Top-Left)' : 'Top-Left Pixel'}</option>
+                          <option value="bottom-left">{lang === 'zh' ? '左下角像素 (Bottom-Left)' : 'Bottom-Left Pixel'}</option>
+                          <option value="top-right">{lang === 'zh' ? '右上角像素 (Top-Right)' : 'Top-Right Pixel'}</option>
+                          <option value="bottom-right">{lang === 'zh' ? '右下角像素 (Bottom-Right)' : 'Bottom-Right Pixel'}</option>
+                          <option value="rgb">{lang === 'zh' ? '指定RGB颜色' : 'Custom RGB Color'}</option>
                         </select>
                       </div>
 
                       {settings.bgExtractionMethod === "rgb" && (
                         <div className="form-group">
                           <div className="label-wrapper">
-                            <span>指定背景色 Custom Color</span>
+                            <span>{lang === 'zh' ? '指定背景色 Custom Color' : 'Custom Color'}</span>
                           </div>
                           <div className="picker-row">
                             <input
@@ -1140,7 +1279,7 @@ export default function App() {
 
                       <div className="form-group">
                         <div className="label-wrapper">
-                          <span>去背容差 Tolerance</span>
+                          <span>{lang === 'zh' ? '去背容差 Tolerance' : 'Color Tolerance'} (Tolerance)</span>
                           <span className="label-val">{settings.backgroundTolerance}</span>
                         </div>
                         <input
@@ -1155,38 +1294,38 @@ export default function App() {
 
                       <div className="form-group">
                         <div className="label-wrapper">
-                          <span>泛洪连接 Scope</span>
+                          <span>{lang === 'zh' ? '泛洪连接 Scope' : 'Removal Scope'} (Scope)</span>
                         </div>
                         <select
                           className="form-select"
                           value={settings.bgRemovalScope}
                           onChange={(e) => updateSetting("bgRemovalScope", e.target.value as any)}
                         >
-                          <option value="off">不清除</option>
-                          <option value="outer">仅外部透明 (Outer Only)</option>
-                          <option value="selected">所选匹配 (Selected)</option>
-                          <option value="all">全图匹配 (All)</option>
+                          <option value="off">{lang === 'zh' ? '不清除' : 'None (Keep Background)'}</option>
+                          <option value="outer">{lang === 'zh' ? '仅外部透明 (Outer Only)' : 'Outer Margin Only'}</option>
+                          <option value="selected">{lang === 'zh' ? '所选匹配 (Selected)' : 'Selected Component'}</option>
+                          <option value="all">{lang === 'zh' ? '全图匹配 (All)' : 'All Matching Colors'}</option>
                         </select>
                       </div>
 
                       <div className="form-row">
                         <div className="form-group">
                           <div className="label-wrapper">
-                            <span>连通性 Connectivity</span>
+                            <span>{lang === 'zh' ? '连通性' : 'Connectivity'}</span>
                           </div>
                           <select
                             className="form-select"
                             value={settings.bgConnectivity}
                             onChange={(e) => updateSetting("bgConnectivity", e.target.value as any)}
                           >
-                            <option value="4">4-方向</option>
-                            <option value="8">8-方向</option>
+                            <option value="4">{lang === 'zh' ? '4-方向' : '4-Direction'}</option>
+                            <option value="8">{lang === 'zh' ? '8-方向' : '8-Direction'}</option>
                           </select>
                         </div>
 
                         <div className="form-group">
                           <div className="label-wrapper">
-                            <span>噪声杂点过滤 Noise Limit</span>
+                            <span>{lang === 'zh' ? '噪声杂点过滤' : 'Noise Limit'} (Noise Limit)</span>
                           </div>
                           <input
                             type="number"
@@ -1194,7 +1333,7 @@ export default function App() {
                             value={settings.floatingMaxPixels}
                             onChange={(e) => updateSetting("floatingMaxPixels", Math.max(0, parseInt(e.target.value) || 0))}
                             min="0"
-                            placeholder="0 (关闭)"
+                            placeholder={lang === 'zh' ? '0 (关闭)' : '0 (Disabled)'}
                           />
                         </div>
                       </div>
@@ -1205,13 +1344,13 @@ export default function App() {
                           checked={settings.trimToContent}
                           onChange={(e) => updateSetting("trimToContent", e.target.checked)}
                         />
-                        <span>去除多余透明边缘 (Trim Bounds)</span>
+                        <span>{lang === 'zh' ? '去除多余透明边缘 (Trim Bounds)' : 'Trim Extra Transparent Margins'}</span>
                       </label>
 
                       {settings.trimToContent && (
                         <div className="form-group">
                           <div className="label-wrapper">
-                            <span>裁切透明阈值 Alpha Threshold</span>
+                            <span>{lang === 'zh' ? '裁切透明阈值' : 'Trim Alpha Threshold'} (Alpha Threshold)</span>
                             <span className="label-val">{settings.trimAlphaThreshold}</span>
                           </div>
                           <input
@@ -1232,7 +1371,7 @@ export default function App() {
                             checked={settings.preRemoveBackground}
                             onChange={(e) => updateSetting("preRemoveBackground", e.target.checked)}
                           />
-                          <span>预处理去背 (Pre-remove)</span>
+                          <span>{lang === 'zh' ? '预处理去背 (Pre-remove)' : 'Pre-remove BG'}</span>
                         </label>
                         <label className="checkbox-label">
                           <input
@@ -1240,7 +1379,7 @@ export default function App() {
                             checked={settings.postRemoveBackground}
                             onChange={(e) => updateSetting("postRemoveBackground", e.target.checked)}
                           />
-                          <span>后处理去背 (Post-remove)</span>
+                          <span>{lang === 'zh' ? '后处理去背 (Post-remove)' : 'Post-remove BG'}</span>
                         </label>
                       </div>
                     </div>
@@ -1253,42 +1392,42 @@ export default function App() {
                     className={`accordion-header ${accordionOpen.color ? "active" : ""}`}
                     onClick={() => toggleAccordion("color")}
                   >
-                    <span>🎨 颜色控制与抖动 (Colors & Palette)</span>
+                    <span>🎨 {lang === 'zh' ? '颜色控制与抖动 (Colors & Palette)' : 'Colors & Palette Dithering'}</span>
                     <span>{accordionOpen.color ? "▼" : "▶"}</span>
                   </button>
                   {accordionOpen.color && (
                     <div className="accordion-content">
                       <div className="form-group">
                         <div className="label-wrapper">
-                          <span>颜色限制 Mode</span>
+                          <span>{lang === 'zh' ? '颜色限制' : 'Palette Mode'} (Mode)</span>
                         </div>
                         <select
                           className="form-select"
                           value={settings.reduceColorMode}
                           onChange={(e) => updateSetting("reduceColorMode", e.target.value)}
                         >
-                          <option value="none">不限色 (None)</option>
-                          <option value="auto">自动聚类 (K-Means Auto)</option>
-                          <option value="fixed">自定义色板 (Fixed Palette)</option>
-                          <option value="mono">黑白双色 (Monochrome 2色)</option>
-                          <option value="gb_legacy">Game Boy 经典绿 (4色)</option>
-                          <option value="gb_pocket">Game Boy Pocket 灰度 (4色)</option>
-                          <option value="gb_light">Game Boy Light 蓝绿背光 (4色)</option>
-                          <option value="pico8">PICO-8 官方色板 (16色)</option>
-                          <option value="nes">FC 红白机 (NES 64色)</option>
-                          <option value="sfc_sprite">SFC/超任 角色精灵色板 (16色)</option>
-                          <option value="sfc_bg">SFC/超任 背景色板 (256色)</option>
-                          <option value="pc98">PC-9801 复古色板 (16色)</option>
-                          <option value="msx">MSX1 色板 (15色)</option>
-                          <option value="c64">Commodore 64 色板 (16色)</option>
-                          <option value="arne16">Arne16 经典复古色板 (16色)</option>
+                          <option value="none">{lang === 'zh' ? '不限色 (None)' : 'No Restriction (None)'}</option>
+                          <option value="auto">{lang === 'zh' ? '自动聚类 (K-Means Auto)' : 'K-Means Clustering'}</option>
+                          <option value="fixed">{lang === 'zh' ? '自定义色板 (Fixed Palette)' : 'Custom Palette (Fixed)'}</option>
+                          <option value="mono">{lang === 'zh' ? '黑白双色 (Monochrome 2色)' : 'Monochrome (2 colors)'}</option>
+                          <option value="gb_legacy">{lang === 'zh' ? 'Game Boy 经典绿 (4色)' : 'Game Boy Classic (4 colors)'}</option>
+                          <option value="gb_pocket">{lang === 'zh' ? 'Game Boy Pocket 灰度 (4色)' : 'Game Boy Pocket (4 colors)'}</option>
+                          <option value="gb_light">{lang === 'zh' ? 'Game Boy Light 蓝绿背光 (4色)' : 'Game Boy Light (4 colors)'}</option>
+                          <option value="pico8">{lang === 'zh' ? 'PICO-8 官方色板 (16色)' : 'PICO-8 (16 colors)'}</option>
+                          <option value="nes">{lang === 'zh' ? 'FC 红白机 (NES 64色)' : 'NES Color Palette (64 colors)'}</option>
+                          <option value="sfc_sprite">{lang === 'zh' ? 'SFC/超任 角色精灵色板 (16色)' : 'Super Famicom Sprite (16 colors)'}</option>
+                          <option value="sfc_bg">{lang === 'zh' ? 'SFC/超任 背景色板 (256色)' : 'Super Famicom BG (256 colors)'}</option>
+                          <option value="pc98">{lang === 'zh' ? 'PC-9801 复古色板 (16色)' : 'PC-9801 Palette (16 colors)'}</option>
+                          <option value="msx">{lang === 'zh' ? 'MSX1 色板 (15色)' : 'MSX1 Palette (15 colors)'}</option>
+                          <option value="c64">{lang === 'zh' ? 'Commodore 64 色板 (16色)' : 'C64 Palette (16 colors)'}</option>
+                          <option value="arne16">{lang === 'zh' ? 'Arne16 经典复古色板 (16色)' : 'Arne16 Retro (16 colors)'}</option>
                         </select>
                       </div>
 
                       {settings.reduceColorMode === "auto" && (
                         <div className="form-group">
                           <div className="label-wrapper">
-                            <span>聚类颜色数量 Max Colors</span>
+                            <span>{lang === 'zh' ? '聚类颜色数量' : 'Max Color Count'} (Max Colors)</span>
                             <span className="label-val">{settings.colorCount} colors</span>
                           </div>
                           <input
@@ -1305,11 +1444,11 @@ export default function App() {
                       {settings.reduceColorMode === "fixed" && (
                         <div className="form-group">
                           <div className="label-wrapper">
-                            <span>十六进制色表 Hex Color List</span>
+                            <span>{lang === 'zh' ? '十六进制色表' : 'Hex Colors List'} (Hex)</span>
                           </div>
                           <textarea
                             className="palette-text-area"
-                            placeholder="每行一个或逗号分隔: #ff0000, #00ff00..."
+                            placeholder={lang === 'zh' ? "每行一个或逗号分隔: #ff0000, #00ff00..." : "One per line or comma separated: #ff0000, #00ff00..."}
                             value={customPaletteText}
                             onChange={(e) => setCustomPaletteText(e.target.value)}
                           />
@@ -1320,7 +1459,7 @@ export default function App() {
                               onClick={handleImportExtractedColors}
                               style={{alignSelf: "flex-start"}}
                             >
-                              使用当前提取色板
+                              {lang === 'zh' ? '使用当前提取色板' : 'Use Current Extracted Palette'}
                             </button>
                           )}
                         </div>
@@ -1330,25 +1469,25 @@ export default function App() {
                         <>
                           <div className="form-group">
                             <div className="label-wrapper">
-                              <span>抖动模式 Dithering Mode</span>
+                              <span>{lang === 'zh' ? '抖动模式' : 'Dithering Algorithm'} (Dither Mode)</span>
                             </div>
                             <select
                               className="form-select"
                               value={settings.ditherMode}
                               onChange={(e) => updateSetting("ditherMode", e.target.value as any)}
                             >
-                              <option value="none">无抖动 (No Dither)</option>
-                              <option value="floyd-steinberg">Floyd-Steinberg (扩散)</option>
-                              <option value="bayer-2x2">Bayer 2x2 网格</option>
-                              <option value="bayer-4x4">Bayer 4x4 网格</option>
-                              <option value="bayer-8x8">Bayer 8x8 网格</option>
-                              <option value="ordered">Ordered 矩阵抖动</option>
+                              <option value="none">{lang === 'zh' ? '无抖动 (No Dither)' : 'None (No Dithering)'}</option>
+                              <option value="floyd-steinberg">Floyd-Steinberg ({lang === 'zh' ? '误差扩散' : 'Diffusion'})</option>
+                              <option value="bayer-2x2">Bayer 2x2 {lang === 'zh' ? '网格' : 'Matrix'}</option>
+                              <option value="bayer-4x4">Bayer 4x4 {lang === 'zh' ? '网格' : 'Matrix'}</option>
+                              <option value="bayer-8x8">Bayer 8x8 {lang === 'zh' ? '网格' : 'Matrix'}</option>
+                              <option value="ordered">{lang === 'zh' ? 'Ordered 矩阵抖动' : 'Ordered Pattern Dithering'}</option>
                             </select>
                           </div>
 
                           <div className="form-group">
                             <div className="label-wrapper">
-                              <span>抖动强度 Strength</span>
+                              <span>{lang === 'zh' ? '抖动强度' : 'Dither Strength'} (Strength)</span>
                               <span className="label-val">{settings.ditherStrength}%</span>
                             </div>
                             <input
@@ -1372,30 +1511,30 @@ export default function App() {
                     className={`accordion-header ${accordionOpen.outline ? "active" : ""}`}
                     onClick={() => toggleAccordion("outline")}
                   >
-                    <span>✏️ 描边勾线 (Sprite Outline)</span>
+                    <span>✏️ {lang === 'zh' ? '描边勾线 (Sprite Outline)' : 'Outline & Canvas Options'}</span>
                     <span>{accordionOpen.outline ? "▼" : "▶"}</span>
                   </button>
                   {accordionOpen.outline && (
                     <div className="accordion-content">
                       <div className="form-group">
                         <div className="label-wrapper">
-                          <span>勾边风格 Outline Style</span>
+                          <span>{lang === 'zh' ? '勾边风格' : 'Outline Style'}</span>
                         </div>
                         <select
                           className="form-select"
                           value={settings.outlineStyle}
                           onChange={(e) => updateSetting("outlineStyle", e.target.value as any)}
                         >
-                          <option value="none">无描边</option>
-                          <option value="rounded">圆润 8-方向 (Rounded)</option>
-                          <option value="sharp">锐利 4-方向 (Sharp)</option>
+                          <option value="none">{lang === 'zh' ? '无描边' : 'No Outline'}</option>
+                          <option value="rounded">{lang === 'zh' ? '圆润 8-方向 (Rounded)' : 'Rounded 8-Way'}</option>
+                          <option value="sharp">{lang === 'zh' ? '锐利 4-方向 (Sharp)' : 'Sharp 4-Way'}</option>
                         </select>
                       </div>
 
                       {settings.outlineStyle !== "none" && (
                         <div className="form-group">
                           <div className="label-wrapper">
-                            <span>描边颜色 Outline Color</span>
+                            <span>{lang === 'zh' ? '描边颜色 Outline Color' : 'Outline Color'}</span>
                           </div>
                           <div className="picker-row">
                             <input
@@ -1422,7 +1561,7 @@ export default function App() {
                             checked={settings.makeSquare}
                             onChange={(e) => updateSetting("makeSquare", e.target.checked)}
                           />
-                          <span>强转正方形 (Make Square)</span>
+                          <span>{lang === 'zh' ? '强转正方形 (Make Square)' : 'Force Square Canvas'}</span>
                         </label>
 
                         <label className="checkbox-label">
@@ -1431,7 +1570,7 @@ export default function App() {
                             checked={settings.keepAspectRatio}
                             onChange={(e) => updateSetting("keepAspectRatio", e.target.checked)}
                           />
-                          <span>保留宽高比 (Keep Aspect)</span>
+                          <span>{lang === 'zh' ? '保留宽高比 (Keep Aspect)' : 'Preserve Aspect Ratio'}</span>
                         </label>
                       </div>
                     </div>
@@ -1446,7 +1585,7 @@ export default function App() {
               <div className="toolbar">
                 <div className="toolbar-group">
                   <span className="toolbar-title">
-                    {activeItem ? `📄 ${activeItem.name}` : "未载入文件 No Image"}
+                    {activeItem ? `📄 ${activeItem.name}` : (lang === 'zh' ? '未载入文件 No Image' : 'No Image Loaded')}
                   </span>
                   {activeItem && activeItem.processedResult && (
                     <span className="label-val" style={{fontSize: '0.75rem'}}>
@@ -1461,32 +1600,57 @@ export default function App() {
                       className={`toggle-btn ${viewMode === "slider" ? "active" : ""}`}
                       onClick={() => setViewMode("slider")}
                     >
-                      滑块对比
+                      {t("sliderView")}
                     </button>
                     <button
                       className={`toggle-btn ${viewMode === "side" ? "active" : ""}`}
                       onClick={() => setViewMode("side")}
                     >
-                      左右分屏
+                      {t("sideView")}
                     </button>
                     <button
                       className={`toggle-btn ${viewMode === "processed" ? "active" : ""}`}
                       onClick={() => setViewMode("processed")}
                     >
-                      效果图
+                      {t("processedView")}
                     </button>
                     <button
                       className={`toggle-btn ${viewMode === "original" ? "active" : ""}`}
                       onClick={() => setViewMode("original")}
                     >
-                      原图
+                      {t("originalView")}
                     </button>
+                  </div>
+
+                  <div className="toggle-group" style={{ marginLeft: "8px" }}>
+                    <button
+                      className={`toggle-btn ${isCropMode ? "active" : ""}`}
+                      style={{ borderColor: isCropMode ? "var(--accent)" : "transparent" }}
+                      onClick={() => {
+                        setIsCropMode(!isCropMode);
+                        setCurrentCropRect(null);
+                      }}
+                      disabled={!activeItem}
+                      title={lang === 'zh' ? '手动拖拽框选裁剪原图区域' : 'Drag on the original image to select crop area'}
+                    >
+                      {t("cropBtn")}
+                    </button>
+                    {activeItem && activeItem.cropRect && (
+                      <button
+                        className="toggle-btn"
+                        style={{ color: "var(--danger)", borderLeft: "1px solid var(--border)" }}
+                        onClick={handleResetCrop}
+                        title={lang === 'zh' ? '恢复至上传的原始图片尺寸' : 'Reset crop bounds back to original full size'}
+                      >
+                        {t("resetCrop")}
+                      </button>
+                    )}
                   </div>
 
                   <div className="toolbar-divider"></div>
 
                   <div className="toggle-group">
-                    <button className={`toggle-btn ${zoomScale === "fit" ? "active" : ""}`} onClick={() => setZoomScale("fit")}>自适应</button>
+                    <button className={`toggle-btn ${zoomScale === "fit" ? "active" : ""}`} onClick={() => setZoomScale("fit")}>{t("fitZoom")}</button>
                     <button className={`toggle-btn ${zoomScale === 1 ? "active" : ""}`} onClick={() => setZoomScale(1)}>1x</button>
                     <button className={`toggle-btn ${zoomScale === 2 ? "active" : ""}`} onClick={() => setZoomScale(2)}>2x</button>
                     <button className={`toggle-btn ${zoomScale === 4 ? "active" : ""}`} onClick={() => setZoomScale(4)}>4x</button>
@@ -1497,14 +1661,14 @@ export default function App() {
                   {viewMode === "original" || viewMode === "side" ? (
                     <label className="checkbox-label" style={{marginLeft: '12px', fontSize: '0.75rem'}}>
                       <input type="checkbox" checked={showCellGrid} onChange={(e) => setShowCellGrid(e.target.checked)} />
-                      <span>参考网格</span>
+                      <span>{t("referenceGrid")}</span>
                     </label>
                   ) : null}
 
                   {viewMode === "processed" || viewMode === "side" || viewMode === "slider" ? (
                     <label className="checkbox-label" style={{marginLeft: '12px', fontSize: '0.75rem'}}>
                       <input type="checkbox" checked={showPixelGrid} onChange={(e) => setShowPixelGrid(e.target.checked)} />
-                      <span>像素网格</span>
+                      <span>{t("pixelGrid")}</span>
                     </label>
                   ) : null}
                 </div>
@@ -1515,8 +1679,8 @@ export default function App() {
                 {!activeItem ? (
                   <div className="dropzone" onClick={() => document.getElementById("file-loader")?.click()}>
                     <div className="dropzone-icon">📁</div>
-                    <div className="dropzone-title">拖拽图片到这里，或点击选择</div>
-                    <div className="dropzone-sub">支持 PNG / JPG / WebP 等格式，处理完全在浏览器本地完成，不传输服务器</div>
+                    <div className="dropzone-title">{t("dropzoneTitle")}</div>
+                    <div className="dropzone-sub">{t("dropzoneSub")}</div>
                     <input
                       type="file"
                       id="file-loader"
@@ -1529,16 +1693,16 @@ export default function App() {
                 ) : activeItem.status === "processing" ? (
                   <div style={{textAlign: 'center'}}>
                     <div style={{fontSize: '2rem', marginBottom: '8px', animation: 'spin 1s linear infinite'}}>⌛</div>
-                    <div>正在处理像素图 Processing...</div>
+                    <div>{t("processing")}</div>
                   </div>
                 ) : activeItem.status === "error" ? (
                   <div style={{textAlign: 'center', color: 'var(--danger)'}}>
                     <div style={{fontSize: '2rem', marginBottom: '8px'}}>⚠️</div>
-                    <div>处理出错: {activeItem.error}</div>
+                    <div>{t("processError")}: {activeItem.error}</div>
                   </div>
                 ) : (
                   <div className="chessboard-bg" style={{position: 'relative'}}>
-                    {viewMode === "slider" && activeItem.processedResult && (
+                    {!isCropMode && viewMode === "slider" && activeItem.processedResult && (
                       <div
                         ref={containerRef}
                         className="compare-container"
@@ -1599,7 +1763,7 @@ export default function App() {
                       </div>
                     )}
 
-                    {viewMode === "processed" && activeItem.processedResult?.result && (
+                    {!isCropMode && viewMode === "processed" && activeItem.processedResult?.result && (
                       <div style={{position: 'relative'}}>
                         <canvas
                           ref={processedCanvasRef}
@@ -1616,7 +1780,7 @@ export default function App() {
                       </div>
                     )}
 
-                    {viewMode === "original" && activeItem.originalImage && (
+                    {!isCropMode && viewMode === "original" && activeOriginalImage && (
                       <div style={{position: 'relative'}}>
                         <canvas
                           ref={rawOriginalCanvasRef}
@@ -1625,15 +1789,15 @@ export default function App() {
                             zoomScale === "fit"
                               ? { maxWidth: '100%', maxHeight: '70vh', height: 'auto', display: 'block' }
                               : {
-                                  width: activeItem.originalImage.width * zoomScale,
-                                  height: activeItem.originalImage.height * zoomScale,
+                                  width: activeOriginalImage.width * zoomScale,
+                                  height: activeOriginalImage.height * zoomScale,
                                 }
                           }
                         />
                       </div>
                     )}
 
-                    {viewMode === "side" && activeItem.processedResult && (
+                    {!isCropMode && viewMode === "side" && activeItem.processedResult && (
                       <div style={{ display: "flex", gap: "24px", padding: "12px" }}>
                         <div style={{ textAlign: "center" }}>
                           <div style={{ fontSize: "0.75rem", marginBottom: "4px", color: "var(--muted)" }}>对齐原画 Alignment Original</div>
@@ -1667,6 +1831,171 @@ export default function App() {
                         </div>
                       </div>
                     )}
+
+                    {isCropMode && activeItem && (
+                      <div
+                        ref={cropContainerRef}
+                        className="crop-container"
+                        style={
+                          zoomScale === "fit"
+                            ? {
+                                position: 'relative',
+                                display: 'inline-block',
+                                maxWidth: '100%',
+                                maxHeight: '70vh',
+                                overflow: 'hidden',
+                                cursor: 'crosshair',
+                                userSelect: 'none',
+                              }
+                            : {
+                                position: 'relative',
+                                display: 'inline-block',
+                                width: activeItem.originalImage.width * zoomScale,
+                                height: activeItem.originalImage.height * zoomScale,
+                                overflow: 'hidden',
+                                cursor: 'crosshair',
+                                userSelect: 'none',
+                              }
+                        }
+                        onMouseDown={handleCropMouseDown}
+                        onMouseMove={handleCropMouseMove}
+                        onMouseUp={handleCropMouseUp}
+                      >
+                        <canvas
+                          ref={cropCanvasRef}
+                          className="viewport-canvas"
+                          style={
+                            zoomScale === "fit"
+                              ? { maxWidth: '100%', maxHeight: '70vh', height: 'auto', display: 'block' }
+                              : {
+                                  width: activeItem.originalImage.width * zoomScale,
+                                  height: activeItem.originalImage.height * zoomScale,
+                                }
+                          }
+                        />
+                        {currentCropRect ? (
+                          <div
+                            style={{
+                              position: 'absolute',
+                              left: `${(currentCropRect.x / activeItem.originalImage.width) * 100}%`,
+                              top: `${(currentCropRect.y / activeItem.originalImage.height) * 100}%`,
+                              width: `${(currentCropRect.w / activeItem.originalImage.width) * 100}%`,
+                              height: `${(currentCropRect.h / activeItem.originalImage.height) * 100}%`,
+                              border: '2px dashed var(--accent)',
+                              boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.5)',
+                              pointerEvents: 'none',
+                              boxSizing: 'border-box',
+                            }}
+                          >
+                            <div
+                              style={{
+                                position: 'absolute',
+                                bottom: '4px',
+                                right: '4px',
+                                background: 'rgba(0, 0, 0, 0.75)',
+                                color: '#fff',
+                                padding: '2px 6px',
+                                borderRadius: '4px',
+                                fontSize: '10px',
+                                fontFamily: 'monospace',
+                                pointerEvents: 'none',
+                                whiteSpace: 'nowrap',
+                              }}
+                            >
+                              {currentCropRect.w} × {currentCropRect.h}
+                            </div>
+                          </div>
+                        ) : (
+                          <div
+                            style={{
+                              position: 'absolute',
+                              top: 0,
+                              left: 0,
+                              width: '100%',
+                              height: '100%',
+                              backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                              pointerEvents: 'none',
+                            }}
+                          />
+                        )}
+                      </div>
+                    )}
+
+                    {isCropMode && (
+                      <div
+                        className="crop-floating-toolbar"
+                        style={{
+                          position: 'absolute',
+                          bottom: '16px',
+                          left: '50%',
+                          transform: 'translateX(-50%)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '12px',
+                          background: 'rgba(20, 20, 20, 0.9)',
+                          backdropFilter: 'blur(8px)',
+                          padding: '8px 16px',
+                          borderRadius: '30px',
+                          border: '1px solid rgba(255, 255, 255, 0.1)',
+                          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5)',
+                          zIndex: 10,
+                        }}
+                      >
+                        <span style={{ color: '#fff', fontSize: '0.8rem', marginRight: '4px', whiteSpace: 'nowrap' }}>
+                          {currentCropRect ? `选中: ${currentCropRect.w}x${currentCropRect.h}` : '请拖拽框选裁剪区域'}
+                        </span>
+                        <button
+                          className="btn-small accent"
+                          onClick={handleApplyCrop}
+                          disabled={!currentCropRect}
+                          style={{
+                            borderRadius: '15px',
+                            padding: '4px 12px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            cursor: currentCropRect ? 'pointer' : 'not-allowed',
+                            opacity: currentCropRect ? 1 : 0.6
+                          }}
+                        >
+                          确定裁剪
+                        </button>
+                        <button
+                          className="btn-small"
+                          onClick={() => setCurrentCropRect(null)}
+                          disabled={!currentCropRect}
+                          style={{
+                            borderRadius: '15px',
+                            padding: '4px 12px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            cursor: currentCropRect ? 'pointer' : 'not-allowed',
+                            opacity: currentCropRect ? 1 : 0.6
+                          }}
+                        >
+                          清除
+                        </button>
+                        <button
+                          className="btn-small"
+                          onClick={() => {
+                            setIsCropMode(false);
+                            setCurrentCropRect(null);
+                          }}
+                          style={{
+                            borderRadius: '15px',
+                            padding: '4px 12px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            color: 'var(--danger)',
+                            borderColor: 'rgba(255, 50, 50, 0.3)',
+                          }}
+                        >
+                          退出
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -1675,10 +2004,10 @@ export default function App() {
               {activePalette.length > 0 && (
                 <div className="palette-display">
                   <div className="palette-display-header">
-                    <span className="palette-display-title">提取色表 extracted colors ({activePalette.length})</span>
+                    <span className="palette-display-title">{t("extractedColors")} ({activePalette.length})</span>
                     <div style={{display: 'flex', gap: '8px'}}>
-                      <button className="btn-small" onClick={handleCopyExtractedColors}>复制Hex</button>
-                      <button className="btn-small" onClick={handleDownloadGPL}>导出 .GPL 色板</button>
+                      <button className="btn-small" onClick={handleCopyExtractedColors}>{t("copyHex")}</button>
+                      <button className="btn-small" onClick={handleDownloadGPL}>{t("exportGpl")}</button>
                     </div>
                   </div>
                   <div className="palette-swatches">
@@ -1701,7 +2030,7 @@ export default function App() {
 
               {/* Bottom Filmstrip Panel */}
               <div className="filmstrip-panel">
-                <span className="filmstrip-title">图片列表 Filmstrip</span>
+                <span className="filmstrip-title">{lang === 'zh' ? '图片列表 Filmstrip' : 'Sprites List (Filmstrip)'}</span>
                 
                 <div className="filmstrip-scroll">
                   {sessionList.map((item, idx) => (
@@ -1766,7 +2095,7 @@ export default function App() {
                 <div className="filmstrip-actions">
                   {activeItem && activeItem.status === "success" && (
                     <div className="action-dropdown">
-                      <button className="action-main" onClick={() => handleDownload(1)}>下载当前图</button>
+                      <button className="action-main" onClick={() => handleDownload(1)}>{lang === 'zh' ? '下载当前图' : 'Download Sprite'}</button>
                       <select
                         className="action-arrow"
                         style={{backgroundColor: 'var(--accent-hover)', border: 'none', color: 'white', padding: '8px', cursor: 'pointer', outline: 'none'}}
@@ -1776,13 +2105,13 @@ export default function App() {
                           e.target.value = "0";
                         }}
                       >
-                        <option value="0">缩放倍率 Export Scale</option>
-                        <option value="1">x1 原始像素</option>
-                        <option value="2">x2 缩放</option>
-                        <option value="4">x4 缩放</option>
-                        <option value="8">x8 缩放</option>
-                        <option value="16">x16 缩放</option>
-                        <option value="32">x32 缩放</option>
+                        <option value="0">{lang === 'zh' ? '缩放倍率 Export Scale' : 'Export Scale'}</option>
+                        <option value="1">x1 {lang === 'zh' ? '原始像素' : 'Original Pixels'}</option>
+                        <option value="2">x2 {lang === 'zh' ? '缩放' : 'Scale'}</option>
+                        <option value="4">x4 {lang === 'zh' ? '缩放' : 'Scale'}</option>
+                        <option value="8">x8 {lang === 'zh' ? '缩放' : 'Scale'}</option>
+                        <option value="16">x16 {lang === 'zh' ? '缩放' : 'Scale'}</option>
+                        <option value="32">x32 {lang === 'zh' ? '缩放' : 'Scale'}</option>
                       </select>
                     </div>
                   )}
@@ -1795,14 +2124,14 @@ export default function App() {
                         value={exportScale}
                         onChange={(e) => setExportScale(parseInt(e.target.value))}
                       >
-                        <option value="1">导出 x1 ZIP</option>
-                        <option value="2">导出 x2 ZIP</option>
-                        <option value="4">导出 x4 ZIP</option>
-                        <option value="8">导出 x8 ZIP</option>
-                        <option value="16">导出 x16 ZIP</option>
+                        <option value="1">{lang === 'zh' ? '导出 x1 ZIP' : 'Export x1 ZIP'}</option>
+                        <option value="2">{lang === 'zh' ? '导出 x2 ZIP' : 'Export x2 ZIP'}</option>
+                        <option value="4">{lang === 'zh' ? '导出 x4 ZIP' : 'Export x4 ZIP'}</option>
+                        <option value="8">{lang === 'zh' ? '导出 x8 ZIP' : 'Export x8 ZIP'}</option>
+                        <option value="16">{lang === 'zh' ? '导出 x16 ZIP' : 'Export x16 ZIP'}</option>
                       </select>
                       <button className="nav-btn primary" onClick={handleDownloadAll} style={{padding: '8px 14px'}}>
-                        📦 批量导出打包
+                        📦 {lang === 'zh' ? '批量导出打包' : 'Batch Export (ZIP)'}
                       </button>
                     </div>
                   )}
@@ -1819,12 +2148,12 @@ export default function App() {
                 {/* Slicing Grid Controls */}
                 <div className="accordion-item">
                   <button className="accordion-header active" style={{cursor: 'default'}}>
-                    <span>🧱 瓦片切片设置 (Tile Slicing)</span>
+                    <span>🧱 {lang === 'zh' ? '瓦片切片设置 (Tile Slicing)' : 'Tile Slicing'}</span>
                   </button>
                   <div className="accordion-content">
                     <div className="form-group">
                       <div className="label-wrapper">
-                        <span>瓦片大小 Tile Size</span>
+                        <span>{lang === 'zh' ? '瓦片大小' : 'Tile Size'}</span>
                       </div>
                       <select
                         className="form-select"
@@ -1849,7 +2178,7 @@ export default function App() {
                           checked={snapToGrid}
                           onChange={(e) => setSnapToGrid(e.target.checked)}
                         />
-                        <span>吸附到网格 (Snap Grid)</span>
+                        <span>{lang === 'zh' ? '吸附到网格 (Snap Grid)' : 'Snap to Grid'}</span>
                       </label>
 
                       <label className="checkbox-label">
@@ -1858,7 +2187,7 @@ export default function App() {
                           checked={showCropGridLine}
                           onChange={(e) => setShowCropGridLine(e.target.checked)}
                         />
-                        <span>显示网格线 (Grid Overlay)</span>
+                        <span>{lang === 'zh' ? '显示网格线 (Grid Overlay)' : 'Show Grid Overlay'}</span>
                       </label>
                     </div>
                   </div>
@@ -1868,7 +2197,7 @@ export default function App() {
                 {selectedTile && (
                   <div className="accordion-item">
                     <button className="accordion-header active" style={{cursor: 'default'}}>
-                      <span>🪄 无缝对齐边缘 (Seamless Blending)</span>
+                      <span>🪄 {lang === 'zh' ? '无缝对齐边缘 (Seamless Blending)' : 'Seamless Blending'}</span>
                     </button>
                     <div className="accordion-content">
                       <div className="form-row">
@@ -1878,7 +2207,7 @@ export default function App() {
                             checked={seamlessHorizontal}
                             onChange={(e) => setSeamlessHorizontal(e.target.checked)}
                           />
-                          <span>左右对齐 (H-Seams)</span>
+                          <span>{lang === 'zh' ? '左右对齐 (H-Seams)' : 'Horizontal Blend'}</span>
                         </label>
 
                         <label className="checkbox-label">
@@ -1887,13 +2216,13 @@ export default function App() {
                             checked={seamlessVertical}
                             onChange={(e) => setSeamlessVertical(e.target.checked)}
                           />
-                          <span>上下对齐 (V-Seams)</span>
+                          <span>{lang === 'zh' ? '上下对齐 (V-Seams)' : 'Vertical Blend'}</span>
                         </label>
                       </div>
 
                       <div className="form-group">
                         <div className="label-wrapper">
-                          <span>过渡半径 Bleed Radius</span>
+                          <span>{lang === 'zh' ? '过渡半径' : 'Bleed Radius'} (Bleed Radius)</span>
                           <span className="label-val">{bleedRadius}px</span>
                         </div>
                         <input
@@ -1908,15 +2237,15 @@ export default function App() {
 
                       <div className="form-group">
                         <div className="label-wrapper">
-                          <span>过渡曲线 Transition</span>
+                          <span>{lang === 'zh' ? '过渡曲线' : 'Transition Curve'} (Transition)</span>
                         </div>
                         <select
                           className="form-select"
                           value={blendCurve}
                           onChange={(e) => setBlendCurve(e.target.value as any)}
                         >
-                          <option value="linear">线性过渡 (Linear)</option>
-                          <option value="cosine">余弦平滑 (Cosine)</option>
+                          <option value="linear">{lang === 'zh' ? '线性过渡 (Linear)' : 'Linear'}</option>
+                          <option value="cosine">{lang === 'zh' ? '余弦平滑 (Cosine)' : 'Cosine Smooth'}</option>
                         </select>
                       </div>
 
@@ -1927,7 +2256,7 @@ export default function App() {
                             checked={offsetShift}
                             onChange={(e) => setOffsetShift(e.target.checked)}
                           />
-                          <span>接缝居中 (Offset Shift)</span>
+                          <span>{lang === 'zh' ? '接缝居中 (Offset Shift)' : 'Center Seams (Offset)'}</span>
                         </label>
 
                         <label className="checkbox-label">
@@ -1936,7 +2265,7 @@ export default function App() {
                             checked={show3x3GridLines}
                             onChange={(e) => setShow3x3GridLines(e.target.checked)}
                           />
-                          <span>平铺辅助线 (3x3 Guides)</span>
+                          <span>{lang === 'zh' ? '平铺辅助线 (3x3 Guides)' : '3x3 Guides'}</span>
                         </label>
                       </div>
                     </div>
@@ -1950,16 +2279,16 @@ export default function App() {
             <main className="viewport-panel">
               <div className="toolbar">
                 <div className="toolbar-group">
-                  <span className="toolbar-title">🧱 瓦片工坊 Workshop: 提取与缝合无缝瓦片</span>
+                  <span className="toolbar-title">{lang === 'zh' ? '🧱 瓦片工坊 Workshop: 提取与缝合无缝瓦片' : '🧱 Tile Workshop: Seamless Slicing & Blending'}</span>
                 </div>
                 {activeItem && selectedTile && (
                   <div className="toolbar-group">
                     <button className="nav-btn primary" onClick={handleAddTileToSession}>
-                      📥 添加到图片列表 (Use in Session)
+                      📥 {lang === 'zh' ? '添加到图片列表 (Use in Session)' : 'Add to Session List'}
                     </button>
                     
                     <div className="action-dropdown">
-                      <button className="action-main" onClick={() => handleDownloadTile(1)}>下载瓦片 Download Tile</button>
+                      <button className="action-main" onClick={() => handleDownloadTile(1)}>{lang === 'zh' ? '下载瓦片 Download Tile' : 'Download Tile'}</button>
                       <select
                         className="action-arrow"
                         style={{backgroundColor: 'var(--accent-hover)', border: 'none', color: 'white', padding: '8px', cursor: 'pointer', outline: 'none'}}
@@ -1969,12 +2298,12 @@ export default function App() {
                           e.target.value = "0";
                         }}
                       >
-                        <option value="0">倍率 Scale</option>
-                        <option value="1">x1 原始大小</option>
-                        <option value="2">x2 缩放</option>
-                        <option value="4">x4 缩放</option>
-                        <option value="8">x8 缩放</option>
-                        <option value="16">x16 缩放</option>
+                        <option value="0">{lang === 'zh' ? '倍率 Scale' : 'Scale'}</option>
+                        <option value="1">x1 {lang === 'zh' ? '原始大小' : 'Original Size'}</option>
+                        <option value="2">x2 {lang === 'zh' ? '缩放' : 'Scale'}</option>
+                        <option value="4">x4 {lang === 'zh' ? '缩放' : 'Scale'}</option>
+                        <option value="8">x8 {lang === 'zh' ? '缩放' : 'Scale'}</option>
+                        <option value="16">x16 {lang === 'zh' ? '缩放' : 'Scale'}</option>
                       </select>
                     </div>
                   </div>
@@ -1985,9 +2314,9 @@ export default function App() {
                 {/* Left Column: Source Image & Crop Picker */}
                 <div style={{flex: 1, borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', minWidth: 0}}>
                   <div style={{padding: '8px 16px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
-                    <span style={{fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--muted)'}}>左键点击截图 Crop Target</span>
+                    <span style={{fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--muted)'}}>{lang === 'zh' ? '左键点击截图 Crop Target' : 'Left-Click to Extract Tile'}</span>
                     <div className="toggle-group">
-                      <button className={`toggle-btn ${zoomScale === "fit" ? "active" : ""}`} onClick={() => setZoomScale("fit")}>自适应</button>
+                      <button className={`toggle-btn ${zoomScale === "fit" ? "active" : ""}`} onClick={() => setZoomScale("fit")}>{lang === 'zh' ? '自适应' : 'Fit'}</button>
                       <button className={`toggle-btn ${zoomScale === 1 ? "active" : ""}`} onClick={() => setZoomScale(1)}>1x</button>
                       <button className={`toggle-btn ${zoomScale === 2 ? "active" : ""}`} onClick={() => setZoomScale(2)}>2x</button>
                       <button className={`toggle-btn ${zoomScale === 4 ? "active" : ""}`} onClick={() => setZoomScale(4)}>4x</button>
@@ -1999,9 +2328,9 @@ export default function App() {
                     style={{flex: 1, position: 'relative', overflow: 'auto'}}
                   >
                     {!activeItem ? (
-                      <div style={{color: 'var(--muted)', margin: 'auto'}}>请先在全局处理模式下载入图片</div>
+                      <div style={{color: 'var(--muted)', margin: 'auto'}}>{lang === 'zh' ? '请先在全局处理模式下载入图片' : 'Please upload and process an image in Global mode first.'}</div>
                     ) : activeItem.status !== "success" ? (
-                      <div style={{color: 'var(--muted)', margin: 'auto'}}>图片尚未处理完毕...</div>
+                      <div style={{color: 'var(--muted)', margin: 'auto'}}>{lang === 'zh' ? '图片尚未处理完毕...' : 'Processing image, please wait...'}</div>
                     ) : (
                       <div 
                         className="chessboard-bg" 
@@ -2048,7 +2377,7 @@ export default function App() {
                 {/* Right Column: Active Tile and 3x3 Preview */}
                 <div style={{flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0}}>
                   <div style={{padding: '8px 16px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
-                    <span style={{fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--muted)'}}>无缝预览 3x3 Preview</span>
+                    <span style={{fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--muted)'}}>{lang === 'zh' ? '无缝预览 3x3 Preview' : 'Seamless Tiling 3x3 Preview'}</span>
                     <div className="toggle-group">
                       <button className={`toggle-btn ${tilingZoom === 1 ? "active" : ""}`} onClick={() => setTilingZoom(1)}>1x</button>
                       <button className={`toggle-btn ${tilingZoom === 2 ? "active" : ""}`} onClick={() => setTilingZoom(2)}>2x</button>
@@ -2062,15 +2391,15 @@ export default function App() {
                     {!selectedTile ? (
                       <div style={{margin: 'auto', textAlign: 'center', color: 'var(--muted)'}}>
                         <div style={{fontSize: '2.5rem', marginBottom: '12px'}}>🧱</div>
-                        <div style={{fontSize: '1rem', fontWeight: 600}}>在左侧点击想要提取的区块</div>
-                        <div style={{fontSize: '0.8rem', marginTop: '6px', opacity: 0.8}}>网页将自动计算其过渡边缘，并实时生成 3x3 拼接的平铺预览。</div>
+                        <div style={{fontSize: '1rem', fontWeight: 600}}>{lang === 'zh' ? '在左侧点击想要提取的区块' : 'Click on the left canvas to extract a tile'}</div>
+                        <div style={{fontSize: '0.8rem', marginTop: '6px', opacity: 0.8}}>{lang === 'zh' ? '网页将自动计算其过渡边缘，并实时生成 3x3 拼接的平铺预览。' : 'The system will blend the seams and generate a repeating 3x3 tiled preview in real-time.'}</div>
                       </div>
                     ) : (
                       <>
                         <div style={{display: 'flex', gap: '20px', justifyContent: 'center', width: '100%', alignItems: 'center', borderBottom: '1px dashed var(--border)', paddingBottom: '20px'}}>
                           {/* Active tile display */}
                           <div style={{textAlign: 'center'}}>
-                            <div style={{fontSize: '0.7rem', color: 'var(--muted)', marginBottom: '6px'}}>活动瓦片 Active Tile ({tileSize}x{tileSize})</div>
+                            <div style={{fontSize: '0.7rem', color: 'var(--muted)', marginBottom: '6px'}}>{lang === 'zh' ? `活动瓦片 Active Tile (${tileSize}x${tileSize})` : `Active Tile (${tileSize}x${tileSize})`}</div>
                             <div className="chessboard-bg" style={{padding: 4, display: 'inline-block'}}>
                               <canvas
                                 ref={tileCanvasRef}
@@ -2087,7 +2416,7 @@ export default function App() {
                           {/* Swatch detail */}
                           {croppedPalette.length > 0 && (
                             <div style={{flex: 1, maxWidth: '240px', textAlign: 'left'}}>
-                              <div style={{fontSize: '0.7rem', color: 'var(--muted)', marginBottom: '6px'}}>瓦片颜色 Swatches ({croppedPalette.length})</div>
+                              <div style={{fontSize: '0.7rem', color: 'var(--muted)', marginBottom: '6px'}}>{lang === 'zh' ? `瓦片颜色 Swatches (${croppedPalette.length})` : `Tile Swatches (${croppedPalette.length})`}</div>
                               <div className="palette-swatches" style={{maxHeight: '120px', overflowY: 'auto', padding: '4px', border: '1px solid var(--border)', borderRadius: '6px', backgroundColor: 'var(--bg)'}}>
                                 {croppedPalette.map((rgb, idx) => {
                                   const hex = rgbToHex(rgb);
@@ -2108,7 +2437,7 @@ export default function App() {
                         </div>
 
                         <div style={{textAlign: 'center', width: '100%', marginTop: '10px'}}>
-                          <div style={{fontSize: '0.7rem', color: 'var(--muted)', marginBottom: '8px'}}>九宫格平铺预览 3x3 Repeating Preview</div>
+                          <div style={{fontSize: '0.7rem', color: 'var(--muted)', marginBottom: '8px'}}>{lang === 'zh' ? '九宫格平铺预览 3x3 Repeating Preview' : '3x3 Repeating Grid Preview'}</div>
                           <div className="chessboard-bg" style={{padding: 8, display: 'inline-block'}}>
                             <canvas
                               ref={tilingPreviewCanvasRef}
@@ -2129,7 +2458,7 @@ export default function App() {
 
               {/* Bottom Filmstrip Panel in Tile Mode */}
               <div className="filmstrip-panel">
-                <span className="filmstrip-title">图片列表 Filmstrip</span>
+                <span className="filmstrip-title">{lang === 'zh' ? '图片列表 Filmstrip' : 'Sprites List (Filmstrip)'}</span>
                 <div className="filmstrip-scroll">
                   {sessionList.map((item, idx) => (
                     <div
@@ -2199,14 +2528,14 @@ export default function App() {
                         value={exportScale}
                         onChange={(e) => setExportScale(parseInt(e.target.value))}
                       >
-                        <option value="1">导出 x1 ZIP</option>
-                        <option value="2">导出 x2 ZIP</option>
-                        <option value="4">导出 x4 ZIP</option>
-                        <option value="8">导出 x8 ZIP</option>
-                        <option value="16">导出 x16 ZIP</option>
+                        <option value="1">{lang === 'zh' ? '导出 x1 ZIP' : 'Export x1 ZIP'}</option>
+                        <option value="2">{lang === 'zh' ? '导出 x2 ZIP' : 'Export x2 ZIP'}</option>
+                        <option value="4">{lang === 'zh' ? '导出 x4 ZIP' : 'Export x4 ZIP'}</option>
+                        <option value="8">{lang === 'zh' ? '导出 x8 ZIP' : 'Export x8 ZIP'}</option>
+                        <option value="16">{lang === 'zh' ? '导出 x16 ZIP' : 'Export x16 ZIP'}</option>
                       </select>
                       <button className="nav-btn primary" onClick={handleDownloadAll} style={{padding: '8px 14px'}}>
-                        📦 批量导出打包
+                        📦 {lang === 'zh' ? '批量导出打包' : 'Batch Export (ZIP)'}
                       </button>
                     </div>
                   )}

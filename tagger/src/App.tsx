@@ -13,6 +13,9 @@ const RECENT_CAP = 8;
 const isTagged = (t: PaletteTags | undefined): boolean => !!t && (!!t.role || t.style.length > 0);
 
 export default function App() {
+  const [lang, setLang] = useState<'zh' | 'en'>(() => {
+    return (localStorage.getItem('adna_lang') as 'zh' | 'en') || 'zh';
+  });
   const [bundle, setBundle] = useState<ParsedBundle | null>(null);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   // active = the keyboard cursor / primary selection (for arrow nav + scroll-into-view)
@@ -90,7 +93,10 @@ export default function App() {
       if (draftRaw) {
         try {
           const draft = JSON.parse(draftRaw) as Record<number, PaletteTags>;
-          if (confirm("发现该 palette 集合上次未导出的本地草稿，是否恢复？")) parsed.tagData = draft;
+          const confirmMsg = lang === 'zh'
+            ? "发现该 palette 集合上次未导出的本地草稿，是否恢复？"
+            : "Found unsaved local draft for this palette set. Do you want to restore it?";
+          if (confirm(confirmMsg)) parsed.tagData = draft;
         } catch { /* ignore bad draft */ }
       }
       setBundle(parsed);
@@ -100,14 +106,14 @@ export default function App() {
       setServerName(null);
       setError("");
     } catch (e) {
-      setError(`加载失败: ${(e as Error).message}`);
+      setError(lang === 'zh' ? `加载失败: ${(e as Error).message}` : `Load failed: ${(e as Error).message}`);
     }
-  }, []);
+  }, [lang]);
 
   const loadSample = useCallback(async () => {
     try {
       const res = await fetch(`${import.meta.env.BASE_URL}sample/my_retro_clean.adnatags`);
-      if (!res.ok) throw new Error(`sample 不可用 (${res.status})`);
+      if (!res.ok) throw new Error(lang === 'zh' ? `sample 不可用 (${res.status})` : `sample not available (${res.status})`);
       const parsed = parseBundle("my_retro_clean.adnatags (sample)", await res.arrayBuffer());
       setBundle(parsed);
       setSelected(new Set());
@@ -299,31 +305,51 @@ export default function App() {
     <div className="app">
       <header className="topbar">
         <strong>Adna Web Asset Tagger</strong>
-        <button onClick={() => fileInput.current?.click()}>打开 .adnatags…</button>
+        <button onClick={() => fileInput.current?.click()}>{lang === 'zh' ? '打开 .adnatags…' : 'Open .adnatags…'}</button>
         <input ref={fileInput} type="file" accept=".adnatags,.zip" hidden
           onChange={(e) => e.target.files?.[0] && loadBundleFile(e.target.files[0])} />
-        <button disabled={!bundle} onClick={() => tagsInput.current?.click()}>Load tags…</button>
+        <button disabled={!bundle} onClick={() => tagsInput.current?.click()}>{lang === 'zh' ? '加载 tags…' : 'Load tags…'}</button>
         <input ref={tagsInput} type="file" accept=".json" hidden
           onChange={(e) => e.target.files?.[0] && onLoadTagsFile(e.target.files[0])} />
-        <button onClick={() => setServerOpen(true)}>服务器…</button>
+        <button onClick={() => setServerOpen(true)}>{lang === 'zh' ? '服务器…' : 'Server…'}</button>
         <span className="spacer" />
         {bundle && (
           <span className="stat">
-            {bundle.name} · {stats.tagged}/{stats.total} tagged{serverName ? " · ☁ 自动同步" : ""}
+            {bundle.name} · {stats.tagged}/{stats.total} tagged{serverName ? (lang === 'zh' ? " · ☁ 自动同步" : " · ☁ Auto Sync") : ""}
           </span>
         )}
-        <button disabled={!bundle} onClick={onExport}>导出 .adnatags</button>
-        <button disabled={!bundle} onClick={onApplyToReroll} title="把当前 role 覆盖写入 reroll 默认 palette 包（需服务器密码）">→ reroll 默认</button>
+        <button disabled={!bundle} onClick={onExport}>{lang === 'zh' ? '导出 .adnatags' : 'Export .adnatags'}</button>
+        <button disabled={!bundle} onClick={onApplyToReroll} title={lang === 'zh' ? "把当前 role 覆盖写入 reroll 默认 palette 包（需服务器密码）" : "Overwrite reroll default palette pack with current roles (server password required)"}>{lang === 'zh' ? '→ reroll 默认' : '→ Reroll Default'}</button>
+        <button
+          style={{
+            marginLeft: '12px',
+            background: 'rgba(255,255,255,0.06)',
+            border: '1px solid rgba(255,255,255,0.1)',
+            padding: '3px 8px',
+            borderRadius: '4px',
+            fontSize: '11px',
+            cursor: 'pointer',
+            color: 'var(--fg)',
+            whiteSpace: 'nowrap'
+          }}
+          onClick={() => {
+            const nextLang = lang === 'zh' ? 'en' : 'zh';
+            setLang(nextLang);
+            localStorage.setItem('adna_lang', nextLang);
+          }}
+        >
+          🌐 {lang === 'zh' ? 'English' : '简体中文'}
+        </button>
       </header>
 
       {error && <div className="error">{error}</div>}
 
       {!bundle ? (
         <div className="dropzone">
-          <div>把 <code>.adnatags</code> 拖到这里，或点「打开 .adnatags…」</div>
+          <div>{lang === 'zh' ? <>把 <code>.adnatags</code> 拖到这里，或点「打开 .adnatags…」</> : <>Drag <code>.adnatags</code> here, or click "Open .adnatags..."</>}</div>
           <div className="dz-actions">
-            <button onClick={loadSample}>试用样例</button>
-            <button onClick={() => setServerOpen(true)}>从服务器打开</button>
+            <button onClick={loadSample}>{lang === 'zh' ? '试用样例' : 'Try Sample'}</button>
+            <button onClick={() => setServerOpen(true)}>{lang === 'zh' ? '从服务器打开' : 'Open from Server'}</button>
           </div>
         </div>
       ) : (
