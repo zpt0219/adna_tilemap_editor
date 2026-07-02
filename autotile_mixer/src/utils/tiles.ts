@@ -1,7 +1,16 @@
+import { sampleNoise2D } from '@lib/noise';
+
+export type MaskStyle = 'linear' | 'arc' | 'pixel';
+
 export interface RenderParams {
   tileSize: number;
   smoothness: number;
   easing?: string;
+  maskStyle?: MaskStyle;
+  pixelSteps?: number;
+  noiseStrength?: number;
+  noiseScale?: number;
+  noiseSeed?: number;
 }
 
 export const EASING_FUNCTIONS: Record<string, (t: number) => number> = {
@@ -24,16 +33,44 @@ export function getWangCorners(i: number): [number, number, number, number] {
   return [nw, ne, se, sw];
 }
 
+// Linear: bilinear interpolation of corner values — creates straight diagonal gradients
 export function calculateWangBaseWeight(
   tx: number,
   ty: number,
   corners: [number, number, number, number]
 ): number {
   const [nw, ne, se, sw] = corners;
-  // Bilinear interpolation:
   const top = nw * (1 - tx) + ne * tx;
   const bot = sw * (1 - tx) + se * tx;
   return top * (1 - ty) + bot * ty;
+}
+
+// Arc: inverse-distance-squared weighting — creates rounded/organic arc boundaries
+export function calculateArcWeight(
+  tx: number,
+  ty: number,
+  corners: [number, number, number, number]
+): number {
+  const [nw, ne, se, sw] = corners;
+  const eps = 0.04;
+  const wNW = 1 / (tx * tx + ty * ty + eps);
+  const wNE = 1 / ((1 - tx) * (1 - tx) + ty * ty + eps);
+  const wSE = 1 / ((1 - tx) * (1 - tx) + (1 - ty) * (1 - ty) + eps);
+  const wSW = 1 / (tx * tx + (1 - ty) * (1 - ty) + eps);
+  const total = wNW + wNE + wSE + wSW;
+  return (nw * wNW + ne * wNE + se * wSE + sw * wSW) / total;
+}
+
+// Pixel: quantize coordinates to a coarse grid — creates stair-step pixel art boundaries
+export function calculatePixelWeight(
+  tx: number,
+  ty: number,
+  corners: [number, number, number, number],
+  steps: number
+): number {
+  const qtx = Math.min(1, (Math.floor(tx * steps) + 0.5) / steps);
+  const qty = Math.min(1, (Math.floor(ty * steps) + 0.5) / steps);
+  return calculateWangBaseWeight(qtx, qty, corners);
 }
 
 // ===========================================================================
@@ -66,7 +103,10 @@ export function blendTilePixels(
   imgBData: ImageData | null,
   params: RenderParams
 ): ImageData {
-  const { tileSize, smoothness, easing } = params;
+  const {
+    tileSize, smoothness, easing, maskStyle = 'linear', pixelSteps,
+    noiseStrength = 0, noiseScale = 5, noiseSeed = 0,
+  } = params;
 
   const outData = new ImageData(tileSize, tileSize);
 
@@ -85,25 +125,41 @@ export function blendTilePixels(
 
   const corners = isWang ? getWangCorners(tileIndex) : BLOB_CORNERS[tileIndex] ?? [0, 0, 0, 0] as [number, number, number, number];
 
+  const resolvedPixelSteps = pixelSteps ?? Math.max(2, Math.floor(tileSize / 8));
+  const applyNoise = noiseStrength > 0;
+
   for (let y = 0; y < tileSize; y++) {
     for (let x = 0; x < tileSize; x++) {
       // Normalized coordinates [0, 1]
       const tx = x / (tileSize - 1);
       const ty = y / (tileSize - 1);
 
-      // Base Weight via bilinear interpolation
-      const baseWeight = calculateWangBaseWeight(tx, ty, corners);
+      const weight =
+        maskStyle === 'arc'   ? calculateArcWeight(tx, ty, corners) :
+        maskStyle === 'pixel' ? calculatePixelWeight(tx, ty, corners, resolvedPixelSteps) :
+                                calculateWangBaseWeight(tx, ty, corners);
 
       // Soft transition factor (grassRatio)
       let grassRatio = 0.5;
       if (smoothness <= 0) {
-        grassRatio = baseWeight > 0.5 ? 1.0 : 0.0;
+        grassRatio = weight > 0.5 ? 1.0 : 0.0;
       } else {
         const low = 0.5 - smoothness / 2;
         const high = 0.5 + smoothness / 2;
-        const t = Math.max(0, Math.min(1, (baseWeight - low) / (high - low)));
+        const t = Math.max(0, Math.min(1, (weight - low) / (high - low)));
         const easeFunc = EASING_FUNCTIONS[easing || 'linear'] || EASING_FUNCTIONS.linear;
         grassRatio = easeFunc(t);
+      }
+
+      // Edge noise perturbation — only active at the boundary band, fades to 0 at tile edges
+      if (applyNoise) {
+        const noiseVal = sampleNoise2D(noiseSeed, x * noiseScale, y * noiseScale);
+        const centeredNoise = noiseVal * 2 - 1;                       // [-1, 1]
+        const boundaryWeight = grassRatio * (1 - grassRatio) * 4;    // peaks at alpha=0.5
+        const edgeFade = Math.sin(tx * Math.PI) * Math.sin(ty * Math.PI); // 0 at tile edges
+        grassRatio = Math.max(0, Math.min(1,
+          grassRatio + centeredNoise * boundaryWeight * edgeFade * noiseStrength
+        ));
       }
 
       // Blend source textures (Alpha-aware blending where Grass sits on top of Dirt)

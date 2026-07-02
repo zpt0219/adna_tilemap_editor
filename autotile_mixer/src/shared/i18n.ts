@@ -22,7 +22,11 @@ export const TRANSLATIONS = {
     downloadPng: "导出 Tileset PNG",
     langBtn: "🌐 English",
     showGrid: "显示网格辅助线",
-    easingFunc: "边缘渐变缓动函数"
+    easingFunc: "边缘渐变缓动函数",
+    maskStyle: "边界形状",
+    noiseStrength: "边缘扰动强度",
+    noiseScale: "扰动频率",
+    noiseSeed: "扰动种子"
   },
   en: {
     title: "Terrain Autotile Previewer",
@@ -47,7 +51,11 @@ export const TRANSLATIONS = {
     downloadPng: "Export Tileset PNG",
     langBtn: "🌐 简体中文",
     showGrid: "Show Grid Lines",
-    easingFunc: "Border Easing Function"
+    easingFunc: "Border Easing Function",
+    maskStyle: "Mask Style",
+    noiseStrength: "Edge Noise Strength",
+    noiseScale: "Noise Scale",
+    noiseSeed: "Noise Seed"
   }
 };
 

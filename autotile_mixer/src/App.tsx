@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './App.css';
 import { TRANSLATIONS, type Lang } from './shared/i18n';
-import { blendTilePixels, type RenderParams, EASING_FUNCTIONS } from './utils/tiles';
+import { blendTilePixels, type RenderParams, type MaskStyle, EASING_FUNCTIONS } from './utils/tiles';
 
 const COLS = 16;
 const ROWS = 10;
@@ -166,8 +166,22 @@ export default function App() {
   // Easing function configuration (defaults to 'linear')
   const [easing, setEasing] = useState<string>('linear');
 
+  // Mask shape style
+  const [maskStyle, setMaskStyle] = useState<MaskStyle>('linear');
+
+  // Pixel steps (only used when maskStyle === 'pixel')
+  const [pixelSteps, setPixelSteps] = useState(4);
+
+  // Edge noise perturbation
+  const [noiseStrength, setNoiseStrength] = useState(0);
+  const [noiseScale, setNoiseScale] = useState(5);
+  const [noiseSeed, setNoiseSeed] = useState(42);
+
   // Zoom config (integer scale factor for visual canvas sizes)
   const [zoom, setZoom] = useState(2);
+
+  // Playground zoom (independent from tileset zoom)
+  const [playgroundZoom, setPlaygroundZoom] = useState(2);
 
   // Interactive playground state (both Wang & Blob share corner-based vertices)
   const [wangVertices, setWangVertices] = useState<number[][]>(() =>
@@ -176,6 +190,7 @@ export default function App() {
 
   const [isDrawing, setIsDrawing] = useState(false);
   const [drawVal, setDrawVal] = useState<number>(1); // 1 = paint A, 0 = paint B (erase)
+  const [touchPaintVal, setTouchPaintVal] = useState<0 | 1>(1); // touch mode toggle
 
   // Canvas refs
   const tilesetCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -273,12 +288,6 @@ export default function App() {
     const canvas = tilesetCanvasRef.current;
     if (!canvas) return;
 
-    const params: RenderParams = {
-      tileSize,
-      smoothness,
-      easing,
-    };
-
     const cols = isWang ? 4 : 5;
     const rows = isWang ? 4 : 3;
 
@@ -302,13 +311,8 @@ export default function App() {
       if (tileIdx === -1) {
         continue;
       }
-      const tileData = blendTilePixels(
-        tileIdx,
-        isWang,
-        imgAData,
-        imgBData,
-        params
-      );
+      const params: RenderParams = { tileSize, smoothness, easing, maskStyle, pixelSteps: maskStyle === 'pixel' ? pixelSteps : undefined, noiseStrength, noiseScale, noiseSeed };
+      const tileData = blendTilePixels(tileIdx, isWang, imgAData, imgBData, params);
       cleanCtx.putImageData(tileData, col * tileSize, row * tileSize);
     }
 
@@ -338,7 +342,7 @@ export default function App() {
         ctx.stroke();
       }
     }
-  }, [isWang, tileSize, showGrid, imgAData, imgBData, smoothness, easing]);
+  }, [isWang, tileSize, showGrid, imgAData, imgBData, smoothness, easing, maskStyle, pixelSteps, noiseStrength, noiseScale, noiseSeed]);
 
   // Re-draw playground
   useEffect(() => {
@@ -399,7 +403,7 @@ export default function App() {
         ctx.stroke();
       }
     }
-  }, [wangVertices, isWang, tileSize, showGrid, imgAData, imgBData, smoothness, easing]);
+  }, [wangVertices, isWang, tileSize, showGrid, imgAData, imgBData, smoothness, easing, maskStyle]);
 
   // Painting interaction logic
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -438,6 +442,36 @@ export default function App() {
   };
 
   const handleMouseUp = () => {
+    setIsDrawing(false);
+  };
+
+  const getCanvasPoint = (canvas: HTMLCanvasElement, clientX: number, clientY: number) => {
+    const rect = canvas.getBoundingClientRect();
+    return {
+      x: (clientX - rect.left) * (canvas.width / rect.width),
+      y: (clientY - rect.top) * (canvas.height / rect.height),
+    };
+  };
+
+  const handleTouchStart = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    if (!e.touches[0]) return;
+    const canvas = playgroundCanvasRef.current;
+    if (!canvas) return;
+    const { x, y } = getCanvasPoint(canvas, e.touches[0].clientX, e.touches[0].clientY);
+    setDrawVal(touchPaintVal);
+    setIsDrawing(true);
+    paintPixel(x, y, touchPaintVal);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    if (!isDrawing || !e.touches[0]) return;
+    const canvas = playgroundCanvasRef.current;
+    if (!canvas) return;
+    const { x, y } = getCanvasPoint(canvas, e.touches[0].clientX, e.touches[0].clientY);
+    paintPixel(x, y, drawVal);
+  };
+
+  const handleTouchEnd = () => {
     setIsDrawing(false);
   };
 
@@ -616,6 +650,89 @@ export default function App() {
 
               <div className="slider-group" style={{ marginTop: '4px' }}>
                 <div className="slider-header" style={{ marginBottom: '6px' }}>
+                  <span className="slider-name">{t.maskStyle}</span>
+                </div>
+                <select
+                  className="text-input"
+                  value={maskStyle}
+                  onChange={(e) => setMaskStyle(e.target.value as MaskStyle)}
+                >
+                  <option value="linear">{lang === 'zh' ? 'Linear 线性（默认）' : 'Linear (Default)'}</option>
+                  <option value="arc">{lang === 'zh' ? 'Arc 圆弧' : 'Arc (Rounded)'}</option>
+                  <option value="pixel">{lang === 'zh' ? 'Pixel 锯齿' : 'Pixel (Stepped)'}</option>
+                </select>
+              </div>
+
+              {maskStyle === 'pixel' && (
+                <div className="slider-group" style={{ marginTop: '4px' }}>
+                  <div className="slider-header">
+                    <span className="slider-name">{lang === 'zh' ? '锯齿台阶数' : 'Pixel Steps'}</span>
+                    <span className="slider-val">{pixelSteps}</span>
+                  </div>
+                  <input
+                    type="range"
+                    className="slider"
+                    min={2} max={16} step={2}
+                    value={pixelSteps}
+                    onChange={(e) => setPixelSteps(parseInt(e.target.value))}
+                  />
+                </div>
+              )}
+
+              <div className="slider-group" style={{ marginTop: '4px' }}>
+                <div className="slider-header">
+                  <span className="slider-name">{t.noiseStrength}</span>
+                  <span className="slider-val">{noiseStrength.toFixed(2)}</span>
+                </div>
+                <input
+                  type="range"
+                  className="slider"
+                  min={0} max={1} step={0.05}
+                  value={noiseStrength}
+                  onChange={(e) => setNoiseStrength(parseFloat(e.target.value))}
+                />
+              </div>
+
+              {noiseStrength > 0 && (<>
+                <div className="slider-group" style={{ marginTop: '4px' }}>
+                  <div className="slider-header">
+                    <span className="slider-name">{t.noiseScale}</span>
+                    <span className="slider-val">{noiseScale}</span>
+                  </div>
+                  <input
+                    type="range"
+                    className="slider"
+                    min={1} max={20} step={1}
+                    value={noiseScale}
+                    onChange={(e) => setNoiseScale(parseInt(e.target.value))}
+                  />
+                </div>
+
+                <div className="slider-group" style={{ marginTop: '4px' }}>
+                  <div className="slider-header" style={{ marginBottom: '6px' }}>
+                    <span className="slider-name">{t.noiseSeed}</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                    <input
+                      type="number"
+                      className="text-input"
+                      style={{ flex: 1 }}
+                      min={0} max={99999}
+                      value={noiseSeed}
+                      onChange={(e) => setNoiseSeed(parseInt(e.target.value) || 0)}
+                    />
+                    <button
+                      className="btn-action btn-secondary"
+                      style={{ padding: '4px 10px', fontSize: '14px' }}
+                      onClick={() => setNoiseSeed(Math.floor(Math.random() * 99999))}
+                      title={lang === 'zh' ? '随机种子' : 'Randomize seed'}
+                    >🎲</button>
+                  </div>
+                </div>
+              </>)}
+
+              <div className="slider-group" style={{ marginTop: '4px' }}>
+                <div className="slider-header" style={{ marginBottom: '6px' }}>
                   <span className="slider-name">{t.tileSize}</span>
                   <span className="slider-val">{tileSize} px</span>
                 </div>
@@ -675,27 +792,48 @@ export default function App() {
 
           {/* Interactive Playground Painter */}
           <section className="panel-card playground-panel">
-            <h2 className="panel-title">{t.playgroundTitle}</h2>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '16px' }}>
+              <h2 className="panel-title" style={{ margin: 0 }}>{t.playgroundTitle}</h2>
+              <div className="scale-selector">
+                <span className="scale-label" style={{ fontSize: '11px', color: 'var(--muted)', fontWeight: 600 }}>SCALE:</span>
+                <div className="scale-tabs">
+                  {[1, 2, 3, 4, 6, 8].map((s) => (
+                    <button key={s} className={`scale-tab-btn ${playgroundZoom === s ? 'active' : ''}`} onClick={() => setPlaygroundZoom(s)}>{s}x</button>
+                  ))}
+                </div>
+              </div>
+            </div>
             <p className="playground-tip">
               <span className="tip-badge">Tip</span>
               {t.playgroundTip}
             </p>
             <div className="playground-canvas-wrapper">
-              <canvas 
-                ref={playgroundCanvasRef} 
+              <canvas
+                ref={playgroundCanvasRef}
                 className="playground-canvas"
                 onMouseDown={handleMouseDown}
                 onMouseMove={handleMouseMove}
                 onMouseUp={handleMouseUp}
                 onMouseLeave={handleMouseUp}
                 onContextMenu={(e) => e.preventDefault()}
+                onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleTouchEnd}
                 style={{
-                  width: `${COLS * tileSize * zoom}px`,
-                  height: `${ROWS * tileSize * zoom}px`
+                  width: `${COLS * tileSize * playgroundZoom}px`,
+                  height: `${ROWS * tileSize * playgroundZoom}px`,
+                  touchAction: 'none',
                 }}
               />
             </div>
             <div className="action-bar" style={{ marginTop: '16px' }}>
+              <button
+                className={`btn-action ${touchPaintVal === 1 ? '' : 'btn-secondary'}`}
+                onClick={() => setTouchPaintVal(v => v === 1 ? 0 : 1)}
+                title={lang === 'zh' ? '触摸绘制模式（鼠标右键也可直接涂 B）' : 'Touch paint mode (right-click also paints B on desktop)'}
+              >
+                {touchPaintVal === 1 ? `✏️ ${lang === 'zh' ? '涂 A' : 'Paint A'}` : `✏️ ${lang === 'zh' ? '涂 B' : 'Paint B'}`}
+              </button>
               <button className="btn-action btn-secondary" onClick={clearPlayground}>
                 🗑️ {t.clearPlayground}
               </button>
