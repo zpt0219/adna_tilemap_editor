@@ -1,15 +1,15 @@
-# Piskel Codebase Analysis & Pixel Editor Solution
+# Implementation Plan & Piskel Analysis - Standalone React Pixel Editor
 
-This document analyzes the open-source [Piskel](https://github.com/piskelapp/piskel) repository and provides integration solutions for building a simple image editor (similar to Aseprite) that supports layered drawing and pixel editing tools but **excludes all animation and timeline capabilities**.
+This unified document contains the codebase analysis of [Piskel](https://github.com/piskelapp/piskel), scoping decisions, and the technical implementation plan for building a lightweight, single-frame pixel editor (similar to Aseprite) as a standalone sub-project in React + TypeScript.
 
 ---
 
-## 1. Piskel Codebase Architecture
+## 1. Piskel Codebase Architecture Analysis
 
-Piskel is a single-page web application written in ES5/ES6 JavaScript. It relies on a legacy front-end stack and is built using **Grunt**. 
+Piskel is a legacy single-page web app built on ES5/ES6, jQuery, Bootstrap 2, and Grunt. Its core design separates data models, UI controllers, and paint tools.
 
 ### 1.1 Core Data Model (`src/js/model/`)
-Piskel's data model is organized hierarchically:
+Piskel's internal project data is structured hierarchically:
 
 ```mermaid
 classDiagram
@@ -39,114 +39,146 @@ classDiagram
     Layer "1" *-- "*" Frame
 ```
 
-*   **`Piskel.js`**: The root model representing a project. It manages the metadata (name, dimensions, fps) and maintains an ordered list of `Layer` instances.
-*   **`Layer.js`**: Represents an editor layer. Each layer manages its opacity, name, and an ordered list of `Frame` instances (corresponding to the animation timeline).
-*   **`Frame.js`**: Holds the actual pixel data (as a 1D pixel buffer or canvas context) and width/height dimensions. It provides low-level pixel manipulation methods (`getPixel`, `setPixel`, `clear`, etc.).
+*   **`Piskel.js`**: Top-level project container holding project metadata (name, description, canvas dimensions) and an array of layers.
+*   **`Layer.js`**: Manages a single canvas layer (opacity, name, blending visibility) and holds an array of `Frame` objects representing the animation timeline.
+*   **`Frame.js`**: Represents a single 2D grid of pixels. It wraps a raw pixel buffer (Uint32Array or a canvas 2D context) and provides basic pixel manipulation methods (`getPixel`, `setPixel`, `clear`, etc.).
 
 ### 1.2 Core UI Controllers (`src/js/controller/`)
-*   **`PiskelController.js`**: The central controller coordinating the active layer, active frame, and active tool.
-*   **`DrawingController.js`**: Listens to mouse/pointer events on the drawing canvas, calculates coordinates relative to the viewport/zoom, and forwards drawing actions to the active tool.
-*   **`HistoryService.js`**: Manages the undo/redo stack. It saves serialized snapshots (checkpoints) of the layers and frames to revert or restore states.
-*   **`CanvasController.js`**: Configures the main editor canvas, grid overlays, and handles zoom/pan actions.
+*   **`PiskelController.js`**: Core controller managing active layer, active frame, active tool, and project properties.
+*   **`DrawingController.js`**: Captures pointer events (click, drag, release) on the drawing canvas, translates screen coordinates to pixel grid indices based on camera scale/zoom, and forwards actions to the active tool.
+*   **`HistoryService.js`**: The undo/redo manager. It periodically creates serialized state checkpoints (snapshots) of all layers and frames, allowing the user to step backwards or forwards.
+*   **`CanvasController.js`**: Manages the main workspace viewport layout, canvas grids, and user viewport interactions (such as mouse-wheel zoom).
 
 ### 1.3 Tool System (`src/js/tools/`)
-*   **`BaseTool.js`**: Abstract parent class defining the lifecycle of a drawing operation (`mouseup`, `mousedown`, `mousemove`).
-*   **Subclass Tools**: Individual files in `src/js/tools/` implement specific operations:
-    *   `SimplePen.js`: Basic drawing with selected brush size.
-    *   `Eraser.js`: Sets matching pixels to transparent.
-    *   `PaintBucket.js`: Flood-fills contiguous pixels of the same color.
-    *   `Stroke.js`: Draws straight lines.
-    *   `Rectangle.js`/`Circle.js`: Renders shapes.
-    *   `ColorPicker.js`: Picks colors from the canvas.
-    *   `Move.js`: Pans the canvas content.
+*   **`BaseTool.js`**: The abstract base class defining pointer event lifecycle callbacks (`mousedown`, `mousemove`, `mouseup`).
+*   **Tool Subclasses**:
+    *   `SimplePen.js`: Basic pixel drawing with adjustable brush sizes.
+    *   `Eraser.js`: Sets matching pixel coordinates to transparent.
+    *   `PaintBucket.js`: Performs flood-fills using contiguous matching color checks.
+    *   `Stroke.js`: Draws lines using vector paths.
+    *   `Rectangle.js` / `Circle.js`: Generates shapes on mouse release.
+    *   `ColorPicker.js`: Queries the color value under the cursor.
 
 ---
 
-## 2. Animation vs. Image Editor Scope
+## 2. Scoping Decoupled Image Editor
 
-To convert Piskel into a pure **image editor (no animation)**, we need to address two aspects: **UI Presentation** and **Data Model Restrictions**.
+To transform Piskel's editing philosophy into a pure **image editor (no animation)**, the following scoping constraints are applied:
 
 | Feature in Piskel | Action Required for Image-Only Editor |
 | :--- | :--- |
-| **Frames list (Left sidebar)** | Remove or hide entirely. The project must enforce exactly `FrameCount = 1`. |
-| **Preview panel (Right sidebar)** | Remove. The loop animation playback is redundant for a single static image. |
+| **Frames list (Left sidebar)** | Remove/hide. The data model is clamped to exactly `FrameCount = 1` across all layers. |
+| **Preview panel (Right sidebar)** | Remove. Loop animation playback of frames is redundant. |
 | **FPS slider / Onion skinning** | Remove. |
-| **Layers panel (Right sidebar)** | Keep. Multi-layer drawing is useful for Aseprite-like editing. |
+| **Layers panel (Right sidebar)** | Keep. Multi-layer drawing is highly useful for static art composition. |
 | **Drawing canvas (Center)** | Keep. This is the main editing viewport. |
-| **Export functions** | Disable Animated GIF and Zip sheet exports. Restrict exports to PNG/PNG spritesheets or custom JSON configurations. |
+| **Export functions** | Disable Animated GIF and Zip sheet exports. Support PNG and local project JSON saving only. |
 
 ---
 
-## 3. Implementation Solutions
+## 3. Option B Technical Implementation Plan
 
-Since the user workspace uses a modern stack (**Vite + React + TypeScript** in `reroll/`, `refiner/`, and `tagger/`), we have two primary approaches:
+This section details how the lightweight React pixel editor will be built as a standalone Vite sub-project named `pixel_editor/` in the workspace root.
 
-### Solution A: Embedding & Customizing Piskel (Legacy Approach)
-This approach involves bringing the Piskel codebase into your workspace as static assets and modifying its entry point to run as a single-frame editor.
-
-#### Steps:
-1.  Clone Piskel into a static asset directory (e.g., `public/piskel/`).
-2.  Modify the build or edit the source directly to disable/hide the animation modules:
-    *   **Hide via CSS**: Add styling in `piskel.css` to hide `.preview-container` (preview window) and `.timeline-container` (left-hand frame list).
-    *   **Disable Frame Operations**: In `PiskelController.js`, clamp frame counts to `1` and disable the shortcut keys for adding/duplicating frames (`Alt+N`, etc.).
-3.  Implement communication via `window.postMessage()` (similar to `piskel-embed`) to load initial images into the editor and save edited canvases.
-
-#### Pros & Cons:
-*   👍 **Pros**: You get Piskel's extensive toolset (dithering, shading, advanced selections) out of the box with minimal custom canvas code.
-*   👎 **Cons**:
-    *   **Tech Stack Bloat**: Piskel relies on jQuery, Bootstrap 2, spectrum color picker, and custom AMD module structures. It's difficult to bundle inside modern Vite projects.
-    *   **Performance Overhead**: Large bundle sizes (~1.5MB of legacy scripts).
-    *   **UI Mismatch**: It doesn't match the modern CSS/layout style of your React apps.
-
----
-
-### Solution B: Building a Lightweight React Pixel Editor (Recommended)
-Given that you have already built a highly performant **Vite + React + Canvas 2D** rendering engine in the `reroll/` module (with pan, zoom, drawing overlays, and an active undo/redo stack in `commands.ts`), building a native React pixel editor component is the cleanest and most maintainable path.
-
-```mermaid
-graph TD
-    App[React Editor Container] --> Toolbar[Toolbar: Pen, Bucket, Eraser]
-    App --> ColorPicker[HSL Color Picker]
-    App --> LayerPanel[Layers Manager: Add, Reorder, Opacity]
-    App --> CanvasView[CanvasViewport: Render offscreen frame to screen]
-    CanvasView --> OffscreenCanvas[Layer 1 Canvas + Layer 2 Canvas]
+### 3.1 Directory Structure
+```
+pixel_editor/
+├── package.json            # Vite dependencies (React, TS, Vite)
+├── tsconfig.json           # Compiler rules
+├── vite.config.ts          # Vite asset pipeline configuration
+├── index.html              # HTML entry point wrapper
+└── src/
+    ├── main.tsx            # Main application mounting script
+    ├── types.ts            # TypeScript interfaces (Layer, Tool, EditorState)
+    ├── PixelEditor.tsx     # Root container, Toolbar, Layer List, Color Palette
+    ├── CanvasView.tsx      # Interactive Canvas Viewport (Draw, Zoom, Pan)
+    ├── styles.css          # Styling stylesheet using CSS variables
+    └── utils/
+        ├── floodFill.ts    # Fast queue-based flood fill algorithm
+        ├── drawHelpers.ts  # Line (Bresenham's), Rect, Circle calculations
+        └── history.ts      # State history manager for undo/redo
 ```
 
-#### Core Components to Implement:
+### 3.2 Types & Models (`pixel_editor/src/types.ts`)
+We will store layer states as standard browser `ImageData` in memory for easy cloning:
+```typescript
+export interface Layer {
+  id: string;
+  name: string;
+  visible: boolean;
+  opacity: number;      // 0.0 to 1.0
+  pixels: ImageData;    // Raw RGBA pixel buffers
+}
 
-1.  **Canvas State**:
-    ```typescript
-    interface LayerData {
-      id: string;
-      name: string;
-      visible: boolean;
-      opacity: number;
-      canvas: HTMLCanvasElement; // Holds the actual pixel data
-    }
-    ```
-2.  **Drawing Tools (Base Pattern)**:
-    Create a tool dispatcher that receives `(ctx, x, y, color, size)` from pointer events:
-    *   **Pen**: `ctx.fillStyle = color; ctx.fillRect(x - halfSize, y - halfSize, size, size)`
-    *   **Eraser**: `ctx.clearRect(x - halfSize, y - halfSize, size, size)`
-    *   **Flood Fill**: Implement a simple queue-based flood fill (flood-fill algorithm) using `ctx.getImageData()` and `ctx.putImageData()`.
-3.  **Viewport Pan/Zoom**:
-    Reuse the exact pan/zoom logic from your `CanvasView.tsx` component in `reroll/`.
-4.  **Undo/Redo**:
-    Store a stack of historical image buffers or use a command pattern to redraw changed bounding boxes.
+export type ToolType = 'pen' | 'eraser' | 'bucket' | 'line' | 'rect' | 'circle' | 'picker';
 
-#### Pros & Cons:
-*   👍 **Pros**:
-    *   **Zero Bloat**: Built directly inside React, compiling in milliseconds, with no legacy dependencies.
-    *   **Consistency**: Fits seamlessly with your existing UI tokens, styling systems, and components.
-    *   **Maintainable**: Pure TypeScript, easily debuggable, and integrated directly into the workspace.
-*   👎 **Cons**:
-    *   Requires writing the flood-fill and line/rectangle drawing helper functions manually (approx. 150 lines of clean canvas utility functions).
+export interface Point {
+  x: number;
+  y: number;
+}
+```
+
+### 3.3 Main Editor UI Layout (`pixel_editor/src/PixelEditor.tsx`)
+A modern, dark-themed pixel editor layout:
+- **Dimension Settings**: Allows the user to select from preset sizes (16x16, 32x32, 64x64, 128x128) or input custom sizes, clamped to a maximum ceiling of **256x256**.
+- **Left Panel (Toolbar)**: Tool selectors (Pen, Eraser, Fill, Shapes) and Brush size selector.
+- **Center Canvas**: Interactive pan/zoom workspace.
+- **Right Panel (Layers & Colors)**:
+  - Color swatches, active primary/secondary color, hex input.
+  - Layer manager: list layers, adjust layer opacity, toggle visibility, and drag-and-drop layer reordering.
+- **Top Actions Panel**: Undo, Redo, Grid toggle, Export PNG.
+
+### 3.4 Canvas Viewport & Drawing Logic (`pixel_editor/src/CanvasView.tsx`)
+- **Rendering Stack**: Composites all visible layers from bottom to top onto a single offscreen canvas based on layer opacities.
+- **Transformations**: Applies translate and scale transform rules to map the composited canvas to the center of the viewport. Supports wheel zoom and middle-drag/space-drag panning.
+- **Stroke Commit**: Coordinates are mapped from screen spaces `(clientX, clientY)` to grid cells `(px, py)`. Points are interpolated using Bresenham's line algorithm during mouse drag so fast movement does not cause dotted lines. On mouse release, changes are pushed onto the history stack.
+
+### 3.5 Helper Algorithms (`pixel_editor/src/utils/`)
+- **`floodFill.ts`**: Queue-based iterative flood-fill algorithm directly modifying `ImageData.data` (Uint8ClampedArray) to prevent browser stack overflow.
+- **`drawHelpers.ts`**: Implements line rendering, circle bounds, and solid/outline rectangles.
+- **`history.ts`**: Deep-clones the list of layer `ImageData` objects on each committed operation, storing them in memory-bounded undo/redo stacks.
 
 ---
 
-## 4. Summary & Recommendation
+## 4. Proposed Workspace Integration Changes
 
-For a clean, lightweight image modification feature, **Solution B (Custom React Editor)** is highly recommended. 
-It capitalizes on the Canvas 2D expertise already present in your project (`reroll/` and `tagger/`) and provides a modern, fast, and native editing experience without dealing with Piskel's legacy build processes.
+### 4.1 [MODIFY] [index.html](file:///d:/godot_exe/adna_tilemap_editor/server/index.html)
+Add a fifth entry card for the **Pixel Editor**:
+```html
+<a class="card" href="/pixel_editor/">
+  <div class="ico">🎨</div>
+  <h2>Pixel Editor</h2>
+  <p id="card5-desc">轻量级像素画编辑器，支持多图层编辑、网格绘制、橡皮擦与油漆桶，导出透明 PNG。</p>
+  <div class="go" id="card5-go">打开应用 →</div>
+</a>
+```
+Add corresponding translations for ID `card5-desc` and `card5-go` (Chinese and English) in the `TRANSLATIONS` script object inside [server/index.html](file:///d:/godot_exe/adna_tilemap_editor/server/index.html).
 
-However, if you want a complete, ready-made toolbar containing advanced features like dithering, rotation, and color replacements immediately, **Solution A** can be achieved by integrating a customized Piskel build via an `iframe`.
+### 4.2 [MODIFY] [deploy.sh](file:///d:/godot_exe/adna_tilemap_editor/server/deploy.sh)
+Modify the deploy script to build and publish the new `pixel_editor` sub-project:
+```bash
+echo "==> building pixel_editor"
+( cd "$REPO/pixel_editor" && npm ci && npm run build )
+
+# Add copy step:
+sudo mkdir -p ... "$WEBROOT/pixel_editor"
+sudo rsync -a --delete "$REPO/pixel_editor/dist/" "$WEBROOT/pixel_editor/"
+```
+
+---
+
+## 5. Verification Plan
+
+### Automated Tests
+* Create unit tests under `pixel_editor/src/__tests__/` to verify:
+  - Bresenham's algorithm correctness.
+  - Flood fill bounds limits and replacement logic.
+  - History undo/redo state stack consistency.
+
+### Manual Verification
+1. Open the main portal page in the browser, check for the new entry card, and verify English/Chinese translations.
+2. Click the card, open `/pixel_editor/`, select a dimension (e.g. 32x32), and paint continuous lines with the pen tool.
+3. Add multiple layers, verify transparency overlays, adjust visibility and opacity, and check drawing depth order.
+4. Zoom and pan the canvas to ensure responsive rendering.
+5. Verify Undo/Redo commands using keyboard shortcuts (`Ctrl+Z`, `Ctrl+Y`).
+6. Click "Export PNG" and check if the resulting file preserves layers, canvas resolution, and transparency.
