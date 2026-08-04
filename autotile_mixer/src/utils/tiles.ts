@@ -1,4 +1,5 @@
-import { sampleNoise2D } from '@lib/noise';
+import { sampleNoise2D, sampleNoise2DTileable, FNL_FREQUENCY } from '@lib/noise';
+import { blobWeightAt, BLOB47_BACKGROUND } from './blob47';
 
 export type MaskStyle = 'linear' | 'arc' | 'pixel';
 
@@ -11,6 +12,13 @@ export interface RenderParams {
   noiseStrength?: number;
   noiseScale?: number;
   noiseSeed?: number;
+  /** Wrap the noise lattice to tileSize instead of fading it out at the tile
+   *  edges. Required for blob47, whose boundaries sit on the border (§6.1). */
+  noiseTileable?: boolean;
+  /** blob47 only: transition band width in cell units (0 < r < 1). */
+  blobRadius?: number;
+  /** blob47 only: smooth-min k for outer corners. Defaults from maskStyle. */
+  cornerRounding?: number;
 }
 
 export const EASING_FUNCTIONS: Record<string, (t: number) => number> = {
@@ -96,6 +104,47 @@ const BLOB_CORNERS: [number, number, number, number][] = [
 // ===========================================================================
 // Pixel-level tile blending
 // ===========================================================================
+export type TileWeightFn = (tx: number, ty: number) => number;
+
+/** Weight sampler for the corner models (Wang 16 and blob 13+1 — both dual-grid). */
+function cornerWeightFn(tileIndex: number, isWang: boolean, params: RenderParams): TileWeightFn {
+  const { tileSize, maskStyle = 'linear', pixelSteps } = params;
+  const corners = isWang
+    ? getWangCorners(tileIndex)
+    : BLOB_CORNERS[tileIndex] ?? ([0, 0, 0, 0] as [number, number, number, number]);
+  const resolvedPixelSteps = pixelSteps ?? Math.max(2, Math.floor(tileSize / 8));
+
+  return (tx, ty) =>
+    maskStyle === 'arc'   ? calculateArcWeight(tx, ty, corners) :
+    maskStyle === 'pixel' ? calculatePixelWeight(tx, ty, corners, resolvedPixelSteps) :
+                            calculateWangBaseWeight(tx, ty, corners);
+}
+
+/**
+ * Weight sampler for blob47 — cell-based, boundaries on the cell borders.
+ * maskStyle is reused: 'linear' = sharp outer corners, 'arc' = rounded outer
+ * corners, 'pixel' = quantized coordinates. See docs/AUTOTILE_SCHEMES.md §6.3.
+ */
+function blob47WeightFn(mask: number, params: RenderParams): TileWeightFn {
+  const { tileSize, maskStyle = 'linear', pixelSteps, blobRadius = 0.5 } = params;
+  if (mask === BLOB47_BACKGROUND) return () => 0;
+
+  const radius = Math.max(0.05, Math.min(0.95, blobRadius));
+  const cornerRounding = params.cornerRounding ?? (maskStyle === 'arc' ? radius : 0);
+  const fieldParams = { radius, cornerRounding };
+
+  if (maskStyle !== 'pixel') {
+    return (tx, ty) => blobWeightAt(tx, ty, mask, fieldParams);
+  }
+
+  const steps = pixelSteps ?? Math.max(2, Math.floor(tileSize / 8));
+  return (tx, ty) => {
+    const qtx = Math.min(1, (Math.floor(tx * steps) + 0.5) / steps);
+    const qty = Math.min(1, (Math.floor(ty * steps) + 0.5) / steps);
+    return blobWeightAt(qtx, qty, mask, fieldParams);
+  };
+}
+
 export function blendTilePixels(
   tileIndex: number,
   isWang: boolean,
@@ -103,9 +152,28 @@ export function blendTilePixels(
   imgBData: ImageData | null,
   params: RenderParams
 ): ImageData {
+  return blendTileWithWeight(cornerWeightFn(tileIndex, isWang, params), imgAData, imgBData, params);
+}
+
+/** Render one blob47 sheet slot. `mask` is a canonical mask, or BLOB47_BACKGROUND. */
+export function blendBlob47TilePixels(
+  mask: number,
+  imgAData: ImageData | null,
+  imgBData: ImageData | null,
+  params: RenderParams
+): ImageData {
+  return blendTileWithWeight(blob47WeightFn(mask, params), imgAData, imgBData, params);
+}
+
+export function blendTileWithWeight(
+  weightAt: TileWeightFn,
+  imgAData: ImageData | null,
+  imgBData: ImageData | null,
+  params: RenderParams
+): ImageData {
   const {
-    tileSize, smoothness, easing, maskStyle = 'linear', pixelSteps,
-    noiseStrength = 0, noiseScale = 5, noiseSeed = 0,
+    tileSize, smoothness, easing,
+    noiseStrength = 0, noiseScale = 5, noiseSeed = 0, noiseTileable = false,
   } = params;
 
   const outData = new ImageData(tileSize, tileSize);
@@ -123,9 +191,6 @@ export function blendTilePixels(
     };
   };
 
-  const corners = isWang ? getWangCorners(tileIndex) : BLOB_CORNERS[tileIndex] ?? [0, 0, 0, 0] as [number, number, number, number];
-
-  const resolvedPixelSteps = pixelSteps ?? Math.max(2, Math.floor(tileSize / 8));
   const applyNoise = noiseStrength > 0;
 
   for (let y = 0; y < tileSize; y++) {
@@ -134,10 +199,7 @@ export function blendTilePixels(
       const tx = x / (tileSize - 1);
       const ty = y / (tileSize - 1);
 
-      const weight =
-        maskStyle === 'arc'   ? calculateArcWeight(tx, ty, corners) :
-        maskStyle === 'pixel' ? calculatePixelWeight(tx, ty, corners, resolvedPixelSteps) :
-                                calculateWangBaseWeight(tx, ty, corners);
+      const weight = weightAt(tx, ty);
 
       // Soft transition factor (grassRatio)
       let grassRatio = 0.5;
@@ -151,12 +213,28 @@ export function blendTilePixels(
         grassRatio = easeFunc(t);
       }
 
-      // Edge noise perturbation — only active at the boundary band, fades to 0 at tile edges
+      // Edge noise perturbation — only active at the boundary band.
       if (applyNoise) {
-        const noiseVal = sampleNoise2D(noiseSeed, x * noiseScale, y * noiseScale);
-        const centeredNoise = noiseVal * 2 - 1;                       // [-1, 1]
+        let noiseVal: number;
+        let edgeFade: number;
+        if (noiseTileable) {
+          // Period-wrapped noise. Seams stay continuous because adjacent
+          // placements show the same periodic pattern, so the jitter survives
+          // at the tile border — which is exactly where blob47's boundaries
+          // sit, and where the fade-out below would erase it (§6.1).
+          const period = Math.max(1, Math.round(tileSize * noiseScale * FNL_FREQUENCY));
+          noiseVal = sampleNoise2DTileable(
+            noiseSeed, (x / tileSize) * period, (y / tileSize) * period, period, period
+          );
+          edgeFade = 1;
+        } else {
+          // Corner models put boundaries through the tile interior, so fading
+          // the noise out at the tile edges keeps seams clean for free.
+          noiseVal = sampleNoise2D(noiseSeed, x * noiseScale, y * noiseScale);
+          edgeFade = Math.sin(tx * Math.PI) * Math.sin(ty * Math.PI);
+        }
+        const centeredNoise = noiseVal * 2 - 1;                      // [-1, 1]
         const boundaryWeight = grassRatio * (1 - grassRatio) * 4;    // peaks at alpha=0.5
-        const edgeFade = Math.sin(tx * Math.PI) * Math.sin(ty * Math.PI); // 0 at tile edges
         grassRatio = Math.max(0, Math.min(1,
           grassRatio + centeredNoise * boundaryWeight * edgeFade * noiseStrength
         ));

@@ -1,7 +1,9 @@
 // FastNoiseLite Perlin 2D — extracted from reroll/src/terrainNoise.ts
 // perlin2() applies FNL_FREQUENCY=0.01 internally; pass scaled world coordinates.
 
-const FNL_FREQUENCY = 0.01;
+/** Frequency perlin2()/sampleNoise2D() apply internally. Exported so callers that
+ *  need to derive a matching lattice period (see perlin2Tileable) stay in sync. */
+export const FNL_FREQUENCY = 0.01;
 const PRIME_X = 501125321;
 const PRIME_Y = 1136930381;
 const GRADIENTS_2D = new Float32Array([
@@ -87,4 +89,61 @@ export function perlin2(seed: number, x: number, y: number): number {
 /** perlin2 normalized to [0, 1]. */
 export function sampleNoise2D(seed: number, x: number, y: number): number {
   return Math.max(0, Math.min(1, (perlin2(seed, x, y) + 1) * 0.5));
+}
+
+function wrapLattice(v: number, period: number): number {
+  const m = v % period;
+  return m < 0 ? m + period : m;
+}
+
+/**
+ * Perlin over a wrapped lattice — the field repeats exactly every `periodX` /
+ * `periodY` units, so a tile sampled over [0, period) is seamless against itself.
+ *
+ * Unlike perlin2(), coordinates are **lattice units** and FNL_FREQUENCY is NOT
+ * applied — the caller owns the mapping so the period can land on whole lattice
+ * cells (a non-integer period cannot wrap). Periods are coerced to integers ≥ 1.
+ *
+ * Needed where a transition boundary sits on the tile border: fading noise out at
+ * the edges (the usual seam fix) would erase it exactly where it matters. See
+ * docs/AUTOTILE_SCHEMES.md §6.1.
+ */
+export function perlin2Tileable(
+  seed: number,
+  x: number,
+  y: number,
+  periodX: number,
+  periodY: number
+): number {
+  const px = Math.max(1, Math.round(periodX));
+  const py = Math.max(1, Math.round(periodY));
+
+  const x0 = Math.floor(x);
+  const y0 = Math.floor(y);
+  const xd0 = x - x0;
+  const yd0 = y - y0;
+  const xd1 = xd0 - 1;
+  const yd1 = yd0 - 1;
+  const xs = fade(xd0);
+  const ys = fade(yd0);
+
+  const x0p = Math.imul(wrapLattice(x0, px), PRIME_X);
+  const y0p = Math.imul(wrapLattice(y0, py), PRIME_Y);
+  const x1p = Math.imul(wrapLattice(x0 + 1, px), PRIME_X);
+  const y1p = Math.imul(wrapLattice(y0 + 1, py), PRIME_Y);
+
+  const xf0 = lerp(gradCoord2(seed, x0p, y0p, xd0, yd0), gradCoord2(seed, x1p, y0p, xd1, yd0), xs);
+  const xf1 = lerp(gradCoord2(seed, x0p, y1p, xd0, yd1), gradCoord2(seed, x1p, y1p, xd1, yd1), xs);
+  return lerp(xf0, xf1, ys) * 1.4247691104677813;
+}
+
+/** perlin2Tileable normalized to [0, 1]. */
+export function sampleNoise2DTileable(
+  seed: number,
+  x: number,
+  y: number,
+  periodX: number,
+  periodY: number
+): number {
+  return Math.max(0, Math.min(1, (perlin2Tileable(seed, x, y, periodX, periodY) + 1) * 0.5));
 }

@@ -1,7 +1,7 @@
 export const TRANSLATIONS = {
   zh: {
     title: "Terrain Autotile Previewer",
-    subtitle: "用于 2-Corner Wang (16 瓦片) 与 Blob (14 瓦片) 地形蒙版拼接预览器",
+    subtitle: "用于 2-Corner Wang (16 瓦片)、简化 Blob (14 瓦片) 与完整 Blob (47 瓦片) 地形蒙版拼接预览器",
     terrainA: "地形 A (前景 / 草地)",
     terrainB: "地形 B (背景 / 泥地)",
     dropzoneA: "拖拽地形 A 图片到此或点击上传",
@@ -12,6 +12,7 @@ export const TRANSLATIONS = {
     tilesetType: "图集类型与网格",
     wang16: "2-Corner Wang 图集 (16 瓦片)",
     blob14: "简化 Blob 地形 (13+1 瓦片)",
+    blob47: "完整 Blob 地形 (47 瓦片 · 6×8)",
     tileSize: "单瓦片大小",
     zoomFactor: "画布放大倍数 (像素对齐)",
     smoothness: "边缘渐变平滑度",
@@ -30,7 +31,7 @@ export const TRANSLATIONS = {
   },
   en: {
     title: "Terrain Autotile Previewer",
-    subtitle: "Previewer for 2-Corner Wang (16 tiles) and Blob (14 tiles) terrain mask layouts",
+    subtitle: "Previewer for 2-Corner Wang (16 tiles), simplified Blob (14 tiles) and full Blob (47 tiles) terrain mask layouts",
     terrainA: "Terrain A (Foreground / Grass)",
     terrainB: "Terrain B (Background / Dirt)",
     dropzoneA: "Drag & drop Terrain A here or click to upload",
@@ -41,6 +42,7 @@ export const TRANSLATIONS = {
     tilesetType: "Tileset Type & Grid",
     wang16: "2-Corner Wang Tileset (16 tiles)",
     blob14: "Simplified Blob Terrain (13+1 tiles)",
+    blob47: "Full Blob Terrain (47 tiles · 6x8)",
     tileSize: "Tile Size",
     zoomFactor: "Canvas Zoom (Pixel Aligned)",
     smoothness: "Border Gradient Smoothness",

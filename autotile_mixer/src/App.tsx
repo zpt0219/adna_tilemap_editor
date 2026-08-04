@@ -1,7 +1,18 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './App.css';
 import { TRANSLATIONS, type Lang } from './shared/i18n';
-import { blendTilePixels, type RenderParams, type MaskStyle, EASING_FUNCTIONS } from './utils/tiles';
+import {
+  blendTilePixels, blendBlob47TilePixels,
+  type RenderParams, type MaskStyle, EASING_FUNCTIONS,
+} from './utils/tiles';
+import {
+  BLOB47_LAYOUT, BLOB47_COLS, BLOB47_ROWS, BLOB47_BACKGROUND_SLOT, blobIndexForMask,
+  N as BIT_N, E as BIT_E, S as BIT_S, W as BIT_W,
+  NE as BIT_NE, SE as BIT_SE, SW as BIT_SW, NW as BIT_NW,
+} from './utils/blob47';
+
+/** Corner models paint vertices; blob47 paints cells. docs/AUTOTILE_SCHEMES.md */
+export type TilesetMode = 'wang' | 'blob14' | 'blob47';
 
 const COLS = 16;
 const ROWS = 10;
@@ -143,8 +154,12 @@ export default function App() {
 
   const t = TRANSLATIONS[lang];
 
-  // Tileset Type: true = Wang 16, false = Blob 14
-  const [isWang, setIsWang] = useState(true);
+  // Tileset model. 'wang' and 'blob14' are both corner (dual-grid) models and
+  // paint on vertices; 'blob47' is cell-based and paints on cells.
+  // See docs/AUTOTILE_SCHEMES.md.
+  const [mode, setMode] = useState<TilesetMode>('wang');
+  const isWang = mode === 'wang';
+  const isBlob47 = mode === 'blob47';
 
   // Textures state
   const [imgAData, setImgAData] = useState<ImageData | null>(null);
@@ -183,9 +198,13 @@ export default function App() {
   // Playground zoom (independent from tileset zoom)
   const [playgroundZoom, setPlaygroundZoom] = useState(2);
 
-  // Interactive playground state (both Wang & Blob share corner-based vertices)
+  // Interactive playground state. Corner models (Wang / blob14) live on the dual
+  // grid, so they store vertices; blob47 is cell-based and stores cells.
   const [wangVertices, setWangVertices] = useState<number[][]>(() =>
     Array(ROWS + 1).fill(null).map(() => Array(COLS + 1).fill(0))
+  );
+  const [blobCells, setBlobCells] = useState<number[][]>(() =>
+    Array(ROWS).fill(null).map(() => Array(COLS).fill(0))
   );
 
   const [isDrawing, setIsDrawing] = useState(false);
@@ -288,8 +307,8 @@ export default function App() {
     const canvas = tilesetCanvasRef.current;
     if (!canvas) return;
 
-    const cols = isWang ? 4 : 5;
-    const rows = isWang ? 4 : 3;
+    const cols = isBlob47 ? BLOB47_COLS : isWang ? 4 : 5;
+    const rows = isBlob47 ? BLOB47_ROWS : isWang ? 4 : 3;
 
     // Maintain an offscreen canvas with clean tileset pixels (without grid lines)
     if (!cleanSheetCanvasRef.current) {
@@ -303,16 +322,28 @@ export default function App() {
     if (!cleanCtx) return;
     cleanCtx.clearRect(0, 0, cleanCanvas.width, cleanCanvas.height);
 
-    const totalTiles = isWang ? 16 : 15;
+    const params: RenderParams = {
+      tileSize, smoothness, easing, maskStyle,
+      pixelSteps: maskStyle === 'pixel' ? pixelSteps : undefined,
+      noiseStrength, noiseScale, noiseSeed,
+      // blob47's boundaries sit on the tile border — the edge-fade the corner
+      // models rely on would erase the jitter exactly there (§6.1).
+      noiseTileable: isBlob47,
+    };
+
+    const totalTiles = isBlob47 ? BLOB47_LAYOUT.length : isWang ? 16 : 15;
     for (let i = 0; i < totalTiles; i++) {
       const col = i % cols;
       const row = Math.floor(i / cols);
-      const tileIdx = isWang ? WANG_LAYOUT[i] : BLOB_LAYOUT[i];
-      if (tileIdx === -1) {
-        continue;
+
+      let tileData: ImageData;
+      if (isBlob47) {
+        tileData = blendBlob47TilePixels(BLOB47_LAYOUT[i], imgAData, imgBData, params);
+      } else {
+        const tileIdx = isWang ? WANG_LAYOUT[i] : BLOB_LAYOUT[i];
+        if (tileIdx === -1) continue;
+        tileData = blendTilePixels(tileIdx, isWang, imgAData, imgBData, params);
       }
-      const params: RenderParams = { tileSize, smoothness, easing, maskStyle, pixelSteps: maskStyle === 'pixel' ? pixelSteps : undefined, noiseStrength, noiseScale, noiseSeed };
-      const tileData = blendTilePixels(tileIdx, isWang, imgAData, imgBData, params);
       cleanCtx.putImageData(tileData, col * tileSize, row * tileSize);
     }
 
@@ -342,7 +373,7 @@ export default function App() {
         ctx.stroke();
       }
     }
-  }, [isWang, tileSize, showGrid, imgAData, imgBData, smoothness, easing, maskStyle, pixelSteps, noiseStrength, noiseScale, noiseSeed]);
+  }, [mode, tileSize, showGrid, imgAData, imgBData, smoothness, easing, maskStyle, pixelSteps, noiseStrength, noiseScale, noiseSeed]);
 
   // Re-draw playground
   useEffect(() => {
@@ -356,14 +387,7 @@ export default function App() {
     canvas.height = ROWS * tileSize;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    const drawTileFromSheet = (tileIndex: number, destCol: number, destRow: number) => {
-      const sheetCols = isWang ? 4 : 5;
-      let sheetIndex = tileIndex;
-      if (isWang) {
-        sheetIndex = WANG_INVERSE_LAYOUT[tileIndex];
-      } else {
-        sheetIndex = BLOB_INVERSE_LAYOUT[tileIndex];
-      }
+    const drawSheetSlot = (sheetIndex: number, sheetCols: number, destCol: number, destRow: number) => {
       const srcCol = sheetIndex % sheetCols;
       const srcRow = Math.floor(sheetIndex / sheetCols);
       const sourceCanvas = cleanSheetCanvasRef.current || tilesetCanvasRef.current;
@@ -376,34 +400,76 @@ export default function App() {
       }
     };
 
-    // Both modes use corner-based (vertex) rendering
-    for (let r = 0; r < ROWS; r++) {
-      for (let c = 0; c < COLS; c++) {
-        const nw = wangVertices[r]?.[c] ?? 0;
-        const ne = wangVertices[r]?.[c + 1] ?? 0;
-        const se = wangVertices[r + 1]?.[c + 1] ?? 0;
-        const sw = wangVertices[r + 1]?.[c] ?? 0;
-        const wangTileIdx = (nw << 3) | (sw << 2) | (se << 1) | ne;
-        
-        const finalTileIdx = isWang ? wangTileIdx : WANG_TO_BLOB[wangTileIdx];
-        drawTileFromSheet(finalTileIdx, c, r);
+    if (isBlob47) {
+      // Cell-based: a cell's tile is decided by its 8 neighbours. Out of bounds
+      // counts as terrain B, so a painted region reads as an island.
+      const cellAt = (r: number, c: number) =>
+        r < 0 || c < 0 || r >= ROWS || c >= COLS ? 0 : blobCells[r]?.[c] ?? 0;
+
+      for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+          if (!cellAt(r, c)) {
+            drawSheetSlot(BLOB47_BACKGROUND_SLOT, BLOB47_COLS, c, r);
+            continue;
+          }
+          let mask = 0;
+          if (cellAt(r - 1, c)) mask |= BIT_N;
+          if (cellAt(r, c + 1)) mask |= BIT_E;
+          if (cellAt(r + 1, c)) mask |= BIT_S;
+          if (cellAt(r, c - 1)) mask |= BIT_W;
+          if (cellAt(r - 1, c + 1)) mask |= BIT_NE;
+          if (cellAt(r + 1, c + 1)) mask |= BIT_SE;
+          if (cellAt(r + 1, c - 1)) mask |= BIT_SW;
+          if (cellAt(r - 1, c - 1)) mask |= BIT_NW;
+          drawSheetSlot(blobIndexForMask(mask), BLOB47_COLS, c, r);
+        }
+      }
+    } else {
+      // Corner models: the tile comes from the 4 surrounding vertices.
+      const sheetCols = isWang ? 4 : 5;
+      for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+          const nw = wangVertices[r]?.[c] ?? 0;
+          const ne = wangVertices[r]?.[c + 1] ?? 0;
+          const se = wangVertices[r + 1]?.[c + 1] ?? 0;
+          const sw = wangVertices[r + 1]?.[c] ?? 0;
+          const wangTileIdx = (nw << 3) | (sw << 2) | (se << 1) | ne;
+
+          const finalTileIdx = isWang ? wangTileIdx : WANG_TO_BLOB[wangTileIdx];
+          const sheetIndex = isWang
+            ? WANG_INVERSE_LAYOUT[finalTileIdx]
+            : BLOB_INVERSE_LAYOUT[finalTileIdx];
+          drawSheetSlot(sheetIndex, sheetCols, c, r);
+        }
       }
     }
 
-    // Overlap vertices dots for painting guide
-    for (let r = 0; r <= ROWS; r++) {
-      for (let c = 0; c <= COLS; c++) {
-        const val = wangVertices[r]?.[c] ?? 0;
-        ctx.beginPath();
-        ctx.arc(c * tileSize, r * tileSize, 3.5, 0, Math.PI * 2);
-        ctx.fillStyle = val === 1 ? '#22c55e' : '#78350f';
-        ctx.strokeStyle = '#fff';
-        ctx.lineWidth = 1;
-        ctx.fill();
-        ctx.stroke();
+    // Painting guide dots — on vertices for the corner models, on cell centres
+    // for blob47, matching what a click actually toggles.
+    const dot = (cx: number, cy: number, val: number) => {
+      ctx.beginPath();
+      ctx.arc(cx, cy, 3.5, 0, Math.PI * 2);
+      ctx.fillStyle = val === 1 ? '#22c55e' : '#78350f';
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 1;
+      ctx.fill();
+      ctx.stroke();
+    };
+
+    if (isBlob47) {
+      for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+          dot((c + 0.5) * tileSize, (r + 0.5) * tileSize, blobCells[r]?.[c] ?? 0);
+        }
+      }
+    } else {
+      for (let r = 0; r <= ROWS; r++) {
+        for (let c = 0; c <= COLS; c++) {
+          dot(c * tileSize, r * tileSize, wangVertices[r]?.[c] ?? 0);
+        }
       }
     }
-  }, [wangVertices, isWang, tileSize, showGrid, imgAData, imgBData, smoothness, easing, maskStyle]);
+  }, [wangVertices, blobCells, mode, tileSize, showGrid, imgAData, imgBData, smoothness, easing, maskStyle]);
 
   // Painting interaction logic
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -476,7 +542,21 @@ export default function App() {
   };
 
   const paintPixel = (px: number, py: number, val: number) => {
-    // Both modes paint on vertices
+    if (isBlob47) {
+      // Cell-based model: a click toggles the cell it lands in.
+      const cx = Math.floor(px / tileSize);
+      const cy = Math.floor(py / tileSize);
+      if (cx < 0 || cx >= COLS || cy < 0 || cy >= ROWS) return;
+      setBlobCells(prev => {
+        if (prev[cy][cx] === val) return prev;
+        const next = prev.map(row => [...row]);
+        next[cy][cx] = val;
+        return next;
+      });
+      return;
+    }
+
+    // Corner models paint on vertices
     const vx = Math.round(px / tileSize);
     const vy = Math.round(py / tileSize);
     if (vx >= 0 && vx <= COLS && vy >= 0 && vy <= ROWS) {
@@ -490,13 +570,15 @@ export default function App() {
 
   const clearPlayground = () => {
     setWangVertices(Array(ROWS + 1).fill(null).map(() => Array(COLS + 1).fill(0)));
+    setBlobCells(Array(ROWS).fill(null).map(() => Array(COLS).fill(0)));
   };
 
   const downloadTileset = () => {
     const cleanCanvas = cleanSheetCanvasRef.current || tilesetCanvasRef.current;
     if (!cleanCanvas) return;
     const link = document.createElement('a');
-    link.download = `tileset_${isWang ? 'wang16' : 'blob14'}_${tileSize}px.png`;
+    const kind = mode === 'wang' ? 'wang16' : mode === 'blob14' ? 'blob14' : 'blob47';
+    link.download = `tileset_${kind}_${tileSize}px.png`;
     link.href = cleanCanvas.toDataURL();
     link.click();
   };
@@ -594,17 +676,23 @@ export default function App() {
           <section className="panel-card">
             <h2 className="panel-title">{t.tilesetType}</h2>
             <div className="type-tabs" style={{ marginBottom: '16px' }}>
-              <button 
-                className={`tab-btn ${isWang ? 'active' : ''}`}
-                onClick={() => setIsWang(true)}
+              <button
+                className={`tab-btn ${mode === 'wang' ? 'active' : ''}`}
+                onClick={() => setMode('wang')}
               >
                 {t.wang16}
               </button>
-              <button 
-                className={`tab-btn ${!isWang ? 'active' : ''}`}
-                onClick={() => setIsWang(false)}
+              <button
+                className={`tab-btn ${mode === 'blob14' ? 'active' : ''}`}
+                onClick={() => setMode('blob14')}
               >
                 {t.blob14}
+              </button>
+              <button
+                className={`tab-btn ${mode === 'blob47' ? 'active' : ''}`}
+                onClick={() => setMode('blob47')}
+              >
+                {t.blob47}
               </button>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -778,8 +866,8 @@ export default function App() {
                 ref={tilesetCanvasRef} 
                 className="tileset-canvas" 
                 style={{
-                  width: `${(isWang ? 4 : 5) * tileSize * zoom}px`,
-                  height: `${(isWang ? 4 : 3) * tileSize * zoom}px`
+                  width: `${(isBlob47 ? BLOB47_COLS : isWang ? 4 : 5) * tileSize * zoom}px`,
+                  height: `${(isBlob47 ? BLOB47_ROWS : isWang ? 4 : 3) * tileSize * zoom}px`
                 }}
               />
             </div>
