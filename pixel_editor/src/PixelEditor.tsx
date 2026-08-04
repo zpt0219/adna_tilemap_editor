@@ -57,17 +57,35 @@ export const PixelEditor: React.FC = () => {
   const [isResizeModalOpen, setIsResizeModalOpen] = useState<boolean>(false);
   const [resizeWidthInput, setResizeWidthInput] = useState<number>(32);
   const [resizeHeightInput, setResizeHeightInput] = useState<number>(32);
+  const importInputRef = useRef<HTMLInputElement | null>(null);
+  const dragDepthRef = useRef(0);
+  const [isDragOver, setIsDragOver] = useState<boolean>(false);
+
+  useEffect(() => {
+    const preventFileDrop = (e: DragEvent) => {
+      if (Array.from(e.dataTransfer?.types ?? []).includes("Files")) {
+        e.preventDefault();
+        if (e.type === "drop" || e.type === "dragend") {
+          dragDepthRef.current = 0;
+          setIsDragOver(false);
+        }
+      }
+    };
+
+    window.addEventListener("dragover", preventFileDrop);
+    window.addEventListener("drop", preventFileDrop);
+    window.addEventListener("dragend", preventFileDrop);
+    return () => {
+      window.removeEventListener("dragover", preventFileDrop);
+      window.removeEventListener("drop", preventFileDrop);
+      window.removeEventListener("dragend", preventFileDrop);
+    };
+  }, []);
 
   // Initialize first layer on mount
   useEffect(() => {
     const defaultLayerId = "layer-1";
-    const initialLayer: Layer = {
-      id: defaultLayerId,
-      name: "图层 1",
-      visible: true,
-      opacity: 1.0,
-      pixels: new ImageData(width, height),
-    };
+    const initialLayer = createBlankLayer(defaultLayerId, "图层 1", width, height);
     const initialLayers = [initialLayer];
     setLayers(initialLayers);
     setActiveLayerId(defaultLayerId);
@@ -99,6 +117,127 @@ export const PixelEditor: React.FC = () => {
       setActiveLayerId(next.activeLayerId);
       setHistoryVersion((v) => v + 1);
     }
+  };
+
+  const createBlankLayer = (id: string, name: string, w: number, h: number): Layer => ({
+    id,
+    name,
+    visible: true,
+    opacity: 1.0,
+    pixels: new ImageData(w, h),
+  });
+
+  const openImageAsProject = (imageData: ImageData, label: string) => {
+    const baseLayerId = "layer-1";
+    const editLayerId = "layer-2";
+    const baseLayer: Layer = {
+      id: baseLayerId,
+      name: `${label} · 原图`,
+      visible: true,
+      opacity: 1.0,
+      pixels: imageData,
+    };
+    const editLayer = createBlankLayer(editLayerId, "编辑层", imageData.width, imageData.height);
+    const nextLayers = [baseLayer, editLayer];
+
+    setWidth(imageData.width);
+    setHeight(imageData.height);
+    setLayers(nextLayers);
+    setActiveLayerId(editLayerId);
+    historyManager.current.init(nextLayers, editLayerId);
+    setHistoryVersion(0);
+  };
+
+  const readImageFile = async (file: File): Promise<ImageData> => {
+    const url = URL.createObjectURL(file);
+    try {
+      const img = new Image();
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = () => reject(new Error("图片加载失败"));
+        img.src = url;
+      });
+
+      const canvas = document.createElement("canvas");
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        throw new Error("无法创建图片解码缓冲区");
+      }
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0);
+      return ctx.getImageData(0, 0, canvas.width, canvas.height);
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  };
+
+  const handleImportClick = () => {
+    importInputRef.current?.click();
+  };
+
+  const handleImportImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      alert("请选择有效的图片文件。");
+      return;
+    }
+
+    try {
+      const imageData = await readImageFile(file);
+      openImageAsProject(imageData, file.name.replace(/\.[^.]+$/, "") || "导入图片");
+    } catch (err) {
+      console.error(err);
+      alert("图片导入失败，请确认文件格式是否受支持。");
+    }
+  };
+
+  const handleFilesDrop = async (files: FileList | null) => {
+    const file = Array.from(files ?? []).find((f) => f.type.startsWith("image/"));
+    if (!file) return;
+
+    try {
+      const imageData = await readImageFile(file);
+      openImageAsProject(imageData, file.name.replace(/\.[^.]+$/, "") || "导入图片");
+    } catch (err) {
+      console.error(err);
+      alert("图片导入失败，请确认文件格式是否受支持。");
+    }
+  };
+
+  const handleDragEnter = (e: React.DragEvent<HTMLDivElement>) => {
+    if (!Array.from(e.dataTransfer.types).includes("Files")) return;
+    e.preventDefault();
+    dragDepthRef.current += 1;
+    setIsDragOver(true);
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    if (!Array.from(e.dataTransfer.types).includes("Files")) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    if (!Array.from(e.dataTransfer.types).includes("Files")) return;
+    e.preventDefault();
+    dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
+    if (dragDepthRef.current === 0) {
+      setIsDragOver(false);
+    }
+  };
+
+  const handleDrop = async (e: React.DragEvent<HTMLDivElement>) => {
+    if (!Array.from(e.dataTransfer.types).includes("Files")) return;
+    e.preventDefault();
+    dragDepthRef.current = 0;
+    setIsDragOver(false);
+    await handleFilesDrop(e.dataTransfer.files);
   };
 
   // Keyboard Shortcuts
@@ -174,13 +313,7 @@ export const PixelEditor: React.FC = () => {
   // Layer Management actions
   const addLayer = () => {
     const newId = `layer-${Date.now()}`;
-    const newLayer: Layer = {
-      id: newId,
-      name: `图层 ${layers.length + 1}`,
-      visible: true,
-      opacity: 1.0,
-      pixels: new ImageData(width, height),
-    };
+    const newLayer = createBlankLayer(newId, `图层 ${layers.length + 1}`, width, height);
     const nextLayers = [...layers, newLayer];
     setLayers(nextLayers);
     setActiveLayerId(newId);
@@ -273,13 +406,7 @@ export const PixelEditor: React.FC = () => {
     if (mode === "clear") {
       // Clear all layers, create single active layer of new dimensions
       const defaultLayerId = "layer-1";
-      const initialLayer: Layer = {
-        id: defaultLayerId,
-        name: "图层 1",
-        visible: true,
-        opacity: 1.0,
-        pixels: new ImageData(w, h),
-      };
+      const initialLayer = createBlankLayer(defaultLayerId, "图层 1", w, h);
       const initialLayers = [initialLayer];
       setLayers(initialLayers);
       setActiveLayerId(defaultLayerId);
@@ -381,7 +508,21 @@ export const PixelEditor: React.FC = () => {
   const canRedo = historyManager.current.getRedoCount() > 0;
 
   return (
-    <div className="app-container">
+    <div
+      className="app-container"
+      onDragEnter={handleDragEnter}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
+      {isDragOver && (
+        <div className="import-drop-overlay">
+          <div className="import-drop-card">
+            <div className="import-drop-title">释放图片以导入</div>
+            <div className="import-drop-text">会保留原图作为底层，并自动创建一个可编辑的上层图层</div>
+          </div>
+        </div>
+      )}
       {/* Top Navigation Bar */}
       <header className="top-bar">
         <div className="top-bar-left">
@@ -414,6 +555,16 @@ export const PixelEditor: React.FC = () => {
         </div>
 
         <div className="top-bar-right">
+          <input
+            ref={importInputRef}
+            type="file"
+            accept="image/*"
+            style={{ display: "none" }}
+            onChange={handleImportImage}
+          />
+          <button className="btn" onClick={handleImportClick} title="导入图片；也可以直接拖拽图片到窗口">
+            📥 导入图片
+          </button>
           <button className="btn btn-primary" onClick={exportPNG}>
             💾 导出 PNG
           </button>

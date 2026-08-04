@@ -37,6 +37,7 @@ body {
   flex-direction: column;
   height: 100vh;
   background-color: var(--bg);
+  position: relative;
 }
 
 /* Top bar styles */
@@ -554,4 +555,40 @@ select.select-input:focus {
   justify-content: flex-end;
   gap: 8px;
   margin-top: 8px;
+}
+
+.import-drop-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(11, 12, 16, 0.72);
+  backdrop-filter: blur(5px);
+  pointer-events: none;
+}
+
+.import-drop-card {
+  min-width: 280px;
+  max-width: 420px;
+  padding: 22px 26px;
+  border-radius: 16px;
+  border: 1px dashed rgba(110, 168, 254, 0.8);
+  background: rgba(28, 31, 38, 0.92);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
+  text-align: center;
+}
+
+.import-drop-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--fg);
+}
+
+.import-drop-text {
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.5;
 }
