@@ -19,3 +19,7 @@ Thumbs.db
 # Logs
 *.log
 npm-debug.log*
+
+# Hand-drawn reference art. Read by the analysis scripts and cited by
+# docs/AUTOTILE_PATTERN_BAKE.md, but deliberately out of version control.
+assets/
