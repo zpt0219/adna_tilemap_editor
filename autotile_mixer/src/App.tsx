@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import './App.css';
 import { TRANSLATIONS, type Lang } from './shared/i18n';
 import {
@@ -12,7 +12,7 @@ import {
 } from './utils/patternPaint';
 import {
   PATTERN_GROUPS, DEFAULT_PATTERN, PATTERN_OFFSET_RANGE, RESEEDABLE_PATTERNS,
-  MIN_BAND_STEPS, MAX_BAND_STEPS, DEFAULT_BAND_STEPS, type PatternId,
+  MIN_BAND_STEPS, MAX_BAND_STEPS, DEFAULT_BAND_STEPS, patternLevelsFor, type PatternId,
 } from './utils/blob47Pattern';
 import {
   NOISE_PRESETS, DEFAULT_NOISES, DEFAULT_NOISE_SEED, DEFAULT_NOISE_STRENGTH,
@@ -153,8 +153,8 @@ export default function App() {
   // Zoom config (integer scale factor for visual canvas sizes)
   const [zoom, setZoom] = useState(2);
 
-  // Playground zoom (independent from tileset zoom)
-  const [playgroundZoom, setPlaygroundZoom] = useState(2);
+  // Playground zoom (independent from tileset zoom, default 1x, supports 1x, 2x, 4x)
+  const [playgroundZoom, setPlaygroundZoom] = useState(1);
 
   // blob47 is cell-based, so the playground stores cells, not vertices.
   const [blobCells, setBlobCells] = useState<number[][]>(() =>
@@ -163,7 +163,48 @@ export default function App() {
 
   const [isDrawing, setIsDrawing] = useState(false);
   const [drawVal, setDrawVal] = useState<number>(1); // 1 = paint A, 0 = paint B (erase)
-  const [touchPaintVal, setTouchPaintVal] = useState<0 | 1>(1); // touch mode toggle
+
+  // Custom shades overrides state (null = derived automatically from roleColours)
+  const [customShadesHex, setCustomShadesHex] = useState<string[] | null>(null);
+
+  const levels = useMemo(() => patternLevelsFor(bandSteps), [bandSteps]);
+
+  const bandShadeIndices = useMemo(() => {
+    return levels
+      .map((lvl, idx) => ({ lvl, idx }))
+      .filter(({ lvl }) => lvl.shade > 0)
+      .map(({ idx }) => idx);
+  }, [levels]);
+
+  const derivedRamp = useMemo(() => patternRamp(roleColours, bandSteps), [roleColours, bandSteps]);
+
+  const currentRampRGB = useMemo(() => {
+    if (customShadesHex && customShadesHex.length === derivedRamp.length) {
+      return derivedRamp.map((c, i) =>
+        customShadesHex[i] ? parseHexColour(customShadesHex[i]) : c
+      );
+    }
+    return derivedRamp;
+  }, [customShadesHex, derivedRamp]);
+
+  const customShadesKey = useMemo(() => (customShadesHex ? customShadesHex.join(',') : ''), [customShadesHex]);
+
+  // Custom noise colors state (null = derived from band ramp)
+  const [customNoiseHex, setCustomNoiseHex] = useState<{ b?: string; edge?: string; a?: string } | null>(null);
+
+  const customNoiseColours = useMemo(() => {
+    if (!customNoiseHex) return undefined;
+    return {
+      b: customNoiseHex.b ? parseHexColour(customNoiseHex.b) : undefined,
+      edge: customNoiseHex.edge ? parseHexColour(customNoiseHex.edge) : undefined,
+      a: customNoiseHex.a ? parseHexColour(customNoiseHex.a) : undefined,
+    };
+  }, [customNoiseHex]);
+
+  const customNoiseKey = useMemo(() => {
+    if (!customNoiseHex) return '';
+    return `${customNoiseHex.b || ''}_${customNoiseHex.edge || ''}_${customNoiseHex.a || ''}`;
+  }, [customNoiseHex]);
 
   // Canvas refs
   const tilesetCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -200,7 +241,8 @@ export default function App() {
     const paint = (mask: number) => new ImageData(
       paintPatternTileRGBA(
         patternId, mask, roleColours, tileSize, patternNoise, bandOffsetPx,
-        patternNoiseSeed, patternNoiseStrength, bandSteps, textureOpts, hardEdgeB, edgeSeed
+        patternNoiseSeed, patternNoiseStrength, bandSteps, textureOpts, hardEdgeB, edgeSeed,
+        currentRampRGB, customNoiseColours
       ),
       tileSize, tileSize
     );
@@ -245,7 +287,7 @@ export default function App() {
       }
     }
   }, [tileSize, showGrid, roleHexKey, patternId, patternNoiseKey, bandOffsetPx,
-      patternNoiseSeed, patternNoiseStrength, bandSteps, textureKey, hardEdgeB, edgeSeed]);
+      patternNoiseSeed, patternNoiseStrength, bandSteps, textureKey, hardEdgeB, edgeSeed, customShadesKey, customNoiseKey]);
 
   // Re-draw playground
   useEffect(() => {
@@ -312,7 +354,7 @@ export default function App() {
       }
     }
   }, [blobCells, tileSize, showGrid, showCellDots, roleHexKey, patternId, patternNoiseKey,
-      bandOffsetPx, patternNoiseSeed, patternNoiseStrength, bandSteps, textureKey, hardEdgeB, edgeSeed]);
+      bandOffsetPx, patternNoiseSeed, patternNoiseStrength, bandSteps, textureKey, hardEdgeB, edgeSeed, customShadesKey, customNoiseKey]);
 
   // Painting interaction logic
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -328,7 +370,7 @@ export default function App() {
     const scaleX = canvas.width / rect.width;
     const scaleY = canvas.height / rect.height;
 
-    const val = e.button === 0 ? 1 : 0; // Left = 1 (A), Right = 0 (B)
+    const val = e.button === 0 ? 1 : 0; // Left click = 1 (A), Right click = 0 (B)
     setDrawVal(val);
     setIsDrawing(true);
 
@@ -367,9 +409,10 @@ export default function App() {
     const canvas = playgroundCanvasRef.current;
     if (!canvas) return;
     const { x, y } = getCanvasPoint(canvas, e.touches[0].clientX, e.touches[0].clientY);
-    setDrawVal(touchPaintVal);
+    const val = 1;
+    setDrawVal(val);
     setIsDrawing(true);
-    paintPixel(x, y, touchPaintVal);
+    paintPixel(x, y, val);
   };
 
   const handleTouchMove = (e: React.TouchEvent<HTMLCanvasElement>) => {
@@ -399,6 +442,10 @@ export default function App() {
 
   const clearPlayground = () => {
     setBlobCells(Array(ROWS).fill(null).map(() => Array(COLS).fill(0)));
+  };
+
+  const fillPlaygroundA = () => {
+    setBlobCells(Array(ROWS).fill(null).map(() => Array(COLS).fill(1)));
   };
 
   const downloadTileset = () => {
@@ -435,7 +482,7 @@ export default function App() {
             RIGHT is surface detail and output size. */}
         <aside className="sidebar sidebar-left">
 
-          {/* 1 — Terrain colours and pattern */}
+          {/* 1 — Terrain colours */}
           <section className="panel-card">
             <h2 className="panel-title">{t.sectionTerrain}</h2>
 
@@ -460,36 +507,27 @@ export default function App() {
               </div>
             ))}
 
-            <div className="slider-header" style={{ margin: '12px 0 6px' }}>
-              <span className="slider-name" style={{ fontSize: '11px' }}>{t.patternShades}</span>
-            </div>
-            <div style={{ display: 'flex', gap: '4px' }}>
-              {patternRamp(roleColours, bandSteps).map((c, i) => (
-                <div
-                  key={i}
-                  title={toHexColour(c)}
-                  style={{
-                    flex: 1, height: '22px', borderRadius: '4px',
-                    border: '1px solid var(--line, rgba(255,255,255,.15))',
-                    background: toHexColour(c),
-                  }}
-                />
-              ))}
-            </div>
-
             <button
               className="btn-preset"
-              style={{ marginTop: '10px', width: '100%' }}
-              onClick={() => setRoleHex({
-                terrainA: toHexColour(DEFAULT_ROLE_COLOURS.terrainA),
-                terrainB: toHexColour(DEFAULT_ROLE_COLOURS.terrainB),
-                edge: toHexColour(DEFAULT_ROLE_COLOURS.edge),
-              })}
+              style={{ marginTop: '12px', width: '100%' }}
+              onClick={() => {
+                setRoleHex({
+                  terrainA: toHexColour(DEFAULT_ROLE_COLOURS.terrainA),
+                  terrainB: toHexColour(DEFAULT_ROLE_COLOURS.terrainB),
+                  edge: toHexColour(DEFAULT_ROLE_COLOURS.edge),
+                });
+                setCustomShadesHex(null);
+              }}
             >
               {t.resetColours}
             </button>
+          </section>
 
-            <div className="slider-header" style={{ margin: '18px 0 6px' }}>
+          {/* 2 — Transition band and pattern */}
+          <section className="panel-card">
+            <h2 className="panel-title">{t.sectionBand}</h2>
+
+            <div className="slider-header" style={{ marginBottom: '6px' }}>
               <span className="slider-name">{t.patternStyle}<InfoTip text={t.patternHint} /></span>
             </div>
             <select
@@ -506,9 +544,6 @@ export default function App() {
               ))}
             </select>
 
-            {/* Only the noise-baked silhouettes can be re-rolled; the clean ones
-                have nothing random in them to vary. Typed or rolled — same field,
-                so a seed that produced a good edge can be written down and reused. */}
             {canReseed && (<>
               <div className="slider-header" style={{ margin: '12px 0 6px' }}>
                 <span className="slider-name">{t.edgeSeed}<InfoTip text={t.edgeRerollHint} /></span>
@@ -533,16 +568,11 @@ export default function App() {
                 >🎲</button>
               </div>
             </>)}
-          </section>
 
-          {/* 2 — The shape of the boundary */}
-          <section className="panel-card">
-            <h2 className="panel-title">{t.sectionBand}</h2>
-
-            <div className="slider-header" style={{ marginBottom: '6px' }}>
+            <div className="slider-header" style={{ margin: '14px 0 6px' }}>
               <span className="slider-name">{t.bandSteps}<InfoTip text={t.bandStepsHint} /></span>
             </div>
-            <div className="type-tabs" style={{ marginBottom: '4px' }}>
+            <div className="type-tabs" style={{ marginBottom: '8px' }}>
               {BAND_STEP_CHOICES.map((n) => (
                 <button
                   key={n}
@@ -552,6 +582,94 @@ export default function App() {
                   {n}
                 </button>
               ))}
+            </div>
+
+            <div className="slider-header" style={{ margin: '12px 0 6px' }}>
+              <span className="slider-name" style={{ fontSize: '11px' }}>{t.patternShades}</span>
+              {customShadesHex && bandShadeIndices.some((idx: number) => Boolean(customShadesHex[idx])) && (
+                <button
+                  className="btn-action btn-secondary"
+                  style={{ fontSize: '11px', padding: '1px 6px', height: '20px' }}
+                  onClick={() => setCustomShadesHex(null)}
+                  title={lang === 'zh' ? '恢复为自动计算色阶' : 'Restore derived shades'}
+                >
+                  ↺ {lang === 'zh' ? '重置' : 'Reset'}
+                </button>
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: '6px', marginBottom: '10px' }}>
+              {bandShadeIndices.map((idx: number) => {
+                const c = currentRampRGB[idx];
+                const hex = toHexColour(c);
+                const isCustom = Boolean(customShadesHex && customShadesHex[idx]);
+                const isDisabled = hardEdgeB && idx === 1;
+                const lvlInfo = levels[idx];
+                const roleLabel = lvlInfo.role === 'terrainA'
+                  ? (lang === 'zh' ? '地形 A 侧过渡' : 'Terrain A side shade')
+                  : (lang === 'zh' ? '地形 B 侧过渡' : 'Terrain B side shade');
+                return (
+                  <div
+                    key={idx}
+                    title={
+                      isDisabled
+                        ? (lang === 'zh' ? `${roleLabel}（硬边模式下停用）` : `${roleLabel} (Disabled in hard-edge mode)`)
+                        : `${roleLabel} (${hex}) - ${lang === 'zh' ? '点击可单独改色' : 'Click to customize'}`
+                    }
+                    style={{
+                      flex: 1, height: '26px', borderRadius: '4px',
+                      border: isCustom ? '2px solid var(--accent)' : '1px solid var(--line, rgba(255,255,255,.2))',
+                      background: hex,
+                      position: 'relative',
+                      cursor: isDisabled ? 'not-allowed' : 'pointer',
+                      overflow: 'hidden',
+                      opacity: isDisabled ? 0.45 : 1,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      userSelect: 'none',
+                    }}
+                  >
+                    {isDisabled && (
+                      <svg
+                        style={{
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          width: '100%',
+                          height: '100%',
+                          pointerEvents: 'none',
+                          zIndex: 2,
+                        }}
+                        viewBox="0 0 100 100"
+                        preserveAspectRatio="none"
+                      >
+                        <line x1="0" y1="0" x2="100" y2="100" stroke="rgba(0,0,0,0.6)" strokeWidth="16" />
+                        <line x1="100" y1="0" x2="0" y2="100" stroke="rgba(0,0,0,0.6)" strokeWidth="16" />
+                        <line x1="0" y1="0" x2="100" y2="100" stroke="#ef4444" strokeWidth="10" />
+                        <line x1="100" y1="0" x2="0" y2="100" stroke="#ef4444" strokeWidth="10" />
+                      </svg>
+                    )}
+                    <input
+                      type="color"
+                      value={hex}
+                      disabled={isDisabled}
+                      onChange={(e) => {
+                        if (isDisabled) return;
+                        const base = (customShadesHex && customShadesHex.length === derivedRamp.length)
+                          ? [...customShadesHex]
+                          : derivedRamp.map(toHexColour);
+                        base[idx] = e.target.value;
+                        setCustomShadesHex(base);
+                      }}
+                      style={{
+                        position: 'absolute', top: '-10px', left: '-10px',
+                        width: '200%', height: '200%',
+                        opacity: 0,
+                        cursor: isDisabled ? 'not-allowed' : 'pointer',
+                        pointerEvents: isDisabled ? 'none' : 'auto',
+                      }}
+                    />
+                  </div>
+                );
+              })}
             </div>
 
             {/* The marker sits outside the <label>: inside it, clicking the
@@ -657,6 +775,64 @@ export default function App() {
                     title={lang === 'zh' ? '随机种子' : 'Randomize seed'}
                   >🎲</button>
                 </div>
+
+                <div className="slider-header" style={{ margin: '12px 0 6px' }}>
+                  <span className="slider-name" style={{ fontSize: '11px' }}>{t.noiseColours}</span>
+                  {customNoiseHex && (customNoiseHex.b || customNoiseHex.edge || customNoiseHex.a) && (
+                    <button
+                      className="btn-action btn-secondary"
+                      style={{ fontSize: '11px', padding: '1px 6px', height: '20px' }}
+                      onClick={() => setCustomNoiseHex(null)}
+                      title={lang === 'zh' ? '恢复为自动跟随过渡带颜色' : 'Restore derived grain colors'}
+                    >
+                      ↺ {lang === 'zh' ? '重置' : 'Reset'}
+                    </button>
+                  )}
+                </div>
+                <div style={{ display: 'flex', gap: '6px', marginBottom: '12px' }}>
+                  {(['b', 'edge', 'a'] as const).map((side) => {
+                    const defaultHex = side === 'b'
+                      ? toHexColour(derivedRamp[1])
+                      : side === 'edge'
+                      ? toHexColour(derivedRamp[2])
+                      : toHexColour(derivedRamp[derivedRamp.length - 2]);
+                    const hex = (customNoiseHex && customNoiseHex[side]) ? customNoiseHex[side]! : defaultHex;
+                    const isCustom = Boolean(customNoiseHex && customNoiseHex[side]);
+                    const label = side === 'b' ? t.noiseColourB : side === 'edge' ? t.noiseColourEdge : t.noiseColourA;
+                    return (
+                      <div key={side} style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <span style={{ fontSize: '10px', color: 'var(--muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</span>
+                        <div
+                          title={`${label} (${hex}) - ${lang === 'zh' ? '点击修改噪点颗粒颜色' : 'Click to customize'}`}
+                          style={{
+                            height: '26px', borderRadius: '4px',
+                            border: isCustom ? '2px solid var(--accent)' : '1px solid var(--line, rgba(255,255,255,.2))',
+                            background: hex,
+                            position: 'relative',
+                            cursor: 'pointer',
+                            overflow: 'hidden',
+                          }}
+                        >
+                          <input
+                            type="color"
+                            value={hex}
+                            onChange={(e) => {
+                              setCustomNoiseHex(prev => ({
+                                ...prev,
+                                [side]: e.target.value,
+                              }));
+                            }}
+                            style={{
+                              position: 'absolute', top: '-10px', left: '-10px',
+                              width: '200%', height: '200%',
+                              opacity: 0, cursor: 'pointer'
+                            }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             )}
 
@@ -741,7 +917,7 @@ export default function App() {
               <span className="slider-name">{t.tileSize}<InfoTip text={t.tileSizeHint} /></span>
               <span className="slider-val">{tileSize} px</span>
             </div>
-            <div className="type-tabs" style={{ marginBottom: '4px' }}>
+            <div className="type-tabs">
               {TILE_SIZES.map((s) => (
                 <button
                   key={s}
@@ -752,16 +928,6 @@ export default function App() {
                 </button>
               ))}
             </div>
-
-            <label className="checkbox-group" style={{ marginTop: '14px' }}>
-              <input
-                type="checkbox"
-                checked={showGrid}
-                onChange={(e) => setShowGrid(e.target.checked)}
-                className="checkbox-input"
-              />
-              <span className="checkbox-label">{t.showGrid}</span>
-            </label>
           </section>
         </aside>
 
@@ -769,20 +935,34 @@ export default function App() {
         <div className="content-area">
           {/* Tileset Sheet Preview */}
           <section className="panel-card preview-card">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '16px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', flexWrap: 'wrap', width: '100%', marginBottom: '16px' }}>
               <h2 className="panel-title" style={{ margin: 0 }}>{t.tilesetPreview}</h2>
-              <div className="scale-selector">
-                <span className="scale-label" style={{ fontSize: '11px', color: 'var(--muted)', fontWeight: 600 }}>SCALE:</span>
-                <div className="scale-tabs">
-                  {[1, 2, 3, 4, 6, 8].map((s) => (
-                    <button
-                      key={s}
-                      className={`scale-tab-btn ${zoom === s ? 'active' : ''}`}
-                      onClick={() => setZoom(s)}
-                    >
-                      {s}x
-                    </button>
-                  ))}
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: '14px', marginLeft: 'auto',
+                flexWrap: 'wrap', justifyContent: 'flex-end',
+              }}>
+                <label className="checkbox-group compact">
+                  <input
+                    type="checkbox"
+                    checked={showGrid}
+                    onChange={(e) => setShowGrid(e.target.checked)}
+                    className="checkbox-input"
+                  />
+                  <span className="checkbox-label">{t.showGrid}</span>
+                </label>
+                <div className="scale-selector">
+                  <span className="scale-label" style={{ fontSize: '11px', color: 'var(--muted)', fontWeight: 600 }}>SCALE:</span>
+                  <div className="scale-tabs">
+                    {[1, 2, 3, 4, 6, 8].map((s) => (
+                      <button
+                        key={s}
+                        className={`scale-tab-btn ${zoom === s ? 'active' : ''}`}
+                        onClick={() => setZoom(s)}
+                      >
+                        {s}x
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
@@ -825,7 +1005,7 @@ export default function App() {
                 <div className="scale-selector">
                   <span className="scale-label" style={{ fontSize: '11px', color: 'var(--muted)', fontWeight: 600 }}>SCALE:</span>
                   <div className="scale-tabs">
-                    {[1, 2, 3, 4, 6, 8].map((s) => (
+                    {[1, 2, 4].map((s) => (
                       <button key={s} className={`scale-tab-btn ${playgroundZoom === s ? 'active' : ''}`} onClick={() => setPlaygroundZoom(s)}>{s}x</button>
                     ))}
                   </div>
@@ -856,14 +1036,10 @@ export default function App() {
               />
             </div>
             <div className="action-bar" style={{ marginTop: '16px' }}>
-              <button
-                className={`btn-action ${touchPaintVal === 1 ? '' : 'btn-secondary'}`}
-                onClick={() => setTouchPaintVal(v => v === 1 ? 0 : 1)}
-                title={lang === 'zh' ? '触摸绘制模式（鼠标右键也可直接涂 B）' : 'Touch paint mode (right-click also paints B on desktop)'}
-              >
-                {touchPaintVal === 1 ? `✏️ ${lang === 'zh' ? '涂 A' : 'Paint A'}` : `✏️ ${lang === 'zh' ? '涂 B' : 'Paint B'}`}
+              <button className="btn-action btn-secondary" onClick={fillPlaygroundA} title={lang === 'zh' ? '全铺地形 A' : 'Fill all Terrain A'}>
+                🎨 {t.fillPlaygroundA}
               </button>
-              <button className="btn-action btn-secondary" onClick={clearPlayground}>
+              <button className="btn-action btn-secondary" onClick={clearPlayground} title={lang === 'zh' ? '重置为地形 B' : 'Clear to Terrain B'}>
                 🗑️ {t.clearPlayground}
               </button>
             </div>

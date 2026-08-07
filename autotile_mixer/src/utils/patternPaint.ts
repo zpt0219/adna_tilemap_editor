@@ -201,9 +201,13 @@ export function paintPatternTileRGBA(
   bandSteps = DEFAULT_BAND_STEPS,
   texture: TextureOptions = NO_TEXTURE,
   hardEdgeB = false,
-  edgeSeed = 0
+  edgeSeed = 0,
+  customRamp?: readonly RGB[],
+  customNoiseColours?: { b?: RGB; edge?: RGB; a?: RGB }
 ): Uint8ClampedArray<ArrayBuffer> {
-  const ramp = patternRamp(colours, bandSteps);
+  const derived = patternRamp(colours, bandSteps);
+  const ramp = customRamp && customRamp.length === derived.length ? customRamp : derived;
+  const levelDefs = patternLevelsFor(bandSteps);
   const grid = patternLevelsForMask(
     pattern, mask, offsetPx, tileSize, bandSteps, hardEdgeB, edgeSeed
   );
@@ -226,14 +230,25 @@ export function paintPatternTileRGBA(
   for (let y = 0; y < tileSize; y++) {
     for (let x = 0; x < tileSize; x++) {
       let level = grid.charCodeAt(y * tileSize + x) - 48;
+      let rgb = ramp[level];
       // Grain lives on the transition band only, and is sampled in OUTPUT
       // space so it gets finer along with the art instead of blocking up.
       if (level > 0 && level < solid && noises.length > 0) {
-        level = Math.max(0, Math.min(solid,
-          level + noiseStep(noises, x, y, noiseSeed, noiseStrength) * span));
+        const step = noiseStep(noises, x, y, noiseSeed, noiseStrength) * span;
+        if (step !== 0) {
+          const nextLvl = Math.max(0, Math.min(solid, level + step));
+          const targetRole = levelDefs[nextLvl]?.role;
+          if (targetRole === 'edge' && customNoiseColours?.edge) {
+            rgb = customNoiseColours.edge;
+          } else if (step < 0 && customNoiseColours?.b) {
+            rgb = customNoiseColours.b;
+          } else if (step > 0 && customNoiseColours?.a) {
+            rgb = customNoiseColours.a;
+          } else {
+            rgb = ramp[nextLvl];
+          }
+        }
       }
-      // Texture speckles the solid terrains only; the band keeps its own grain.
-      let rgb = ramp[level];
       if (texA && level === solid) {
         const k = textureShadeAt(texture.algoA, x, y, texture.seed, texture.amountA, shades);
         if (k > 0) rgb = texA[k];
