@@ -51,7 +51,10 @@
 }
 
 #root {
-  width: 1126px;
+  /* The site shell's content column is 1126px. This tool is three columns of
+     controls around a tileset sheet and a 16x10 playground, so it gets a wider
+     one — .app-container caps and centres the content inside it. */
+  width: 1760px;
   max-width: 100%;
   margin: 0 auto;
   text-align: center;

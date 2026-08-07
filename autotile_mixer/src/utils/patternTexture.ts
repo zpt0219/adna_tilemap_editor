@@ -14,13 +14,20 @@
 import { sample, type NoiseId } from './patternNoise';
 import type { RGB } from './patternPaint';
 
-/** `ripple` and `web` are texture-only; the rest are shared with the band grain. */
-export type TextureId = 'none' | NoiseId | 'ripple' | 'web';
+/**
+ * `ripple`, `web`, `brick` and `carpet` are texture-only; the rest are shared
+ * with the band grain. The last two are geometric rather than noisy — for those
+ * `amount` reads as line weight instead of scatter density.
+ */
+export type TextureId = 'none' | NoiseId | 'ripple' | 'web' | 'brick' | 'carpet' | 'weave';
 
 export const TEXTURE_PRESETS: readonly { id: TextureId; zh: string; en: string }[] = [
   { id: 'none', zh: '无纹理', en: 'None' },
   { id: 'ripple', zh: '波纹 · 横向短划（水面）', en: 'Ripples — short horizontal dashes' },
   { id: 'web', zh: '涟漪网 · 细线连成的网', en: 'Web — thin connected veins' },
+  { id: 'brick', zh: '方砖路面 · 错缝铺装', en: 'Paving — square flags, running bond' },
+  { id: 'carpet', zh: '地毯花纹 · 菱格团花', en: 'Carpet — diamond lattice medallions' },
+  { id: 'weave', zh: '斜铺砖 · 菱格编织', en: 'Weave — diagonal interlocking bricks' },
   { id: 'white', zh: '白噪散点 · 细碎', en: 'White speckle — fine' },
   { id: 'blue', zh: '蓝噪散点 · 均匀', en: 'Blue speckle — even' },
   { id: 'clumped', zh: '云斑 · 成片', en: 'Clumped — patchy' },
@@ -92,6 +99,111 @@ function webField(x: number, y: number, seed: number): number {
 }
 
 /**
+ * Wrap into the tile before anything else looks at the coordinate. The two
+ * geometric fields below are built on lattices rather than hashes, so this is
+ * what makes their 16-periodicity structural instead of something to check:
+ * negative and out-of-tile coordinates land on the same pixel by construction.
+ */
+const wrap16 = (v: number) => ((v % 16) + 16) % 16;
+
+/**
+ * Paving laid in running bond: 8x4 bricks with every other course half-dropped,
+ * and the field reads as nearness to a joint. `amount` therefore behaves as
+ * mortar weight — the joint lines appear first at low amounts and thicken from
+ * there, rather than the surface filling with scatter.
+ *
+ * Both 8 and 4 divide 16 and the half-drop repeats every two courses, so the
+ * pattern closes on the tile in both axes.
+ *
+ * The 1.5 falloff is load-bearing, not a taste call. A 2:1 brick puts 88 of the
+ * 256 pixels on a joint, so a wider falloff would leave the strongest shade
+ * more common than the weakest — the opposite of what a highlight is, and what
+ * the sparsity test rejects. At 1.5 a joint is a crisp line with one soft pixel
+ * beside it: 88 at full strength against 168 below half.
+ */
+function brickField(x: number, y: number, seed: number): number {
+  const SX = 8;
+  const SY = 4;
+  const px = wrap16(x + (seed & 15));
+  const py = wrap16(y + ((seed >>> 4) & 15));
+  const ox = (Math.floor(py / SY) % 2) * (SX / 2); // running bond
+  const fx = (((px - ox) % SX) + SX) % SX;
+  const fy = py % SY;
+  const d = Math.min(Math.min(fx, SX - fx), Math.min(fy, SY - fy));
+  return 1 - Math.min(1, d / 1.5);
+}
+
+/**
+ * A half-drop diamond lattice: each 8x8 cell carries a lozenge outline with a
+ * medallion at its centre, the classic kilim/carpet motif. Manhattan distance
+ * from the cell centre gives the diamond for free — the outline is one ring of
+ * that distance, the medallion another.
+ *
+ * The two rings sit at distances the pixel grid can actually hit (cell centres
+ * fall between pixels, so the distance is always a whole number), which is what
+ * lets the motif reach full strength instead of washing out.
+ */
+function carpetField(x: number, y: number, seed: number): number {
+  const S = 8;
+  const px = wrap16(x + (seed & 15));
+  const py = wrap16(y + ((seed >>> 4) & 15));
+  const ox = (Math.floor(py / S) % 2) * (S / 2);
+  const u = ((((px - ox) % S) + S) % S) - (S - 1) / 2;
+  const v = (py % S) - (S - 1) / 2;
+  const m = Math.abs(u) + Math.abs(v);
+  const medallion = 1 - Math.min(1, Math.abs(m - 1) / 1.5);
+  const lozenge = 1 - Math.min(1, Math.abs(m - 4) / 1.5);
+  return Math.max(0, Math.max(medallion, lozenge));
+}
+
+/**
+ * Diagonal interlocking brick weave, traced from `assets/test3.png`.
+ *
+ * Baked rather than derived: four rhombic facets interlock around a shared
+ * point with one of them outlined, and no field expression gets that — the
+ * generator would have to encode the four orientations anyway, at which point
+ * the table IS the cheaper description. It is a 16x16 tile already, which is
+ * exactly the period everything here has to have.
+ *
+ * Each digit is the luminance RANK of the reference's five tones, 0 lightest.
+ * That is what lets two picked colours reproduce the reference: rank 0 stays the
+ * plain terrain colour and rank 4 is the texture colour at full strength.
+ */
+const WEAVE =
+  '0032222222311300' +
+  '0003222222233000' +
+  '0004422222230000' +
+  '0043342222300000' +
+  '0433334223000000' +
+  '4333333430000000' +
+  '4333333340000003' +
+  '1433333334000031' +
+  '1143333333400311' +
+  '1114333333343111' +
+  '1113433333341111' +
+  '1132243333411111' +
+  '1322224334111111' +
+  '3222222441111111' +
+  '3222222231111113' +
+  '0322222223111130';
+
+/** The weave's own tone count; `shades` rescales onto the caller's ramp. */
+const WEAVE_RANKS = 4;
+
+/**
+ * The weave names its shade outright instead of being thresholded into one:
+ * its tones are already a ramp, so `amount` scales the ramp — full weave at 1,
+ * flattening toward the bare terrain as it drops.
+ */
+function weaveShade(x: number, y: number, seed: number, amount: number, shades: number): number {
+  const px = wrap16(x + (seed & 15));
+  const py = wrap16(y + ((seed >>> 4) & 15));
+  const rank = WEAVE.charCodeAt(py * 16 + px) - 48;
+  const k = Math.round((rank * shades * Math.min(1, amount)) / WEAVE_RANKS);
+  return Math.max(0, Math.min(shades, k));
+}
+
+/**
  * Which texture shade a pixel takes: 0 for the plain terrain colour, 1..shades
  * for progressively stronger ones.
  *
@@ -110,9 +222,13 @@ export function textureShadeAt(
 ): number {
   if (texture === 'none' || amount <= 0 || shades < 1) return 0;
   const s = (seed ^ TEXTURE_SALT) >>> 0;
+  // Baked art, not a field: it already knows which tone each pixel is.
+  if (texture === 'weave') return weaveShade(x, y, s, amount, shades);
   const n = texture === 'ripple' ? rippleField(x, y, s)
     : texture === 'web' ? webField(x, y, s)
-      : sample(texture, x, y, s);
+      : texture === 'brick' ? brickField(x, y, s)
+        : texture === 'carpet' ? carpetField(x, y, s)
+          : sample(texture, x, y, s);
   const cut = 1 - Math.min(1, amount);
   if (n < cut) return 0;
   const u = cut >= 1 ? 1 : (n - cut) / (1 - cut);
@@ -141,6 +257,35 @@ export function textureColour(c: RGB, t: number): RGB {
   const nv = lighten ? v * (1 + 0.3 * t) : v * (1 - 0.18 * t);
   const ns = lighten ? s * (1 - 0.15 * t) : s * (1 + 0.1 * t);
   return hsvToRgb(h, clamp01(ns), clamp01(nv));
+}
+
+const mix = (a: number, b: number, t: number) => Math.round(a + (b - a) * t);
+
+/**
+ * The `shades + 1` colours a textured terrain is drawn with, index 0 being the
+ * plain terrain colour.
+ *
+ * With an explicit `target` the ramp walks from the terrain colour to exactly
+ * that colour, which lets the texture be any colour at all rather than a
+ * brightness shift of the terrain — a grass field can carry yellow flecks, water
+ * white foam. Without one it falls back to deriving the shift, which is what
+ * makes a freshly picked terrain colour look textured before anything is set.
+ */
+export function textureRamp(
+  base: RGB,
+  target: RGB | undefined,
+  shades: number = DEFAULT_TEXTURE_SHADES
+): RGB[] {
+  const n = Math.max(1, shades);
+  return Array.from({ length: n + 1 }, (_, k) => {
+    const t = k / n;
+    if (!target) return textureColour(base, t);
+    return {
+      r: mix(base.r, target.r, t),
+      g: mix(base.g, target.g, t),
+      b: mix(base.b, target.b, t),
+    };
+  });
 }
 
 // --- local HSV, kept here so this module does not depend on patternPaint ----

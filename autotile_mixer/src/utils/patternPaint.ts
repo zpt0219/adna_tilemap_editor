@@ -23,20 +23,37 @@ import {
   DEFAULT_NOISES, DEFAULT_NOISE_SEED, DEFAULT_NOISE_STRENGTH, noiseStep, type NoiseId,
 } from './patternNoise';
 import {
-  DEFAULT_TEXTURE, DEFAULT_TEXTURE_SHADES, textureColour, textureShadeAt, type TextureId,
+  DEFAULT_TEXTURE, DEFAULT_TEXTURE_SHADES, textureColour, textureRamp, textureShadeAt,
+  type TextureId,
 } from './patternTexture';
 
-/** Speckle applied inside the solid terrains. `amount` 0 disables per terrain. */
+/**
+ * Speckle applied inside the solid terrains. `amount` 0 disables per terrain.
+ *
+ * The algorithm is per terrain as well as the amount and colour: the two solid
+ * regions are different materials, and the whole point of the geometric ones is
+ * that paving under grass wants a different field from the grass itself.
+ */
 export interface TextureOptions {
-  algo: TextureId;
+  algoA: TextureId;
+  algoB: TextureId;
   amountA: number;
   amountB: number;
   shades: number;
   seed: number;
+  /**
+   * What each terrain's texture fades toward. Independent of the terrain and
+   * band colours on purpose — the speckle in hand-drawn pixel art is usually a
+   * different material, not a lighter version of the ground. Omitted means
+   * derive it from the terrain colour (see textureRamp).
+   */
+  colourA?: RGB;
+  colourB?: RGB;
 }
 
 export const NO_TEXTURE: TextureOptions = {
-  algo: DEFAULT_TEXTURE,
+  algoA: DEFAULT_TEXTURE,
+  algoB: DEFAULT_TEXTURE,
   amountA: 0,
   amountB: 0,
   shades: DEFAULT_TEXTURE_SHADES,
@@ -51,11 +68,41 @@ export interface RGB {
 
 export type RoleColours = Record<PatternRole, RGB>;
 
-/** The reference palette this pattern was authored against. */
-export const DEFAULT_ROLE_COLOURS: RoleColours = {
+/**
+ * The palette the shade recipes were solved against. It is a TEST FIXTURE, not
+ * a UI default: the locked sheet hashes exist to catch a silhouette changing,
+ * so they have to be measured against a palette that never moves. Changing what
+ * the app starts up with must not disturb them.
+ */
+export const REFERENCE_ROLE_COLOURS: RoleColours = {
   terrainA: { r: 248, g: 248, b: 248 },
   terrainB: { r: 176, g: 216, b: 72 },
   edge: { r: 175, g: 198, b: 255 },
+};
+
+/**
+ * What the app opens with: water on grass, with a sand shoreline.
+ *
+ * Terrain A is the painted region, so painting makes ponds and lakes in a grass
+ * field. Terrain A's blue is deliberately short of full saturation — the
+ * terrainA shade recipe only ADDS saturation (see SHADE_RECIPES), so a base at
+ * s=1 has nowhere to go and the band's inner steps would collapse into the
+ * terrain colour, leaving just the outline.
+ */
+export const DEFAULT_ROLE_COLOURS: RoleColours = {
+  terrainA: { r: 58, g: 127, b: 201 },  // #3a7fc9 water
+  terrainB: { r: 93, g: 168, b: 50 },   // #5da832 grass
+  edge: { r: 232, g: 213, b: 160 },     // #e8d5a0 sand
+};
+
+/**
+ * What the texture pickers open on: the shift the old auto-derivation would
+ * have produced for the default terrains. Derived rather than written out, so
+ * the starting point cannot drift away from textureColour().
+ */
+export const DEFAULT_TEXTURE_COLOURS: { terrainA: RGB; terrainB: RGB } = {
+  terrainA: textureColour(DEFAULT_ROLE_COLOURS.terrainA, 1),
+  terrainB: textureColour(DEFAULT_ROLE_COLOURS.terrainB, 1),
 };
 
 const clamp255 = (v: number) => Math.max(0, Math.min(255, Math.round(v)));
@@ -153,20 +200,22 @@ export function paintPatternTileRGBA(
   noiseStrength = DEFAULT_NOISE_STRENGTH,
   bandSteps = DEFAULT_BAND_STEPS,
   texture: TextureOptions = NO_TEXTURE,
-  hardEdgeB = false
+  hardEdgeB = false,
+  edgeSeed = 0
 ): Uint8ClampedArray<ArrayBuffer> {
   const ramp = patternRamp(colours, bandSteps);
-  const grid = patternLevelsForMask(pattern, mask, offsetPx, tileSize, bandSteps, hardEdgeB);
+  const grid = patternLevelsForMask(
+    pattern, mask, offsetPx, tileSize, bandSteps, hardEdgeB, edgeSeed
+  );
   const solid = ramp.length - 1;
 
   // Texture shades are a handful of colours, not a per-pixel computation.
   const shades = Math.max(1, texture.shades);
-  const texOn = texture.algo !== 'none';
-  const texA = texOn && texture.amountA > 0
-    ? Array.from({ length: shades + 1 }, (_, k) => textureColour(colours.terrainA, k / shades))
+  const texA = texture.algoA !== 'none' && texture.amountA > 0
+    ? textureRamp(colours.terrainA, texture.colourA, shades)
     : null;
-  const texB = texOn && texture.amountB > 0
-    ? Array.from({ length: shades + 1 }, (_, k) => textureColour(colours.terrainB, k / shades))
+  const texB = texture.algoB !== 'none' && texture.amountB > 0
+    ? textureRamp(colours.terrainB, texture.colourB, shades)
     : null;
   // Grain displacement scales with the band so it keeps reading as the band
   // widens; at the default step count this is 1 and nothing changes.
@@ -186,10 +235,10 @@ export function paintPatternTileRGBA(
       // Texture speckles the solid terrains only; the band keeps its own grain.
       let rgb = ramp[level];
       if (texA && level === solid) {
-        const k = textureShadeAt(texture.algo, x, y, texture.seed, texture.amountA, shades);
+        const k = textureShadeAt(texture.algoA, x, y, texture.seed, texture.amountA, shades);
         if (k > 0) rgb = texA[k];
       } else if (texB && level === 0) {
-        const k = textureShadeAt(texture.algo, x, y, texture.seed, texture.amountB, shades);
+        const k = textureShadeAt(texture.algoB, x, y, texture.seed, texture.amountB, shades);
         if (k > 0) rgb = texB[k];
       }
       const { r, g, b } = rgb;

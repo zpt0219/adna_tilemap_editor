@@ -22,7 +22,7 @@ body {
 }
 
 .app-container {
-  max-width: 1400px;
+  max-width: 1760px;
   margin: 0 auto;
   padding: 24px;
   min-height: 100vh;
@@ -32,10 +32,15 @@ body {
 }
 
 /* Header */
+/* Three columns rather than space-between, so the title is centred on the PAGE
+   and not merely on the gap left over between the back button and the language
+   toggle — those two have different widths, and in the flex version that
+   difference showed up as the title sitting off-centre. */
 .app-header {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
+  gap: 16px;
   margin-bottom: 24px;
   border-bottom: 1px solid var(--line);
   padding-bottom: 16px;
@@ -45,6 +50,27 @@ body {
   display: flex;
   align-items: center;
   gap: 16px;
+  justify-self: start;
+}
+
+.app-title-group {
+  justify-self: center;
+  text-align: center;
+}
+
+@media (max-width: 1024px) {
+  /* No room for three across: controls share a row, title takes its own. */
+  .app-header {
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      'left right'
+      'title title';
+    row-gap: 12px;
+  }
+
+  .header-left { grid-area: left; }
+  .header-right { grid-area: right; }
+  .app-title-group { grid-area: title; }
 }
 
 .back-btn {
@@ -87,6 +113,7 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
+  justify-self: end;
 }
 
 .btn-lang {
@@ -105,17 +132,125 @@ body {
   background: var(--panel-hi);
 }
 
-/* Main Grid Layout */
+/* Main Grid Layout — controls flank the canvases so the sheet stays centred and
+   the two outer thirds of a wide screen carry panels instead of empty space. */
 .main-grid {
   display: grid;
-  grid-template-columns: 420px minmax(0, 1fr);
+  grid-template-columns: 340px minmax(0, 1fr) 340px;
+  grid-template-areas: "left center right";
   gap: 24px;
   flex: 1;
+}
+
+.sidebar-left { grid-area: left; }
+.content-area { grid-area: center; }
+.sidebar-right { grid-area: right; }
+
+/* Not enough width for three columns: stack both control columns on the left
+   and let the canvases run full height beside them. */
+@media (max-width: 1500px) {
+  .main-grid {
+    grid-template-columns: 380px minmax(0, 1fr);
+    grid-template-areas:
+      "left center"
+      "right center";
+    align-content: start;
+  }
 }
 
 @media (max-width: 1024px) {
   .main-grid {
     grid-template-columns: 1fr;
+    grid-template-areas: "left" "center" "right";
+  }
+}
+
+/* Hover-revealed help. These explanations are long and rarely re-read, so they
+   sit behind a marker next to their label instead of permanently occupying the
+   column. Shown on :focus too, which is what makes it work on touch and by
+   keyboard — :focus rather than :focus-visible, since a tap is the whole point. */
+.infotip {
+  position: relative;
+  display: inline-flex;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+.infotip-btn {
+  width: 15px;
+  height: 15px;
+  padding: 0;
+  border: 1px solid var(--muted);
+  border-radius: 50%;
+  background: none;
+  color: var(--muted);
+  font: 700 10px/1 inherit;
+  cursor: help;
+  display: grid;
+  place-items: center;
+}
+
+.infotip-btn:hover,
+.infotip-btn:focus {
+  border-color: var(--accent);
+  color: var(--accent);
+  outline: none;
+}
+
+.infotip-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  width: 280px;
+  padding: 10px 12px;
+  background: var(--panel-hi);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 12px 24px -6px rgba(0, 0, 0, 0.55);
+  color: var(--fg);
+  font-size: 11.5px;
+  font-weight: 400;
+  line-height: 1.55;
+  text-align: left;
+  white-space: normal;
+  z-index: 50;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.12s ease;
+}
+
+/* Bridges the gap between marker and panel. Without it, moving the pointer down
+   to read leaves .infotip and the panel disappears on the way. */
+.infotip-panel::before {
+  content: '';
+  position: absolute;
+  inset: -8px 0 100% 0;
+}
+
+/* The right column has no room to open rightwards, so it opens the other way. */
+.sidebar-right .infotip-panel {
+  left: auto;
+  right: 0;
+}
+
+.infotip:hover .infotip-panel,
+.infotip-btn:focus + .infotip-panel {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* One column: no horizontal room to anchor against, so dock it to the bottom
+   of the viewport where it can never be clipped. */
+@media (max-width: 1024px) {
+  .infotip-panel,
+  .sidebar-right .infotip-panel {
+    position: fixed;
+    top: auto;
+    bottom: 16px;
+    left: 16px;
+    right: 16px;
+    width: auto;
+    font-size: 13px;
   }
 }
 
@@ -124,6 +259,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 20px;
+  align-content: start;
 }
 
 .panel-card {
@@ -476,6 +612,23 @@ body {
   font-size: 13px;
   font-weight: 500;
   color: var(--fg);
+}
+
+/* Header-row variant: the same control sized to sit beside the scale tabs
+   rather than claim a line of its own and push the canvas down. */
+.checkbox-group.compact {
+  padding: 4px 10px;
+  gap: 7px;
+}
+
+.checkbox-group.compact .checkbox-input {
+  width: 14px;
+  height: 14px;
+}
+
+.checkbox-group.compact .checkbox-label {
+  font-size: 12px;
+  white-space: nowrap;
 }
 
 /* Disabled Panel when showing pure mask */

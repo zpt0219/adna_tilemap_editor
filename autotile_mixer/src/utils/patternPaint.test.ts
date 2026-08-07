@@ -4,10 +4,11 @@ import {
   PATTERN_TILE_SIZE, patternLevelsForMask, patternFieldForMask, PATTERN_BACKGROUND,
   PATTERNS, PATTERN_GROUPS, DEFAULT_PATTERN, PATTERN_BANDS, PATTERN_OFFSET_RANGE,
   FIELD_STEP, FIELD_CHARS, clampOffset, bandsFor, bandNoiseSpan, patternLevelsFor,
-  MIN_BAND_STEPS, MAX_BAND_STEPS, DEFAULT_BAND_STEPS, type PatternId,
+  MIN_BAND_STEPS, MAX_BAND_STEPS, DEFAULT_BAND_STEPS,
+  RESEEDABLE_PATTERNS, edgeJitterAmplitude, type PatternId,
 } from './blob47Pattern';
 import {
-  DEFAULT_ROLE_COLOURS,
+  REFERENCE_ROLE_COLOURS,
   paintPatternTileRGBA,
   patternRamp,
   shadeColour,
@@ -19,6 +20,14 @@ import {
 // every tileset the app emits.
 
 const ALL_PATTERNS = PATTERNS.map((p) => p.id);
+
+/** Border pixel indices of a tileSize grid, keyed by the mask bit for that edge. */
+const edgeIndices = (ts: number): [number, number[]][] => [
+  [1, [...Array(ts).keys()]],
+  [4, [...Array(ts).keys()].map((i) => ts * (ts - 1) + i)],
+  [8, [...Array(ts).keys()].map((i) => i * ts)],
+  [2, [...Array(ts).keys()].map((i) => i * ts + ts - 1)],
+];
 
 describe('blob47 built-in patterns', () => {
   it('offers a non-empty menu whose default is present', () => {
@@ -141,9 +150,9 @@ describe('sliding the transition band', () => {
 describe('shading from one colour per role', () => {
   it('derives the shades the recipes were tuned for', () => {
     // A drifting recipe changes every pattern at once, so pin the two outputs
-    // the default palette must produce.
-    expect(toHexColour(shadeColour(DEFAULT_ROLE_COLOURS.terrainB, 'terrainB'))).toBe('#88c020');
-    expect(toHexColour(shadeColour(DEFAULT_ROLE_COLOURS.terrainA, 'terrainA'))).toBe('#d8f0f8');
+    // the reference palette must produce.
+    expect(toHexColour(shadeColour(REFERENCE_ROLE_COLOURS.terrainB, 'terrainB'))).toBe('#88c020');
+    expect(toHexColour(shadeColour(REFERENCE_ROLE_COLOURS.terrainA, 'terrainA'))).toBe('#d8f0f8');
   });
 
   it('keeps a saturated terrain its own colour', () => {
@@ -173,8 +182,8 @@ describe('shading from one colour per role', () => {
     expect(tint.b).toBeGreaterThan(tint.r);
   });
 
-  it('gives the five levels the expected default palette', () => {
-    expect(patternRamp(DEFAULT_ROLE_COLOURS).map(toHexColour)).toEqual([
+  it('gives the five levels the expected reference palette', () => {
+    expect(patternRamp(REFERENCE_ROLE_COLOURS).map(toHexColour)).toEqual([
       '#b0d848', '#88c020', '#afc6ff', '#d8f0f8', '#f8f8f8',
     ]);
   });
@@ -188,7 +197,7 @@ function sheetHash(id: PatternId): number {
   const h = BLOB47_ROWS * ts;
   const sheet = new Uint8ClampedArray(w * h * 4);
   BLOB47_LAYOUT.forEach((mask, slot) => {
-    const px = paintPatternTileRGBA(id, mask, DEFAULT_ROLE_COLOURS, ts);
+    const px = paintPatternTileRGBA(id, mask, REFERENCE_ROLE_COLOURS, ts);
     const ox = (slot % BLOB47_COLS) * ts;
     const oy = Math.floor(slot / BLOB47_COLS) * ts;
     for (let y = 0; y < ts; y++) {
@@ -210,7 +219,7 @@ describe('transition-band steps', () => {
     for (const n of COUNTS) {
       // levels = the band's colours plus the two solid terrains
       expect(patternLevelsFor(n)).toHaveLength(n + 2);
-      expect(patternRamp(DEFAULT_ROLE_COLOURS, n)).toHaveLength(n + 2);
+      expect(patternRamp(REFERENCE_ROLE_COLOURS, n)).toHaveLength(n + 2);
     }
   });
 
@@ -249,7 +258,7 @@ describe('transition-band steps', () => {
   });
 
   it('scales the shade recipe rather than switching it on and off', () => {
-    const base = DEFAULT_ROLE_COLOURS.terrainB;
+    const base = REFERENCE_ROLE_COLOURS.terrainB;
     const full = shadeColour(base, 'terrainB', 1);
     const half = shadeColour(base, 'terrainB', 0.5);
     expect(toHexColour(full)).toBe('#88c020');           // unchanged at t=1
@@ -286,8 +295,8 @@ describe('transition-band steps', () => {
 
   it.each(ALL_PATTERNS)('%s grain reaches further at 5 steps than at 3', (id) => {
     const reach = (n: number) => {
-      const clean = paintPatternTileRGBA(id, 110, DEFAULT_ROLE_COLOURS, 32, [], 0, 0, 1, n);
-      const noisy = paintPatternTileRGBA(id, 110, DEFAULT_ROLE_COLOURS, 32, ['blue'], 0, 0, 1, n);
+      const clean = paintPatternTileRGBA(id, 110, REFERENCE_ROLE_COLOURS, 32, [], 0, 0, 1, n);
+      const noisy = paintPatternTileRGBA(id, 110, REFERENCE_ROLE_COLOURS, 32, ['blue'], 0, 0, 1, n);
       let worst = 0;
       for (let i = 0; i < clean.length; i += 4) {
         const d = Math.max(Math.abs(clean[i] - noisy[i]),
@@ -302,10 +311,10 @@ describe('transition-band steps', () => {
   });
 
   it.each(ALL_PATTERNS)('%s grain never escapes the ramp, whatever the span', (id) => {
-    const allowed = new Set(patternRamp(DEFAULT_ROLE_COLOURS, MAX_BAND_STEPS).map(toHexColour));
+    const allowed = new Set(patternRamp(REFERENCE_ROLE_COLOURS, MAX_BAND_STEPS).map(toHexColour));
     for (const mask of [0, 31, 110, 255]) {
       const px = paintPatternTileRGBA(
-        id, mask, DEFAULT_ROLE_COLOURS, 16, ['blue', 'white', 'clumped', 'ordered'],
+        id, mask, REFERENCE_ROLE_COLOURS, 16, ['blue', 'white', 'clumped', 'ordered'],
         0, 0, 2, MAX_BAND_STEPS);
       for (let i = 0; i < px.length; i += 4) {
         expect(allowed).toContain(toHexColour({ r: px[i], g: px[i + 1], b: px[i + 2] }));
@@ -455,7 +464,7 @@ describe('resolution', () => {
 
   it('paints RGBA at whatever size was asked for', () => {
     for (const ts of [16, 32]) {
-      const px = paintPatternTileRGBA(DEFAULT_PATTERN, 110, DEFAULT_ROLE_COLOURS, ts);
+      const px = paintPatternTileRGBA(DEFAULT_PATTERN, 110, REFERENCE_ROLE_COLOURS, ts);
       expect(px).toHaveLength(ts * ts * 4);
     }
   });
@@ -463,7 +472,7 @@ describe('resolution', () => {
 
 describe('painting', () => {
   it('emits opaque RGBA at the requested size', () => {
-    const px = paintPatternTileRGBA(DEFAULT_PATTERN, 255, DEFAULT_ROLE_COLOURS, 32);
+    const px = paintPatternTileRGBA(DEFAULT_PATTERN, 255, REFERENCE_ROLE_COLOURS, 32);
     expect(px).toHaveLength(32 * 32 * 4);
     for (let i = 3; i < px.length; i += 4) expect(px[i]).toBe(255);
   });
@@ -490,5 +499,111 @@ describe('painting', () => {
   it('locks every pattern in the menu', () => {
     // Guards against adding a pattern without adding its lock above.
     expect([...ALL_PATTERNS].sort()).toEqual([...LOCKS.map(([id]) => id)].sort());
+  });
+});
+
+describe('re-rolling an irregular edge', () => {
+  const RESEEDABLE = ALL_PATTERNS.filter((id) => RESEEDABLE_PATTERNS.has(id));
+  const CLEAN = ALL_PATTERNS.filter((id) => !RESEEDABLE_PATTERNS.has(id));
+  const SEEDS = [1, 2, 7, 42, 1234, 99999];
+
+  it('only offers a re-roll on patterns baked from a noisy field', () => {
+    expect(RESEEDABLE.length).toBeGreaterThan(0);
+    expect(CLEAN).toEqual(['rounded', 'sharp', 'bold']);
+    for (const id of CLEAN) expect(edgeJitterAmplitude(id)).toBe(0);
+    for (const id of RESEEDABLE) expect(edgeJitterAmplitude(id)).toBeGreaterThan(0);
+  });
+
+  it.each(ALL_PATTERNS)('%s is untouched at seed 0', (id) => {
+    // The whole feature has to be inert until the dice is clicked.
+    for (const mask of BLOB47_MASKS) {
+      expect(patternLevelsForMask(id, mask, 0, 16, DEFAULT_BAND_STEPS, false, 0))
+        .toBe(patternLevelsForMask(id, mask));
+    }
+  });
+
+  it.each(CLEAN)('%s ignores the seed entirely', (id) => {
+    for (const seed of SEEDS) {
+      for (const mask of BLOB47_MASKS) {
+        expect(patternLevelsForMask(id, mask, 0, 16, DEFAULT_BAND_STEPS, false, seed))
+          .toBe(patternLevelsForMask(id, mask));
+      }
+    }
+  });
+
+  it.each(RESEEDABLE)('%s actually changes, and differently per seed', (id) => {
+    const print = (seed: number) =>
+      BLOB47_MASKS.map((m) => patternLevelsForMask(id, m, 0, 16, DEFAULT_BAND_STEPS, false, seed))
+        .join('');
+    const base = print(0);
+    const variants = SEEDS.map(print);
+    for (const v of variants) expect(v).not.toBe(base);
+    expect(new Set(variants).size).toBe(SEEDS.length);
+  });
+
+  // THE invariant. A displaced field is exactly what docs/AUTOTILE_PATTERN_BAKE.md
+  // §7.2 warns against, and this is why it is safe here: the amplitude is bounded
+  // by the headroom the offset range already measured, so a border pixel on an
+  // open edge cannot be pushed past bands[0] no matter the seed. Swept over every
+  // pattern, mask, seed, both tile sizes, both step-count extremes and the whole
+  // offset range, because one escaping pixel is a visible straight-line seam.
+  it.each(RESEEDABLE)('%s never lets a re-roll touch the cell border', (id) => {
+    const [lo, hi] = PATTERN_OFFSET_RANGE[id];
+    // hi is where the budget is thinnest and 32px is where interpolation could
+    // smuggle a value past it, so both stay in; the rest is trimmed to keep the
+    // sweep under a few seconds.
+    const offsets = [lo, 0, hi];
+    const seeds = [1, 42, 99999];
+    for (const ts of [16, 32]) {
+      for (const steps of [MIN_BAND_STEPS, MAX_BAND_STEPS]) {
+        for (const hardB of [false, true]) {
+          for (const off of offsets) {
+            for (const seed of seeds) {
+              for (const mask of BLOB47_MASKS) {
+                const g = patternLevelsForMask(id, mask, off, ts, steps, hardB, seed);
+                for (const [bit, idx] of edgeIndices(ts)) {
+                  if (mask & bit) continue;
+                  for (const i of idx) expect(g[i]).toBe('0');
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  });
+
+  it.each(RESEEDABLE)('%s spends its jitter budget on the offset slider', (id) => {
+    // The two controls ask for the same headroom, so pushing the band fully
+    // toward the border leaves nothing to jitter with. Documented, not a bug.
+    const [, hi] = PATTERN_OFFSET_RANGE[id];
+    expect(edgeJitterAmplitude(id, hi)).toBe(0);
+    expect(edgeJitterAmplitude(id, 0)).toBe(hi);
+    // Negative offsets buy room back rather than costing it.
+    expect(edgeJitterAmplitude(id, PATTERN_OFFSET_RANGE[id][0])).toBe(hi);
+  });
+
+  it.each(RESEEDABLE)('%s still renders something after a re-roll', (id) => {
+    // Jitter erodes; it must not erase a painted cell altogether.
+    for (const seed of SEEDS) {
+      const visible = [...patternLevelsForMask(id, 0, 0, 16, DEFAULT_BAND_STEPS, false, seed)]
+        .filter((c) => c !== '0').length;
+      expect(visible).toBeGreaterThan(0);
+    }
+  });
+
+  it('resolves the same displaced shape at 32px, not a different one', () => {
+    // The noise is sampled in FIELD space, so 32px is the same silhouette drawn
+    // finer. Downsampling it back must land close to the 16px grid.
+    const id = 'jagged';
+    const at16 = patternLevelsForMask(id, 110, 0, 16, DEFAULT_BAND_STEPS, false, 7);
+    const at32 = patternLevelsForMask(id, 110, 0, 32, DEFAULT_BAND_STEPS, false, 7);
+    let same = 0;
+    for (let y = 0; y < 16; y++) {
+      for (let x = 0; x < 16; x++) {
+        if (at32[y * 2 * 32 + x * 2] === at16[y * 16 + x]) same++;
+      }
+    }
+    expect(same).toBeGreaterThan(200); // of 256
   });
 });

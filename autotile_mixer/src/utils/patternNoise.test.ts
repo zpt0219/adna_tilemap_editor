@@ -3,7 +3,7 @@ import {
   NOISE_PRESETS, DEFAULT_NOISES, DEFAULT_NOISE_STRENGTH, MAX_NOISE_STRENGTH,
   noiseStep, type NoiseId,
 } from './patternNoise';
-import { DEFAULT_ROLE_COLOURS, paintPatternTileRGBA, patternRamp, toHexColour } from './patternPaint';
+import { REFERENCE_ROLE_COLOURS, paintPatternTileRGBA, patternRamp, toHexColour } from './patternPaint';
 import { DEFAULT_PATTERN } from './blob47Pattern';
 
 const ALL: NoiseId[] = NOISE_PRESETS.map((n) => n.id);
@@ -202,8 +202,8 @@ describe('seeding', () => {
   });
 
   it('repaints a tile when only the seed changes', () => {
-    const s0 = paintPatternTileRGBA(DEFAULT_PATTERN, 110, DEFAULT_ROLE_COLOURS, 16, ['blue'], 0, 0);
-    const s9 = paintPatternTileRGBA(DEFAULT_PATTERN, 110, DEFAULT_ROLE_COLOURS, 16, ['blue'], 0, 9);
+    const s0 = paintPatternTileRGBA(DEFAULT_PATTERN, 110, REFERENCE_ROLE_COLOURS, 16, ['blue'], 0, 0);
+    const s9 = paintPatternTileRGBA(DEFAULT_PATTERN, 110, REFERENCE_ROLE_COLOURS, 16, ['blue'], 0, 9);
     expect(Array.from(s9)).not.toEqual(Array.from(s0));
   });
 });
@@ -274,15 +274,15 @@ describe('grain amount', () => {
   });
 
   it('leaves the tile untouched at 0 even with algorithms ticked', () => {
-    const bare = paintPatternTileRGBA(DEFAULT_PATTERN, 110, DEFAULT_ROLE_COLOURS, 16, []);
-    const zero = paintPatternTileRGBA(DEFAULT_PATTERN, 110, DEFAULT_ROLE_COLOURS, 16, ALL, 0, 0, 0);
+    const bare = paintPatternTileRGBA(DEFAULT_PATTERN, 110, REFERENCE_ROLE_COLOURS, 16, []);
+    const zero = paintPatternTileRGBA(DEFAULT_PATTERN, 110, REFERENCE_ROLE_COLOURS, 16, ALL, 0, 0, 0);
     expect(Array.from(zero)).toEqual(Array.from(bare));
   });
 
   it('keeps the solid interior clean however loud it gets', () => {
     const px = paintPatternTileRGBA(
-      DEFAULT_PATTERN, 255, DEFAULT_ROLE_COLOURS, 16, ALL, 0, 0, MAX_NOISE_STRENGTH);
-    const solid = patternRamp(DEFAULT_ROLE_COLOURS)[4];
+      DEFAULT_PATTERN, 255, REFERENCE_ROLE_COLOURS, 16, ALL, 0, 0, MAX_NOISE_STRENGTH);
+    const solid = patternRamp(REFERENCE_ROLE_COLOURS)[4];
     for (let i = 0; i < px.length; i += 4) {
       expect([px[i], px[i + 1], px[i + 2]]).toEqual([solid.r, solid.g, solid.b]);
     }
@@ -294,25 +294,25 @@ describe('noise applied to a pattern', () => {
 
   it.each(SELECTIONS)('%s leaves a solid interior tile untouched', (...sel) => {
     // Mask 255 is entirely level 4 — the grain must not speckle open terrain.
-    const px = paintPatternTileRGBA(DEFAULT_PATTERN,255, DEFAULT_ROLE_COLOURS, 16, sel as NoiseId[]);
-    const solid = patternRamp(DEFAULT_ROLE_COLOURS)[4];
+    const px = paintPatternTileRGBA(DEFAULT_PATTERN,255, REFERENCE_ROLE_COLOURS, 16, sel as NoiseId[]);
+    const solid = patternRamp(REFERENCE_ROLE_COLOURS)[4];
     for (let i = 0; i < px.length; i += 4) {
       expect([px[i], px[i + 1], px[i + 2]]).toEqual([solid.r, solid.g, solid.b]);
     }
   });
 
   it.each(SELECTIONS)('%s leaves the background tile untouched', (...sel) => {
-    const px = paintPatternTileRGBA(DEFAULT_PATTERN,-1, DEFAULT_ROLE_COLOURS, 16, sel as NoiseId[]);
-    const field = patternRamp(DEFAULT_ROLE_COLOURS)[0];
+    const px = paintPatternTileRGBA(DEFAULT_PATTERN,-1, REFERENCE_ROLE_COLOURS, 16, sel as NoiseId[]);
+    const field = patternRamp(REFERENCE_ROLE_COLOURS)[0];
     for (let i = 0; i < px.length; i += 4) {
       expect([px[i], px[i + 1], px[i + 2]]).toEqual([field.r, field.g, field.b]);
     }
   });
 
   it.each(SELECTIONS)('%s stays inside the five-colour ramp', (...sel) => {
-    const allowed = new Set(patternRamp(DEFAULT_ROLE_COLOURS).map(toHexColour));
+    const allowed = new Set(patternRamp(REFERENCE_ROLE_COLOURS).map(toHexColour));
     for (const mask of [0, 31, 110, 175, 255]) {
-      const px = paintPatternTileRGBA('rounded', mask, DEFAULT_ROLE_COLOURS, 16, sel as NoiseId[]);
+      const px = paintPatternTileRGBA('rounded', mask, REFERENCE_ROLE_COLOURS, 16, sel as NoiseId[]);
       for (let i = 0; i < px.length; i += 4) {
         expect(allowed).toContain(toHexColour({ r: px[i], g: px[i + 1], b: px[i + 2] }));
       }
@@ -320,14 +320,14 @@ describe('noise applied to a pattern', () => {
   });
 
   it('an empty selection paints exactly the untouched pattern', () => {
-    const bare = paintPatternTileRGBA('rounded', 110, DEFAULT_ROLE_COLOURS, 16);
-    const empty = paintPatternTileRGBA('rounded', 110, DEFAULT_ROLE_COLOURS, 16, []);
+    const bare = paintPatternTileRGBA('rounded', 110, REFERENCE_ROLE_COLOURS, 16);
+    const empty = paintPatternTileRGBA('rounded', 110, REFERENCE_ROLE_COLOURS, 16, []);
     expect(Array.from(empty)).toEqual(Array.from(bare));
   });
 
   it('actually changes the band when switched on', () => {
-    const clean = paintPatternTileRGBA('rounded', 110, DEFAULT_ROLE_COLOURS, 16, []);
-    const grainy = paintPatternTileRGBA('rounded', 110, DEFAULT_ROLE_COLOURS, 16, ['blue']);
+    const clean = paintPatternTileRGBA('rounded', 110, REFERENCE_ROLE_COLOURS, 16, []);
+    const grainy = paintPatternTileRGBA('rounded', 110, REFERENCE_ROLE_COLOURS, 16, ['blue']);
     expect(Array.from(grainy)).not.toEqual(Array.from(clean));
   });
 });

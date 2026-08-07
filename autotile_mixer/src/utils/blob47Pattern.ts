@@ -254,6 +254,72 @@ export function clampOffset(pattern: PatternId, offsetPx: number): number {
 }
 
 /**
+ * Patterns whose silhouette was baked from a noise-displaced field. Only these
+ * take a re-roll: jittering `sharp` or `rounded` would not be a variation of
+ * them, it would be a different pattern wearing their name.
+ */
+export const RESEEDABLE_PATTERNS: ReadonlySet<PatternId> = new Set<PatternId>([
+  'jagged', 'gravel', 'boulder', 'thorn', 'coast', 'moss', 'billow',
+]);
+
+/**
+ * How far a re-roll may push the boundary, in pixels of the 16-space field.
+ *
+ * This is the one number that keeps runtime field displacement safe, so the
+ * derivation matters. The inset invariant is that a pixel on an OPEN cell edge
+ * must stay level 0, i.e. `d < bands[0]` — the neighbour draws plain terrain B
+ * there, and a boundary reaching the border gets clipped into a straight line.
+ *
+ * `PATTERN_OFFSET_RANGE`'s positive end was measured as
+ * `hi = floor((bands[0] - mx - FIELD_STEP) / FIELD_STEP) * FIELD_STEP`, where
+ * `mx` is the largest stored field value on any open edge. So
+ * `mx + hi <= bands[0] - FIELD_STEP`. Adding a displacement bounded by `A`:
+ *
+ *     mx + off + A <= (bands[0] - FIELD_STEP - hi) + off + A
+ *
+ * which stays under `bands[0]` whenever `A <= hi - off`. Negative offsets only
+ * buy more room, hence the `max(0, off)`.
+ *
+ * The consequence to know about: pushing the band all the way toward the border
+ * spends the whole budget, and the re-roll goes quiet. That is not a bug to fix
+ * — it is the same headroom being asked for twice.
+ */
+export function edgeJitterAmplitude(pattern: PatternId, offsetPx = 0): number {
+  if (!RESEEDABLE_PATTERNS.has(pattern)) return 0;
+  const [, hi] = PATTERN_OFFSET_RANGE[pattern];
+  return Math.max(0, hi - Math.max(0, clampOffset(pattern, offsetPx)));
+}
+
+/**
+ * Tile-periodic value noise over the 16-space field, in [-1, 1].
+ *
+ * Sampled in FIELD space rather than output space, so 32px output resolves the
+ * same displaced silhouette more finely instead of drawing a different one —
+ * exactly how the field itself is resampled. The lattice divides 16, so it
+ * repeats with the tile and every seam stays continuous.
+ */
+function edgeNoise(u: number, v: number, seed: number): number {
+  const per = 4;
+  const fx = (u / PATTERN_TILE_SIZE) * per;
+  const fy = (v / PATTERN_TILE_SIZE) * per;
+  const x0 = Math.floor(fx);
+  const y0 = Math.floor(fy);
+  const fade = (t: number) => t * t * (3 - 2 * t);
+  const tx = fade(fx - x0);
+  const ty = fade(fy - y0);
+  const h = (ix: number, iy: number) => {
+    const wx = ((ix % per) + per) % per;
+    const wy = ((iy % per) + per) % per;
+    let n = Math.imul(wx, 374761393) + Math.imul(wy, 668265263) + Math.imul(seed, 1442695041);
+    n = Math.imul(n ^ (n >>> 13), 1274126177);
+    return (((n ^ (n >>> 16)) >>> 0) / 4294967296) * 2 - 1;
+  };
+  const a = h(x0, y0) * (1 - tx) + h(x0 + 1, y0) * tx;
+  const b = h(x0, y0 + 1) * (1 - tx) + h(x0 + 1, y0 + 1) * tx;
+  return a * (1 - ty) + b * ty;
+}
+
+/**
  * Bilinear sample of a stored field, in 16-space pixel-centre coordinates
  * (sample `i` sits at u = i). Out-of-range reads clamp to the edge; the
  * boundary is always inset well away from the tile border, so the replicated
@@ -294,11 +360,15 @@ export function patternLevelsForMask(
   offsetPx = 0,
   tileSize: number = PATTERN_TILE_SIZE,
   bandSteps: number = DEFAULT_BAND_STEPS,
-  hardEdgeB = false
+  hardEdgeB = false,
+  edgeSeed = 0
 ): string {
   if (mask < 0) return '0'.repeat(tileSize * tileSize);
   const off = clampOffset(pattern, offsetPx);
-  const key = `${pattern}:${mask}:${off}:${tileSize}:${bandSteps}:${hardEdgeB}`;
+  // Seed 0 means "the silhouette exactly as baked", so the whole displacement
+  // drops out rather than being computed and multiplied by zero.
+  const amp = edgeSeed === 0 ? 0 : edgeJitterAmplitude(pattern, off);
+  const key = `${pattern}:${mask}:${off}:${tileSize}:${bandSteps}:${hardEdgeB}:${amp > 0 ? edgeSeed : 0}`;
   let levels = LEVEL_CACHE.get(key);
   if (levels === undefined) {
     const field = patternFieldForMask(pattern, mask);
@@ -309,7 +379,8 @@ export function patternLevelsForMask(
       const v = (y + 0.5) * scale - 0.5;
       for (let x = 0; x < tileSize; x++) {
         const u = (x + 0.5) * scale - 0.5;
-        const d = sampleField(field, u, v) + off;
+        const jitter = amp > 0 ? amp * edgeNoise(u, v, edgeSeed) : 0;
+        const d = sampleField(field, u, v) + off + jitter;
         // Bands ascend, so the last one passed is the level. Levels stay below
         // 10, which is what keeps one digit per pixel workable.
         let level = 0;
