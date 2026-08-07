@@ -8,6 +8,7 @@ import {
   BLOB47_ROWS,
   BLOB47_BACKGROUND,
   blobIndexForMask,
+  blobSlotForMask,
   blobWeightAt,
 } from './blob47';
 
@@ -60,18 +61,28 @@ describe('mask algebra', () => {
 });
 
 describe('sheet layout', () => {
-  it('fills a 6x8 sheet with 47 tiles plus one background slot', () => {
+  it('fills a 6x8 sheet with every canonical mask and no background slot', () => {
     expect(BLOB47_ROWS * BLOB47_COLS).toBe(48);
     expect(BLOB47_LAYOUT).toHaveLength(48);
-    expect(BLOB47_LAYOUT[47]).toBe(BLOB47_BACKGROUND);
-    expect(new Set(BLOB47_LAYOUT.slice(0, 47)).size).toBe(47);
+    // A terrain-B cell draws no tile, so the sheet carries no background entry.
+    expect(BLOB47_LAYOUT).not.toContain(BLOB47_BACKGROUND);
+    expect(new Set(BLOB47_LAYOUT)).toEqual(new Set(BLOB47_MASKS));
   });
 
-  it('places each canonical mask at its own index', () => {
-    BLOB47_MASKS.forEach((mask, i) => {
-      expect(BLOB47_LAYOUT[i]).toBe(mask);
-      expect(blobIndexForMask(mask)).toBe(i);
-    });
+  it('spends its one spare slot on a second copy of the solid tile', () => {
+    const counts = new Map<number, number>();
+    for (const m of BLOB47_LAYOUT) counts.set(m, (counts.get(m) ?? 0) + 1);
+    const repeated = [...counts].filter(([, n]) => n > 1);
+    expect(repeated).toEqual([[0xff, 2]]);
+  });
+
+  it('resolves every raw mask to a slot holding that mask', () => {
+    for (const m of ALL_MASKS) {
+      const slot = blobSlotForMask(m);
+      expect(slot).toBeGreaterThanOrEqual(0);
+      expect(slot).toBeLessThan(48);
+      expect(BLOB47_LAYOUT[slot]).toBe(canonicalizeBlobMask(m));
+    }
   });
 });
 

@@ -62,21 +62,43 @@ export function blobIndexForMask(mask: number): number {
 }
 
 // ---------------------------------------------------------------------------
-// Sheet layout — 6 rows x 8 cols = 48 slots: 47 tiles + 1 pure-B background.
+// Sheet layout — 6 rows x 8 cols = 48 slots.
 // ---------------------------------------------------------------------------
 export const BLOB47_COLS = 8;
 export const BLOB47_ROWS = 6;
+
+/** Sentinel for "no tile" — the cell is plain terrain B, i.e. the layer below. */
 export const BLOB47_BACKGROUND = -1;
 
-/** Slot contents in reading order: the 47 canonical masks, then background. */
-export const BLOB47_LAYOUT: number[] = [...BLOB47_MASKS, BLOB47_BACKGROUND];
+/**
+ * The conventional blob47 sheet order: adjacent slots continue each other, so
+ * the sheet reads as one coherent picture instead of 48 loose tiles, and it
+ * interchanges with tilesets authored to the same convention.
+ *
+ * All 47 canonical masks appear. The solid tile (255) fills the two slots the
+ * arrangement leaves spare, and there is deliberately **no background slot** —
+ * a terrain-B cell draws no tile at all.
+ */
+export const BLOB47_LAYOUT: number[] = [
+    6,  10,  46,  76,  38, 110,  78,  12,
+    7,  14,  31, 175, 127, 255, 205,   5,
+   39,  79,  15,  63, 223, 159, 141,   1,
+   23, 143,  13,  55, 239, 111,  77,   4,
+    3,  11,  47,  95, 191, 255, 207,   9,
+    0,   2,  27, 137,  19, 155, 139,   8,
+];
 
-/** Sheet slot holding the pure terrain-B tile. */
-export const BLOB47_BACKGROUND_SLOT = BLOB47_LAYOUT.length - 1;
+const MASK_TO_SLOT: Int16Array = (() => {
+  const table = new Int16Array(256).fill(-1);
+  for (let m = 0; m < 256; m++) {
+    table[m] = BLOB47_LAYOUT.indexOf(canonicalizeBlobMask(m));
+  }
+  return table;
+})();
 
 /** Sheet slot (0..47) holding the tile for a raw neighbourhood mask. */
 export function blobSlotForMask(mask: number): number {
-  return blobIndexForMask(mask);
+  return MASK_TO_SLOT[mask & 0xff];
 }
 
 // ---------------------------------------------------------------------------

@@ -6,13 +6,34 @@ import {
   type RenderParams, type MaskStyle, EASING_FUNCTIONS,
 } from './utils/tiles';
 import {
-  BLOB47_LAYOUT, BLOB47_COLS, BLOB47_ROWS, BLOB47_BACKGROUND_SLOT, blobIndexForMask,
+  BLOB47_LAYOUT, BLOB47_COLS, BLOB47_ROWS, BLOB47_BACKGROUND, blobSlotForMask,
   N as BIT_N, E as BIT_E, S as BIT_S, W as BIT_W,
   NE as BIT_NE, SE as BIT_SE, SW as BIT_SW, NW as BIT_NW,
 } from './utils/blob47';
+import {
+  DEFAULT_ROLE_COLOURS, paintPatternTileRGBA, parseHexColour, patternRamp, toHexColour,
+  type RoleColours,
+} from './utils/patternPaint';
+import {
+  PATTERN_GROUPS, DEFAULT_PATTERN, PATTERN_OFFSET_RANGE,
+  MIN_BAND_STEPS, MAX_BAND_STEPS, DEFAULT_BAND_STEPS, type PatternId,
+} from './utils/blob47Pattern';
+import {
+  NOISE_PRESETS, DEFAULT_NOISES, DEFAULT_NOISE_SEED, DEFAULT_NOISE_STRENGTH,
+  MAX_NOISE_STRENGTH, type NoiseId,
+} from './utils/patternNoise';
+import {
+  TEXTURE_PRESETS, DEFAULT_TEXTURE, DEFAULT_TEXTURE_SHADES,
+  MIN_TEXTURE_SHADES, MAX_TEXTURE_SHADES, type TextureId,
+} from './utils/patternTexture';
 
-/** Corner models paint vertices; blob47 paints cells. docs/AUTOTILE_SCHEMES.md */
-export type TilesetMode = 'wang' | 'blob14' | 'blob47';
+/**
+ * Corner models paint vertices; blob47 and pattern paint cells.
+ * docs/AUTOTILE_SCHEMES.md. 'pattern' shares blob47's mask model and sheet
+ * layout but takes its silhouette from baked art instead of a distance field,
+ * so it needs colours rather than textures.
+ */
+export type TilesetMode = 'wang' | 'blob14' | 'blob47' | 'pattern';
 
 const COLS = 16;
 const ROWS = 10;
@@ -160,6 +181,73 @@ export default function App() {
   const [mode, setMode] = useState<TilesetMode>('wang');
   const isWang = mode === 'wang';
   const isBlob47 = mode === 'blob47';
+  const isPattern = mode === 'pattern';
+  /** blob47 and pattern share the cell-based sheet layout and playground rules. */
+  const isCellBased = isBlob47 || isPattern;
+
+  // Pattern mode: one colour per role, kept as hex for the <input type="color">.
+  const [roleHex, setRoleHex] = useState<Record<keyof RoleColours, string>>(() => ({
+    terrainA: toHexColour(DEFAULT_ROLE_COLOURS.terrainA),
+    terrainB: toHexColour(DEFAULT_ROLE_COLOURS.terrainB),
+    edge: toHexColour(DEFAULT_ROLE_COLOURS.edge),
+  }));
+  const roleColours: RoleColours = React.useMemo(() => ({
+    terrainA: parseHexColour(roleHex.terrainA),
+    terrainB: parseHexColour(roleHex.terrainB),
+    edge: parseHexColour(roleHex.edge),
+  }), [roleHex]);
+  const roleHexKey = `${roleHex.terrainA}|${roleHex.terrainB}|${roleHex.edge}`;
+
+  // Which built-in pattern the colours are painted onto.
+  const [patternId, setPatternId] = useState<PatternId>(DEFAULT_PATTERN);
+  // Grain on the pattern's transition band. The algorithms stack, so this is a
+  // set; empty means no grain.
+  const [patternNoise, setPatternNoise] = useState<NoiseId[]>([...DEFAULT_NOISES]);
+  const patternNoiseKey = patternNoise.join(',');
+  const [patternNoiseSeed, setPatternNoiseSeed] = useState(DEFAULT_NOISE_SEED);
+  const [patternNoiseStrength, setPatternNoiseStrength] = useState(DEFAULT_NOISE_STRENGTH);
+
+  // Speckle inside the solid terrains, so a filled region reads as a material.
+  const [textureAlgo, setTextureAlgo] = useState<TextureId>(DEFAULT_TEXTURE);
+  const [textureAmountA, setTextureAmountA] = useState(0.4);
+  const [textureAmountB, setTextureAmountB] = useState(0);
+  const [textureShades, setTextureShades] = useState(DEFAULT_TEXTURE_SHADES);
+  const textureOpts = {
+    algo: textureAlgo,
+    amountA: textureAmountA,
+    amountB: textureAmountB,
+    shades: textureShades,
+    seed: patternNoiseSeed,
+  };
+  const textureKey = `${textureAlgo}|${textureAmountA}|${textureAmountB}|${textureShades}`;
+  const TEXTURE_SHADE_CHOICES = Array.from(
+    { length: MAX_TEXTURE_SHADES - MIN_TEXTURE_SHADES + 1 },
+    (_, i) => MIN_TEXTURE_SHADES + i
+  );
+
+  // Where the transition band sits, as -1 (toward the cell centre) .. +1
+  // (toward its border). Kept normalised because each pattern has its own
+  // usable range — a fixed pixel slider would be mostly dead travel on the
+  // noisier ones. See PATTERN_OFFSET_RANGE.
+  // How many colours the transition band is drawn with.
+  const [bandSteps, setBandSteps] = useState(DEFAULT_BAND_STEPS);
+  const BAND_STEP_CHOICES = Array.from(
+    { length: MAX_BAND_STEPS - MIN_BAND_STEPS + 1 },
+    (_, i) => MIN_BAND_STEPS + i
+  );
+
+  // Collapse the terrain-B shade so open terrain meets the outline hard.
+  const [hardEdgeB, setHardEdgeB] = useState(false);
+
+  const [bandBias, setBandBias] = useState(0);
+  const bandOffsetPx = (() => {
+    const [lo, hi] = PATTERN_OFFSET_RANGE[patternId];
+    return bandBias < 0 ? -bandBias * lo : bandBias * hi;
+  })();
+  const toggleNoise = (id: NoiseId) =>
+    setPatternNoise((prev) =>
+      prev.includes(id) ? prev.filter((n) => n !== id) : [...prev, id]
+    );
 
   // Textures state
   const [imgAData, setImgAData] = useState<ImageData | null>(null);
@@ -215,6 +303,9 @@ export default function App() {
   const tilesetCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const playgroundCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const cleanSheetCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  /** The plain terrain-B tile. The blob47 sheet has no background slot, so the
+   *  playground keeps it aside instead of blitting it out of the sheet. */
+  const bgTileCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
   // Input file refs
   const fileInputARef = useRef<HTMLInputElement | null>(null);
@@ -307,8 +398,8 @@ export default function App() {
     const canvas = tilesetCanvasRef.current;
     if (!canvas) return;
 
-    const cols = isBlob47 ? BLOB47_COLS : isWang ? 4 : 5;
-    const rows = isBlob47 ? BLOB47_ROWS : isWang ? 4 : 3;
+    const cols = isCellBased ? BLOB47_COLS : isWang ? 4 : 5;
+    const rows = isCellBased ? BLOB47_ROWS : isWang ? 4 : 3;
 
     // Maintain an offscreen canvas with clean tileset pixels (without grid lines)
     if (!cleanSheetCanvasRef.current) {
@@ -331,13 +422,20 @@ export default function App() {
       noiseTileable: isBlob47,
     };
 
-    const totalTiles = isBlob47 ? BLOB47_LAYOUT.length : isWang ? 16 : 15;
+    const totalTiles = isCellBased ? BLOB47_LAYOUT.length : isWang ? 16 : 15;
     for (let i = 0; i < totalTiles; i++) {
       const col = i % cols;
       const row = Math.floor(i / cols);
 
       let tileData: ImageData;
-      if (isBlob47) {
+      if (isPattern) {
+        // Baked art, nearest-scaled. Every tileSize offered is a multiple of the
+        // pattern's 16px, so the scale-up stays pixel-clean.
+        tileData = new ImageData(
+          paintPatternTileRGBA(patternId, BLOB47_LAYOUT[i], roleColours, tileSize, patternNoise, bandOffsetPx, patternNoiseSeed, patternNoiseStrength, bandSteps, textureOpts, hardEdgeB),
+          tileSize, tileSize
+        );
+      } else if (isBlob47) {
         tileData = blendBlob47TilePixels(BLOB47_LAYOUT[i], imgAData, imgBData, params);
       } else {
         const tileIdx = isWang ? WANG_LAYOUT[i] : BLOB_LAYOUT[i];
@@ -345,6 +443,24 @@ export default function App() {
         tileData = blendTilePixels(tileIdx, isWang, imgAData, imgBData, params);
       }
       cleanCtx.putImageData(tileData, col * tileSize, row * tileSize);
+    }
+
+    // The plain terrain-B tile lives outside the sheet (see BLOB47_LAYOUT), so
+    // render it separately for the playground to use on unpainted cells.
+    if (isCellBased) {
+      if (!bgTileCanvasRef.current) bgTileCanvasRef.current = document.createElement('canvas');
+      const bg = bgTileCanvasRef.current;
+      bg.width = tileSize;
+      bg.height = tileSize;
+      const bgCtx = bg.getContext('2d');
+      if (bgCtx) {
+        bgCtx.putImageData(
+          isPattern
+            ? new ImageData(paintPatternTileRGBA(patternId, BLOB47_BACKGROUND, roleColours, tileSize, patternNoise, bandOffsetPx, patternNoiseSeed, patternNoiseStrength, bandSteps, textureOpts, hardEdgeB), tileSize, tileSize)
+            : blendBlob47TilePixels(BLOB47_BACKGROUND, imgAData, imgBData, params),
+          0, 0
+        );
+      }
     }
 
     // Render to on-screen preview canvas
@@ -373,7 +489,7 @@ export default function App() {
         ctx.stroke();
       }
     }
-  }, [mode, tileSize, showGrid, imgAData, imgBData, smoothness, easing, maskStyle, pixelSteps, noiseStrength, noiseScale, noiseSeed]);
+  }, [mode, tileSize, showGrid, imgAData, imgBData, smoothness, easing, maskStyle, pixelSteps, noiseStrength, noiseScale, noiseSeed, roleHexKey, patternId, patternNoiseKey, bandOffsetPx, patternNoiseSeed, patternNoiseStrength, bandSteps, textureKey, hardEdgeB]);
 
   // Re-draw playground
   useEffect(() => {
@@ -400,16 +516,17 @@ export default function App() {
       }
     };
 
-    if (isBlob47) {
+    if (isCellBased) {
       // Cell-based: a cell's tile is decided by its 8 neighbours. Out of bounds
       // counts as terrain B, so a painted region reads as an island.
       const cellAt = (r: number, c: number) =>
         r < 0 || c < 0 || r >= ROWS || c >= COLS ? 0 : blobCells[r]?.[c] ?? 0;
 
+      const bg = bgTileCanvasRef.current;
       for (let r = 0; r < ROWS; r++) {
         for (let c = 0; c < COLS; c++) {
           if (!cellAt(r, c)) {
-            drawSheetSlot(BLOB47_BACKGROUND_SLOT, BLOB47_COLS, c, r);
+            if (bg) ctx.drawImage(bg, c * tileSize, r * tileSize);
             continue;
           }
           let mask = 0;
@@ -421,7 +538,7 @@ export default function App() {
           if (cellAt(r + 1, c + 1)) mask |= BIT_SE;
           if (cellAt(r + 1, c - 1)) mask |= BIT_SW;
           if (cellAt(r - 1, c - 1)) mask |= BIT_NW;
-          drawSheetSlot(blobIndexForMask(mask), BLOB47_COLS, c, r);
+          drawSheetSlot(blobSlotForMask(mask), BLOB47_COLS, c, r);
         }
       }
     } else {
@@ -456,7 +573,7 @@ export default function App() {
       ctx.stroke();
     };
 
-    if (isBlob47) {
+    if (isCellBased) {
       for (let r = 0; r < ROWS; r++) {
         for (let c = 0; c < COLS; c++) {
           dot((c + 0.5) * tileSize, (r + 0.5) * tileSize, blobCells[r]?.[c] ?? 0);
@@ -469,7 +586,7 @@ export default function App() {
         }
       }
     }
-  }, [wangVertices, blobCells, mode, tileSize, showGrid, imgAData, imgBData, smoothness, easing, maskStyle]);
+  }, [wangVertices, blobCells, mode, tileSize, showGrid, imgAData, imgBData, smoothness, easing, maskStyle, roleHexKey, patternId, patternNoiseKey, bandOffsetPx, patternNoiseSeed, patternNoiseStrength, bandSteps, textureKey, hardEdgeB]);
 
   // Painting interaction logic
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -542,7 +659,7 @@ export default function App() {
   };
 
   const paintPixel = (px: number, py: number, val: number) => {
-    if (isBlob47) {
+    if (isCellBased) {
       // Cell-based model: a click toggles the cell it lands in.
       const cx = Math.floor(px / tileSize);
       const cy = Math.floor(py / tileSize);
@@ -577,7 +694,8 @@ export default function App() {
     const cleanCanvas = cleanSheetCanvasRef.current || tilesetCanvasRef.current;
     if (!cleanCanvas) return;
     const link = document.createElement('a');
-    const kind = mode === 'wang' ? 'wang16' : mode === 'blob14' ? 'blob14' : 'blob47';
+    const kind = mode === 'wang' ? 'wang16' : mode === 'blob14' ? 'blob14'
+      : mode === 'pattern' ? `blob47_${patternId}` : 'blob47';
     link.download = `tileset_${kind}_${tileSize}px.png`;
     link.href = cleanCanvas.toDataURL();
     link.click();
@@ -605,7 +723,8 @@ export default function App() {
       <main className="main-grid">
         {/* Sidebar Controls */}
         <aside className="sidebar">
-          {/* Section: Textures */}
+          {/* Section: Textures — pattern mode is coloured, not textured. */}
+          {!isPattern && (
           <section className="panel-card">
             <h2 className="panel-title">{t.terrainA} / {t.terrainB}</h2>
             <div className="textures-grid">
@@ -671,6 +790,7 @@ export default function App() {
               {t.recommendSize}
             </p>
           </section>
+          )}
 
           {/* Section: Type & Options */}
           <section className="panel-card">
@@ -694,6 +814,17 @@ export default function App() {
               >
                 {t.blob47}
               </button>
+              <button
+                className={`tab-btn ${mode === 'pattern' ? 'active' : ''}`}
+                onClick={() => {
+                  setMode('pattern');
+                  // Pattern mode only offers 16 and 32; carry a larger size
+                  // back in here rather than rendering one and correcting it.
+                  if (tileSize !== 16 && tileSize !== 32) setTileSize(32);
+                }}
+              >
+                {t.pattern}
+              </button>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <label className="checkbox-group">
@@ -706,6 +837,10 @@ export default function App() {
                 <span className="checkbox-label">{t.showGrid}</span>
               </label>
 
+              {/* The pattern's silhouette is baked art, so none of the field
+                  controls below do anything in that mode — hide them rather
+                  than leave dead sliders on screen. */}
+              {!isPattern && (<>
               <div className="slider-group" style={{ marginTop: '4px' }}>
                 <div className="slider-header" style={{ marginBottom: '6px' }}>
                   <span className="slider-name">{t.smoothness}</span>
@@ -818,22 +953,278 @@ export default function App() {
                   </div>
                 </div>
               </>)}
+              </>)}
+
+              {isPattern && (
+                <div className="slider-group" style={{ marginTop: '4px' }}>
+                  <div className="slider-header" style={{ marginBottom: '6px' }}>
+                    <span className="slider-name">{t.patternStyle}</span>
+                  </div>
+                  <select
+                    className="text-input"
+                    style={{ marginBottom: '16px' }}
+                    value={patternId}
+                    onChange={(e) => setPatternId(e.target.value as PatternId)}
+                  >
+                    {PATTERN_GROUPS.map((g) => (
+                      <optgroup key={g.en} label={lang === 'zh' ? g.zh : g.en}>
+                        {g.items.map((p) => (
+                          <option key={p.id} value={p.id}>{lang === 'zh' ? p.zh : p.en}</option>
+                        ))}
+                      </optgroup>
+                    ))}
+                  </select>
+
+                  <div className="slider-header" style={{ marginBottom: '6px' }}>
+                    <span className="slider-name">{t.bandSteps}</span>
+                  </div>
+                  <div className="type-tabs" style={{ marginBottom: '4px' }}>
+                    {BAND_STEP_CHOICES.map((n) => (
+                      <button
+                        key={n}
+                        className={`tab-btn ${bandSteps === n ? 'active' : ''}`}
+                        onClick={() => setBandSteps(n)}
+                      >
+                        {n}
+                      </button>
+                    ))}
+                  </div>
+                  <p style={{ margin: '4px 0 8px', fontSize: '11px', color: 'var(--muted)', lineHeight: 1.5 }}>
+                    {t.bandStepsHint}
+                  </p>
+
+                  <label className="checkbox-group" style={{ marginBottom: '4px' }}>
+                    <input
+                      type="checkbox"
+                      className="checkbox-input"
+                      checked={hardEdgeB}
+                      onChange={(e) => setHardEdgeB(e.target.checked)}
+                    />
+                    <span className="checkbox-label">{t.hardEdgeB}</span>
+                  </label>
+                  <p style={{ margin: '2px 0 14px', fontSize: '11px', color: 'var(--muted)', lineHeight: 1.5 }}>
+                    {t.hardEdgeBHint}
+                  </p>
+
+                  <div className="slider-header" style={{ marginBottom: '6px' }}>
+                    <span className="slider-name">{t.bandBias}</span>
+                    <span className="slider-val">
+                      {bandOffsetPx === 0 ? t.bandBiasZero : `${bandOffsetPx > 0 ? '+' : ''}${bandOffsetPx.toFixed(2)} px`}
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    className="slider-input"
+                    min={-1} max={1} step={0.05}
+                    value={bandBias}
+                    onChange={(e) => setBandBias(parseFloat(e.target.value))}
+                  />
+                  <div style={{
+                    display: 'flex', justifyContent: 'space-between',
+                    fontSize: '10.5px', color: 'var(--muted)', margin: '2px 0 14px',
+                  }}>
+                    <span>{t.bandTowardCentre}</span>
+                    <span>{t.bandTowardBorder}</span>
+                  </div>
+
+                  <div className="slider-header" style={{ marginBottom: '6px' }}>
+                    <span className="slider-name">{t.patternNoise}</span>
+                    <span className="slider-val">
+                      {patternNoise.length === 0 ? t.noiseOff : `${patternNoise.length}`}
+                    </span>
+                  </div>
+                  <div style={{ marginBottom: '6px' }}>
+                    {NOISE_PRESETS.map((n) => (
+                      <label key={n.id} className="checkbox-group" style={{ marginBottom: '4px' }}>
+                        <input
+                          type="checkbox"
+                          className="checkbox-input"
+                          checked={patternNoise.includes(n.id)}
+                          onChange={() => toggleNoise(n.id)}
+                        />
+                        <span className="checkbox-label">{lang === 'zh' ? n.zh : n.en}</span>
+                      </label>
+                    ))}
+                  </div>
+                  {patternNoise.length > 0 && (
+                    <div style={{ margin: '2px 0 10px' }}>
+                      <div className="slider-header" style={{ marginBottom: '6px' }}>
+                        <span className="slider-name">{t.noiseAmount}</span>
+                        <span className="slider-val">
+                          {patternNoiseStrength === 0
+                            ? t.noiseOff
+                            : `${Math.round(patternNoiseStrength * 100)}%`}
+                        </span>
+                      </div>
+                      <input
+                        type="range"
+                        className="slider-input"
+                        style={{ marginBottom: '12px' }}
+                        min={0} max={MAX_NOISE_STRENGTH} step={0.05}
+                        value={patternNoiseStrength}
+                        onChange={(e) => setPatternNoiseStrength(parseFloat(e.target.value))}
+                      />
+
+                      <div className="slider-header" style={{ marginBottom: '6px' }}>
+                        <span className="slider-name">{t.noiseSeed}</span>
+                      </div>
+                      <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                        <input
+                          type="number"
+                          className="text-input"
+                          style={{ flex: 1 }}
+                          min={0} max={99999}
+                          value={patternNoiseSeed}
+                          onChange={(e) => setPatternNoiseSeed(
+                            Math.max(0, Math.min(99999, parseInt(e.target.value) || 0))
+                          )}
+                        />
+                        <button
+                          className="btn-action btn-secondary"
+                          style={{ padding: '4px 10px', fontSize: '14px' }}
+                          onClick={() => setPatternNoiseSeed(Math.floor(Math.random() * 99999) + 1)}
+                          title={lang === 'zh' ? '随机种子' : 'Randomize seed'}
+                        >🎲</button>
+                      </div>
+                      <p style={{ margin: '6px 0 0', fontSize: '11px', color: 'var(--muted)', lineHeight: 1.5 }}>
+                        {t.noiseSeedHint}
+                      </p>
+                    </div>
+                  )}
+
+                  <p style={{ margin: '0 0 16px', fontSize: '11px', color: 'var(--muted)', lineHeight: 1.5 }}>
+                    {t.noiseStackHint}
+                  </p>
+
+                  <div className="slider-header" style={{ marginBottom: '6px' }}>
+                    <span className="slider-name">{t.terrainTexture}</span>
+                  </div>
+                  <select
+                    className="text-input"
+                    style={{ marginBottom: textureAlgo === 'none' ? '16px' : '10px' }}
+                    value={textureAlgo}
+                    onChange={(e) => setTextureAlgo(e.target.value as TextureId)}
+                  >
+                    {TEXTURE_PRESETS.map((p) => (
+                      <option key={p.id} value={p.id}>{lang === 'zh' ? p.zh : p.en}</option>
+                    ))}
+                  </select>
+
+                  {textureAlgo !== 'none' && (<>
+                    {([['A', textureAmountA, setTextureAmountA, t.textureAmountA],
+                       ['B', textureAmountB, setTextureAmountB, t.textureAmountB]] as const)
+                      .map(([key, val, set, label]) => (
+                        <div key={key}>
+                          <div className="slider-header" style={{ marginBottom: '4px' }}>
+                            <span className="slider-name">{label}</span>
+                            <span className="slider-val">
+                              {val === 0 ? t.noiseOff : `${Math.round(val * 100)}%`}
+                            </span>
+                          </div>
+                          <input
+                            type="range"
+                            className="slider-input"
+                            style={{ marginBottom: '8px' }}
+                            min={0} max={1} step={0.05}
+                            value={val}
+                            onChange={(e) => set(parseFloat(e.target.value))}
+                          />
+                        </div>
+                      ))}
+
+                    <div className="slider-header" style={{ marginBottom: '6px' }}>
+                      <span className="slider-name">{t.textureShades}</span>
+                    </div>
+                    <div className="type-tabs" style={{ marginBottom: '6px' }}>
+                      {TEXTURE_SHADE_CHOICES.map((n) => (
+                        <button
+                          key={n}
+                          className={`tab-btn ${textureShades === n ? 'active' : ''}`}
+                          onClick={() => setTextureShades(n)}
+                        >
+                          {n}
+                        </button>
+                      ))}
+                    </div>
+                    <p style={{ margin: '0 0 16px', fontSize: '11px', color: 'var(--muted)', lineHeight: 1.5 }}>
+                      {t.textureHint}
+                    </p>
+                  </>)}
+
+                  <div className="slider-header" style={{ marginBottom: '8px' }}>
+                    <span className="slider-name">{t.patternColours}</span>
+                  </div>
+                  {([
+                    ['terrainA', t.colourTerrainA],
+                    ['terrainB', t.colourTerrainB],
+                    ['edge', t.colourEdge],
+                  ] as const).map(([role, label]) => (
+                    <div key={role} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                      <input
+                        type="color"
+                        value={roleHex[role]}
+                        onChange={(e) => setRoleHex((p) => ({ ...p, [role]: e.target.value }))}
+                        style={{ width: '38px', height: '28px', padding: 0, border: 'none', background: 'none', cursor: 'pointer' }}
+                        aria-label={label}
+                      />
+                      <span style={{ fontSize: '12px', flex: 1 }}>{label}</span>
+                      <code style={{ fontSize: '11px', color: 'var(--muted)' }}>{roleHex[role]}</code>
+                    </div>
+                  ))}
+
+                  <div className="slider-header" style={{ margin: '12px 0 6px' }}>
+                    <span className="slider-name" style={{ fontSize: '11px' }}>{t.patternShades}</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: '4px' }}>
+                    {patternRamp(roleColours).map((c, i) => (
+                      <div
+                        key={i}
+                        title={toHexColour(c)}
+                        style={{
+                          flex: 1, height: '22px', borderRadius: '4px',
+                          border: '1px solid var(--line, rgba(255,255,255,.15))',
+                          background: toHexColour(c),
+                        }}
+                      />
+                    ))}
+                  </div>
+
+                  <button
+                    className="btn-preset"
+                    style={{ marginTop: '10px', width: '100%' }}
+                    onClick={() => setRoleHex({
+                      terrainA: toHexColour(DEFAULT_ROLE_COLOURS.terrainA),
+                      terrainB: toHexColour(DEFAULT_ROLE_COLOURS.terrainB),
+                      edge: toHexColour(DEFAULT_ROLE_COLOURS.edge),
+                    })}
+                  >
+                    {t.resetColours}
+                  </button>
+
+                  <p style={{ margin: '10px 0 0', fontSize: '11px', color: 'var(--muted)', lineHeight: 1.5 }}>
+                    {t.patternHint}
+                  </p>
+                </div>
+              )}
 
               <div className="slider-group" style={{ marginTop: '4px' }}>
                 <div className="slider-header" style={{ marginBottom: '6px' }}>
                   <span className="slider-name">{t.tileSize}</span>
                   <span className="slider-val">{tileSize} px</span>
                 </div>
-                <select 
+                <select
                   className="text-input"
                   value={tileSize}
                   onChange={(e) => setTileSize(parseInt(e.target.value))}
                 >
                   <option value={16}>16 x 16</option>
                   <option value={32}>32 x 32</option>
-                  <option value={48}>48 x 48</option>
-                  <option value={64}>64 x 64</option>
-                  <option value={128}>128 x 128</option>
+                  {/* The pattern is 16px art resampled up; past 32 there is no
+                      more detail in the field to recover, so it stops there.
+                      The texture modes have real source pixels and do not. */}
+                  {!isPattern && <option value={48}>48 x 48</option>}
+                  {!isPattern && <option value={64}>64 x 64</option>}
+                  {!isPattern && <option value={128}>128 x 128</option>}
                 </select>
               </div>
             </div>
@@ -866,8 +1257,8 @@ export default function App() {
                 ref={tilesetCanvasRef} 
                 className="tileset-canvas" 
                 style={{
-                  width: `${(isBlob47 ? BLOB47_COLS : isWang ? 4 : 5) * tileSize * zoom}px`,
-                  height: `${(isBlob47 ? BLOB47_ROWS : isWang ? 4 : 3) * tileSize * zoom}px`
+                  width: `${(isCellBased ? BLOB47_COLS : isWang ? 4 : 5) * tileSize * zoom}px`,
+                  height: `${(isCellBased ? BLOB47_ROWS : isWang ? 4 : 3) * tileSize * zoom}px`
                 }}
               />
             </div>

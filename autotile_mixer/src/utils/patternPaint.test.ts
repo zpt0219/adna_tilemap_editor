@@ -1,0 +1,494 @@
+import { describe, it, expect } from 'vitest';
+import { BLOB47_MASKS, BLOB47_LAYOUT, BLOB47_COLS, BLOB47_ROWS } from './blob47';
+import {
+  PATTERN_TILE_SIZE, patternLevelsForMask, patternFieldForMask, PATTERN_BACKGROUND,
+  PATTERNS, PATTERN_GROUPS, DEFAULT_PATTERN, PATTERN_BANDS, PATTERN_OFFSET_RANGE,
+  FIELD_STEP, FIELD_CHARS, clampOffset, bandsFor, bandNoiseSpan, patternLevelsFor,
+  MIN_BAND_STEPS, MAX_BAND_STEPS, DEFAULT_BAND_STEPS, type PatternId,
+} from './blob47Pattern';
+import {
+  DEFAULT_ROLE_COLOURS,
+  paintPatternTileRGBA,
+  patternRamp,
+  shadeColour,
+  toHexColour,
+} from './patternPaint';
+
+// The pattern is art, so these tests are a lock, not a specification: they fail
+// when the baked grids or the shade recipes drift, which would silently change
+// every tileset the app emits.
+
+const ALL_PATTERNS = PATTERNS.map((p) => p.id);
+
+describe('blob47 built-in patterns', () => {
+  it('offers a non-empty menu whose default is present', () => {
+    expect(ALL_PATTERNS.length).toBeGreaterThan(1);
+    expect(new Set(ALL_PATTERNS).size).toBe(ALL_PATTERNS.length);
+    expect(ALL_PATTERNS).toContain(DEFAULT_PATTERN);
+  });
+
+  it('keeps the grouped menu and the flat list in step', () => {
+    // The <select> renders groups; everything else iterates the flat list, so a
+    // pattern dropped from one and not the other would silently go missing.
+    const grouped = PATTERN_GROUPS.flatMap((g) => g.items.map((i) => i.id));
+    expect(grouped).toEqual(ALL_PATTERNS);
+    for (const g of PATTERN_GROUPS) expect(g.items.length).toBeGreaterThan(0);
+  });
+
+  it.each(ALL_PATTERNS)('%s has art for every canonical mask, 16x16, levels 0..4', (id) => {
+    expect(BLOB47_MASKS).toHaveLength(47);
+    for (const mask of BLOB47_MASKS) {
+      const grid = patternLevelsForMask(id, mask);
+      expect(grid).toHaveLength(PATTERN_TILE_SIZE * PATTERN_TILE_SIZE);
+      expect(grid).toMatch(/^[0-4]+$/);
+    }
+  });
+
+  it.each(ALL_PATTERNS)('%s paints the background as unshaded terrain B', (id) => {
+    expect(patternLevelsForMask(id, -1)).toBe(PATTERN_BACKGROUND);
+  });
+
+  it.each(ALL_PATTERNS)('%s makes the solid-interior mask entirely terrain A', (id) => {
+    // Every neighbour is terrain A, so nothing in the tile may be boundary.
+    expect(patternLevelsForMask(id, 255)).toBe('4'.repeat(256));
+  });
+
+  it('gives every pattern a distinct silhouette', () => {
+    const fingerprints = ALL_PATTERNS.map((id) =>
+      BLOB47_MASKS.map((m) => patternLevelsForMask(id, m)).join('')
+    );
+    expect(new Set(fingerprints).size).toBe(ALL_PATTERNS.length);
+  });
+
+  it('rejects a non-canonical mask rather than painting nonsense', () => {
+    // 16 is NE with neither adjacent edge — callers must canonicalize first.
+    expect(() => patternLevelsForMask(DEFAULT_PATTERN, 16)).toThrow(/no art/);
+  });
+
+  it.each(ALL_PATTERNS)('%s stores a well-formed 16x16 field', (id) => {
+    for (const mask of BLOB47_MASKS) {
+      const f = patternFieldForMask(id, mask);
+      expect(f).toHaveLength(PATTERN_TILE_SIZE * PATTERN_TILE_SIZE);
+      for (const ch of f) expect(FIELD_CHARS).toContain(ch);
+    }
+  });
+
+  it.each(ALL_PATTERNS)('%s has bands on the quantisation grid', (id) => {
+    // Floor-quantising the field only preserves comparisons if no band falls
+    // between two representable distances.
+    for (const b of PATTERN_BANDS[id]) {
+      expect(Math.abs(b / FIELD_STEP - Math.round(b / FIELD_STEP))).toBeLessThan(1e-9);
+    }
+    const [lo, hi] = PATTERN_OFFSET_RANGE[id];
+    expect(lo).toBeLessThanOrEqual(0);
+    expect(hi).toBeGreaterThan(0);
+  });
+});
+
+describe('sliding the transition band', () => {
+  it.each(ALL_PATTERNS)('%s is unchanged at offset 0', (id) => {
+    for (const mask of BLOB47_MASKS) {
+      expect(patternLevelsForMask(id, mask, 0)).toBe(patternLevelsForMask(id, mask));
+    }
+  });
+
+  it.each(ALL_PATTERNS)('%s grows terrain A toward the border, shrinks it toward the centre', (id) => {
+    const [lo, hi] = PATTERN_OFFSET_RANGE[id];
+    const count4 = (o: number) =>
+      BLOB47_MASKS.reduce((n, m) => n + [...patternLevelsForMask(id, m, o)]
+        .filter((c) => c === '4').length, 0);
+    if (hi > 0) expect(count4(hi)).toBeGreaterThan(count4(0));
+    if (lo < 0) expect(count4(lo)).toBeLessThan(count4(0));
+  });
+
+  it.each(ALL_PATTERNS)('%s keeps the boundary off the cell border at max offset', (id) => {
+    // The reason the positive end is bounded: past it the band butts against
+    // the neighbouring tile and reads as a straight clipped line.
+    const [, hi] = PATTERN_OFFSET_RANGE[id];
+    const TS = PATTERN_TILE_SIZE;
+    for (const mask of BLOB47_MASKS) {
+      const g = patternLevelsForMask(id, mask, hi);
+      const edges: [number, number[]][] = [
+        [1, [...Array(TS).keys()]],
+        [4, [...Array(TS).keys()].map((i) => TS * (TS - 1) + i)],
+        [8, [...Array(TS).keys()].map((i) => i * TS)],
+        [2, [...Array(TS).keys()].map((i) => i * TS + TS - 1)],
+      ];
+      for (const [bit, idx] of edges) {
+        if (mask & bit) continue;
+        for (const i of idx) expect(g[i]).toBe('0');
+      }
+    }
+  });
+
+  it.each(ALL_PATTERNS)('%s still renders something at the most negative offset', (id) => {
+    // The reason the negative end is bounded: past it the smallest island is
+    // eaten and a painted cell would render as empty terrain B.
+    const [lo] = PATTERN_OFFSET_RANGE[id];
+    const visible = [...patternLevelsForMask(id, 0, lo)].filter((c) => c !== '0').length;
+    expect(visible).toBeGreaterThan(0);
+  });
+
+  it('clamps an out-of-range offset instead of distorting the tile', () => {
+    const [lo, hi] = PATTERN_OFFSET_RANGE[DEFAULT_PATTERN];
+    expect(clampOffset(DEFAULT_PATTERN, 99)).toBe(hi);
+    expect(clampOffset(DEFAULT_PATTERN, -99)).toBe(lo);
+    expect(patternLevelsForMask(DEFAULT_PATTERN, 110, 99))
+      .toBe(patternLevelsForMask(DEFAULT_PATTERN, 110, hi));
+  });
+});
+
+describe('shading from one colour per role', () => {
+  it('derives the shades the recipes were tuned for', () => {
+    // A drifting recipe changes every pattern at once, so pin the two outputs
+    // the default palette must produce.
+    expect(toHexColour(shadeColour(DEFAULT_ROLE_COLOURS.terrainB, 'terrainB'))).toBe('#88c020');
+    expect(toHexColour(shadeColour(DEFAULT_ROLE_COLOURS.terrainA, 'terrainA'))).toBe('#d8f0f8');
+  });
+
+  it('keeps a saturated terrain its own colour', () => {
+    // Regression: the terrainA recipe's hue was solved against a white base, so
+    // it is an *absolute* cool tint. Adding it to a coloured base rotated the
+    // hue ~195 degrees and turned deep blue water into magenta.
+    const water = { r: 0x00, g: 0x18, b: 0xa0 };
+    const hueOf = (c: { r: number; g: number; b: number }) => {
+      const mx = Math.max(c.r, c.g, c.b), mn = Math.min(c.r, c.g, c.b);
+      if (mx === mn) return 0;
+      const d = mx - mn;
+      const h = c.r === mx ? (c.g - c.b) / d : c.g === mx ? 2 + (c.b - c.r) / d : 4 + (c.r - c.g) / d;
+      return ((h * 60) % 360 + 360) % 360;
+    };
+    for (const t of [0.25, 0.5, 1]) {
+      const shaded = shadeColour(water, 'terrainA', t);
+      const drift = Math.abs(hueOf(shaded) - hueOf(water));
+      expect(Math.min(drift, 360 - drift)).toBeLessThan(20);
+      expect(shaded.b).toBeGreaterThan(shaded.r); // still reads as blue
+    }
+  });
+
+  it('tints an achromatic terrain instead of only darkening it', () => {
+    // White has no hue to shift; the recipe supplies an absolute one. Without
+    // that branch the rim would come out grey and the outline would read flat.
+    const tint = shadeColour({ r: 255, g: 255, b: 255 }, 'terrainA');
+    expect(tint.b).toBeGreaterThan(tint.r);
+  });
+
+  it('gives the five levels the expected default palette', () => {
+    expect(patternRamp(DEFAULT_ROLE_COLOURS).map(toHexColour)).toEqual([
+      '#b0d848', '#88c020', '#afc6ff', '#d8f0f8', '#f8f8f8',
+    ]);
+  });
+});
+
+/** FNV-1a over the whole 128x96 sheet, laid out in BLOB47_LAYOUT order at 16px
+ *  with the reference colours — the same quantity as hashing the exported PNG. */
+function sheetHash(id: PatternId): number {
+  const ts = PATTERN_TILE_SIZE;
+  const w = BLOB47_COLS * ts;
+  const h = BLOB47_ROWS * ts;
+  const sheet = new Uint8ClampedArray(w * h * 4);
+  BLOB47_LAYOUT.forEach((mask, slot) => {
+    const px = paintPatternTileRGBA(id, mask, DEFAULT_ROLE_COLOURS, ts);
+    const ox = (slot % BLOB47_COLS) * ts;
+    const oy = Math.floor(slot / BLOB47_COLS) * ts;
+    for (let y = 0; y < ts; y++) {
+      for (let x = 0; x < ts; x++) {
+        const src = (y * ts + x) * 4;
+        sheet.set(px.subarray(src, src + 4), ((oy + y) * w + ox + x) * 4);
+      }
+    }
+  });
+  let hash = 0x811c9dc5;
+  for (const byte of sheet) hash = Math.imul(hash ^ byte, 0x01000193) >>> 0;
+  return hash >>> 0;
+}
+
+describe('transition-band steps', () => {
+  const COUNTS = [MIN_BAND_STEPS, 4, MAX_BAND_STEPS];
+
+  it('adds one colour per step', () => {
+    for (const n of COUNTS) {
+      // levels = the band's colours plus the two solid terrains
+      expect(patternLevelsFor(n)).toHaveLength(n + 2);
+      expect(patternRamp(DEFAULT_ROLE_COLOURS, n)).toHaveLength(n + 2);
+    }
+  });
+
+  it.each(ALL_PATTERNS)('%s is untouched at the default step count', (id) => {
+    // The whole feature has to be inert until the slider is moved.
+    for (const mask of BLOB47_MASKS) {
+      expect(patternLevelsForMask(id, mask, 0, 16, DEFAULT_BAND_STEPS))
+        .toBe(patternLevelsForMask(id, mask));
+    }
+  });
+
+  it.each(ALL_PATTERNS)('%s keeps the band outer edge fixed as steps are added', (id) => {
+    // This is why the offset range does not need re-measuring per count: the
+    // first threshold, which both offset limits are derived from, never moves.
+    for (const n of COUNTS) expect(bandsFor(id, n)[0]).toBe(bandsFor(id, MIN_BAND_STEPS)[0]);
+  });
+
+  it.each(ALL_PATTERNS)('%s grows only into terrain A', (id) => {
+    for (const n of COUNTS) {
+      const b = bandsFor(id, n);
+      expect(b).toHaveLength(n + 1);
+      // ascending, and every added threshold sits deeper than the last stored one
+      for (let i = 1; i < b.length; i++) expect(b[i]).toBeGreaterThanOrEqual(b[i - 1]);
+      expect(b.slice(0, 4)).toEqual([...PATTERN_BANDS[id]]);
+    }
+  });
+
+  it('fades the added shades back toward clean terrain', () => {
+    const levels = patternLevelsFor(MAX_BAND_STEPS);
+    const inner = levels.filter((l) => l.role === 'terrainA');
+    // strongest shade beside the outline, then weaker, ending on the raw colour
+    expect(inner.map((l) => l.shade)).toEqual([1, 2 / 3, 1 / 3, 0]);
+    for (let i = 1; i < inner.length; i++) {
+      expect(inner[i].shade).toBeLessThan(inner[i - 1].shade);
+    }
+  });
+
+  it('scales the shade recipe rather than switching it on and off', () => {
+    const base = DEFAULT_ROLE_COLOURS.terrainB;
+    const full = shadeColour(base, 'terrainB', 1);
+    const half = shadeColour(base, 'terrainB', 0.5);
+    expect(toHexColour(full)).toBe('#88c020');           // unchanged at t=1
+    expect(toHexColour(shadeColour(base, 'terrainB'))).toBe(toHexColour(full));
+    expect(toHexColour(shadeColour(base, 'terrainB', 0))).toBe(toHexColour(base));
+    // half-shade sits between the two, not at either end
+    expect(half.g).toBeGreaterThan(full.g);
+    expect(half.g).toBeLessThan(base.g);
+  });
+
+  it.each(ALL_PATTERNS)('%s renders strictly more colours as steps are added', (id) => {
+    // The honest property: moving the slider must do something for every
+    // pattern. Not that all declared levels render — `sharp` has zero-width
+    // shade bands by design and skips two of them (see below).
+    const distinct = (n: number) => {
+      const seen = new Set<string>();
+      for (const mask of BLOB47_MASKS) {
+        for (const ch of patternLevelsForMask(id, mask, 0, 32, n)) seen.add(ch);
+      }
+      return seen.size;
+    };
+    expect(distinct(4)).toBeGreaterThan(distinct(MIN_BAND_STEPS));
+    expect(distinct(MAX_BAND_STEPS)).toBeGreaterThan(distinct(4));
+  });
+
+  it.each(ALL_PATTERNS)('%s scales the grain span with the band', (id) => {
+    // Coverage grows on its own — a wider band holds more pixels. The span is
+    // what stops the fixed one-level nudge from shrinking into invisibility
+    // against the finer shades a wider band is sliced into.
+    expect(bandNoiseSpan(id, MIN_BAND_STEPS)).toBe(1);
+    expect(bandNoiseSpan(id, MAX_BAND_STEPS)).toBeGreaterThan(1);
+    for (const n of COUNTS) expect(bandNoiseSpan(id, n)).toBeLessThanOrEqual(2);
+  });
+
+  it.each(ALL_PATTERNS)('%s grain reaches further at 5 steps than at 3', (id) => {
+    const reach = (n: number) => {
+      const clean = paintPatternTileRGBA(id, 110, DEFAULT_ROLE_COLOURS, 32, [], 0, 0, 1, n);
+      const noisy = paintPatternTileRGBA(id, 110, DEFAULT_ROLE_COLOURS, 32, ['blue'], 0, 0, 1, n);
+      let worst = 0;
+      for (let i = 0; i < clean.length; i += 4) {
+        const d = Math.max(Math.abs(clean[i] - noisy[i]),
+                           Math.abs(clean[i + 1] - noisy[i + 1]),
+                           Math.abs(clean[i + 2] - noisy[i + 2]));
+        if (d > worst) worst = d;
+      }
+      return worst;
+    };
+    expect(reach(MAX_BAND_STEPS)).toBeGreaterThan(0);
+    expect(reach(MIN_BAND_STEPS)).toBeGreaterThan(0);
+  });
+
+  it.each(ALL_PATTERNS)('%s grain never escapes the ramp, whatever the span', (id) => {
+    const allowed = new Set(patternRamp(DEFAULT_ROLE_COLOURS, MAX_BAND_STEPS).map(toHexColour));
+    for (const mask of [0, 31, 110, 255]) {
+      const px = paintPatternTileRGBA(
+        id, mask, DEFAULT_ROLE_COLOURS, 16, ['blue', 'white', 'clumped', 'ordered'],
+        0, 0, 2, MAX_BAND_STEPS);
+      for (let i = 0; i < px.length; i += 4) {
+        expect(allowed).toContain(toHexColour({ r: px[i], g: px[i + 1], b: px[i + 2] }));
+      }
+    }
+  });
+
+  it.each(ALL_PATTERNS)('%s hard B edge collapses that shade and nothing else', (id) => {
+    for (const n of COUNTS) {
+      const soft = bandsFor(id, n);
+      const hard = bandsFor(id, n, true);
+      expect(hard).toHaveLength(soft.length);
+      expect(hard[0]).toBe(soft[0]);        // outer edge fixed -> offsets stay valid
+      expect(hard[1]).toBe(hard[0]);        // no terrain-B shade left
+      // every other band keeps its width, just sits one shade closer out
+      for (let i = 2; i < soft.length; i++) {
+        expect(hard[i] - hard[i - 1]).toBeCloseTo(soft[i] - soft[i - 1], 9);
+      }
+    }
+  });
+
+  it.each(ALL_PATTERNS)('%s stops rendering the terrain-B shade when hard', (id) => {
+    let softSeen = 0;
+    let hardSeen = 0;
+    for (const mask of BLOB47_MASKS) {
+      for (const ch of patternLevelsForMask(id, mask, 0, 32, 4, false)) if (ch === '1') softSeen++;
+      for (const ch of patternLevelsForMask(id, mask, 0, 32, 4, true)) if (ch === '1') hardSeen++;
+    }
+    expect(hardSeen).toBe(0);
+    if (bandsFor(id, 4)[1] > bandsFor(id, 4)[0]) expect(softSeen).toBeGreaterThan(0);
+  });
+
+  it('is a no-op on a pattern whose B shade is already collapsed', () => {
+    // sharp is the one that was authored this way; the flag must not shift it.
+    expect(bandsFor('sharp', 4, true)).toEqual(bandsFor('sharp', 4));
+  });
+
+  it.each(ALL_PATTERNS)('%s hard B edge still keeps the boundary off the border', (id) => {
+    const [, hi] = PATTERN_OFFSET_RANGE[id];
+    for (const mask of BLOB47_MASKS) {
+      const g = patternLevelsForMask(id, mask, hi, 16, MAX_BAND_STEPS, true);
+      const edges: [number, number[]][] = [
+        [1, [...Array(16).keys()]],
+        [4, [...Array(16).keys()].map((i) => 16 * 15 + i)],
+        [8, [...Array(16).keys()].map((i) => i * 16)],
+        [2, [...Array(16).keys()].map((i) => i * 16 + 15)],
+      ];
+      for (const [bit, idx] of edges) {
+        if (mask & bit) continue;
+        for (const i of idx) expect(g[i]).toBe('0');
+      }
+    }
+  });
+
+  it('sharp has zero-width shade bands on purpose, and keeps them', () => {
+    // It is the "hard 1px outline" pattern: terrain meets outline meets terrain
+    // with no shading between. Added steps give it an inner falloff without
+    // reviving the shade levels it deliberately collapsed.
+    const b = PATTERN_BANDS.sharp;
+    expect(b[0]).toBe(b[1]);
+    expect(b[2]).toBe(b[3]);
+    const five = bandsFor('sharp', MAX_BAND_STEPS);
+    expect(five[0]).toBe(five[1]);
+    expect(five[2]).toBe(five[3]);
+    expect(five[5]).toBeGreaterThan(five[4]);
+  });
+
+  it.each(ALL_PATTERNS)('%s still keeps the boundary off the cell border at 5 steps', (id) => {
+    const [, hi] = PATTERN_OFFSET_RANGE[id];
+    for (const mask of BLOB47_MASKS) {
+      const g = patternLevelsForMask(id, mask, hi, 16, MAX_BAND_STEPS);
+      const edges: [number, number[]][] = [
+        [1, [...Array(16).keys()]],
+        [4, [...Array(16).keys()].map((i) => 16 * 15 + i)],
+        [8, [...Array(16).keys()].map((i) => i * 16)],
+        [2, [...Array(16).keys()].map((i) => i * 16 + 15)],
+      ];
+      for (const [bit, idx] of edges) {
+        if (mask & bit) continue;
+        for (const i of idx) expect(g[i]).toBe('0');
+      }
+    }
+  });
+});
+
+describe('resolution', () => {
+  const TS = PATTERN_TILE_SIZE;
+
+  it.each(ALL_PATTERNS)('%s at 16px is exactly the stored field thresholded', (id) => {
+    // Bilinear sampling must degenerate to a plain lookup here, or every
+    // pattern would drift the moment the resampling path was introduced.
+    for (const mask of BLOB47_MASKS) {
+      const grid = patternLevelsForMask(id, mask, 0, TS);
+      const field = patternFieldForMask(id, mask);
+      const [b0, b1, b2, b3] = PATTERN_BANDS[id];
+      let expected = '';
+      for (let i = 0; i < field.length; i++) {
+        const d = FIELD_CHARS.indexOf(field[i]) * FIELD_STEP;
+        expected += d >= b3 ? '4' : d >= b2 ? '3' : d >= b1 ? '2' : d >= b0 ? '1' : '0';
+      }
+      expect(grid).toBe(expected);
+    }
+  });
+
+  it.each(ALL_PATTERNS)('%s at 32px resolves detail a 2x upscale cannot', (id) => {
+    // A nearest-neighbour blow-up would make every 2x2 output block uniform.
+    // Thresholding the resampled field must break at least some of them, or
+    // the extra resolution is buying nothing.
+    let mixedBlocks = 0;
+    for (const mask of BLOB47_MASKS) {
+      const g = patternLevelsForMask(id, mask, 0, 32);
+      for (let y = 0; y < 32; y += 2) {
+        for (let x = 0; x < 32; x += 2) {
+          const q = [g[y * 32 + x], g[y * 32 + x + 1], g[(y + 1) * 32 + x], g[(y + 1) * 32 + x + 1]];
+          if (new Set(q).size > 1) mixedBlocks++;
+        }
+      }
+    }
+    expect(mixedBlocks).toBeGreaterThan(100);
+  });
+
+  it.each(ALL_PATTERNS)('%s keeps the boundary off the cell border at 32px too', (id) => {
+    // The inset invariant has to survive resampling, including the clamped
+    // half-pixel the interpolation reads past each edge.
+    const [, hi] = PATTERN_OFFSET_RANGE[id];
+    for (const mask of BLOB47_MASKS) {
+      const g = patternLevelsForMask(id, mask, hi, 32);
+      const edges: [number, number[]][] = [
+        [1, [...Array(32).keys()]],
+        [4, [...Array(32).keys()].map((i) => 32 * 31 + i)],
+        [8, [...Array(32).keys()].map((i) => i * 32)],
+        [2, [...Array(32).keys()].map((i) => i * 32 + 31)],
+      ];
+      for (const [bit, idx] of edges) {
+        if (mask & bit) continue;
+        for (const i of idx) expect(g[i]).toBe('0');
+      }
+    }
+  });
+
+  it('scales the band with the tile, so the art reads the same size', () => {
+    // An outline 1px wide at 16 should be 2px wide at 32, not still 1px.
+    const width = (ts: number) =>
+      [...patternLevelsForMask('bold', 110, 0, ts)].filter((c) => c === '2').length / ts;
+    expect(width(32)).toBeGreaterThan(width(16) * 1.6);
+  });
+
+  it('paints RGBA at whatever size was asked for', () => {
+    for (const ts of [16, 32]) {
+      const px = paintPatternTileRGBA(DEFAULT_PATTERN, 110, DEFAULT_ROLE_COLOURS, ts);
+      expect(px).toHaveLength(ts * ts * 4);
+    }
+  });
+});
+
+describe('painting', () => {
+  it('emits opaque RGBA at the requested size', () => {
+    const px = paintPatternTileRGBA(DEFAULT_PATTERN, 255, DEFAULT_ROLE_COLOURS, 32);
+    expect(px).toHaveLength(32 * 32 * 4);
+    for (let i = 3; i < px.length; i += 4) expect(px[i]).toBe(255);
+  });
+
+  // Locks art, shade recipes, sheet layout and rounding in one number each.
+  // Regenerate with the baker if a pattern is deliberately redesigned.
+  const LOCKS = [
+    ['rounded', 0xee2a3175],
+    ['sharp', 0x4bc96dd5],
+    ['bold', 0xc42e9d95],
+    ['jagged', 0xa4c760e7],
+    ['gravel', 0x0e0e4c37],
+    ['boulder', 0xae807907],
+    ['thorn', 0x21fad4c7],
+    ['coast', 0x876b3175],
+    ['moss', 0x487fe7b7],
+    ['billow', 0x765dd967],
+  ] as const;
+
+  it.each(LOCKS)('%s sheet is byte-stable', (id, expected) => {
+    expect(sheetHash(id)).toBe(expected);
+  });
+
+  it('locks every pattern in the menu', () => {
+    // Guards against adding a pattern without adding its lock above.
+    expect([...ALL_PATTERNS].sort()).toEqual([...LOCKS.map(([id]) => id)].sort());
+  });
+});
