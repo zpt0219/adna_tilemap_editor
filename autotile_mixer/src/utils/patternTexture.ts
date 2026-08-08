@@ -15,17 +15,17 @@ import { sample, type NoiseId } from './patternNoise';
 import type { RGB } from './patternPaint';
 
 /**
- * `ripple`, `web`, `brick` and `carpet` are texture-only; the rest are shared
+ * `ripple`, `brick` and `carpet` are texture-only; the rest are shared
  * with the band grain. The last two are geometric rather than noisy — for those
  * `amount` reads as line weight instead of scatter density.
  */
-export type TextureId = 'none' | NoiseId | 'ripple' | 'web' | 'cells' | 'small_cells' | 'brick' | 'carpet' | 'weave';
+export type TextureId = 'none' | NoiseId | 'ripple' | 'cells' | 'medium_cells' | 'small_cells' | 'brick' | 'carpet' | 'weave';
 
 export const TEXTURE_PRESETS: readonly { id: TextureId; zh: string; en: string }[] = [
   { id: 'none', zh: '无纹理', en: 'None' },
   { id: 'ripple', zh: '波纹 · 横向短划（水面）', en: 'Ripples — short horizontal dashes' },
-  { id: 'web', zh: '涟漪网 · 细线连成的网', en: 'Web — thin connected veins' },
   { id: 'cells', zh: '大细胞 · 2x2 多边形', en: 'Large Cells — 2x2 polygonal cells' },
+  { id: 'medium_cells', zh: '中细胞 · 3x3 多边形', en: 'Medium Cells — 3x3 polygonal cells' },
   { id: 'small_cells', zh: '小细胞 · 4x4 细小多边形', en: 'Small Cells — 4x4 fine polygonal cells' },
   { id: 'brick', zh: '方砖路面 · 错缝铺装', en: 'Paving — square flags, running bond' },
   { id: 'carpet', zh: '地毯花纹 · 菱格团花', en: 'Carpet — diamond lattice medallions' },
@@ -74,38 +74,11 @@ function rippleField(x: number, y: number, seed: number): number {
 }
 
 /**
- * Cellular (Worley) noise read at its *edges*: near-equal distance to the two
- * closest feature points means the pixel sits on a cell boundary, and those
- * boundaries join up into one connected filigree.
- */
-function webField(x: number, y: number, seed: number): number {
-  const per = 4;
-  const fx = (x / 16) * per;
-  const fy = (y / 16) * per;
-  const cx = Math.floor(fx);
-  const cy = Math.floor(fy);
-  let f1 = 9, f2 = 9;
-  for (let dy = -1; dy <= 1; dy++) {
-    for (let dx = -1; dx <= 1; dx++) {
-      const ix = cx + dx;
-      const iy = cy + dy;
-      const wx = ((ix % per) + per) % per;
-      const wy = ((iy % per) + per) % per;
-      const px = ix + hash01(wx, wy, seed);
-      const py = iy + hash01(wx, wy, seed ^ 0x9e37);
-      const d = Math.hypot(px - fx, py - fy);
-      if (d < f1) { f2 = f1; f1 = d; } else if (d < f2) { f2 = d; }
-    }
-  }
-  return 1 - Math.min(1, (f2 - f1) * 1.6);
-}
-
-/**
  * A tileable Voronoi cell field. Unlike `webField`, this keeps a little of the
  * nearest cell's identity in the interior, so full strength reads as softly
  * varied polygon tiles with darker shared boundaries rather than as a vein
  * network.
- * `per` defines the number of cells across the 16px tile (2 for 2x2 cells, 4 for 4x4 cells).
+ * `per` defines the number of cells across the 16px tile (2 for 2x2, 3 for 3x3, 4 for 4x4).
  */
 function cellsField(x: number, y: number, seed: number, per = 2): number {
   const fx = (x / 16) * per;
@@ -122,12 +95,12 @@ function cellsField(x: number, y: number, seed: number, per = 2): number {
       const wx = ((ix % per) + per) % per;
       const wy = ((iy % per) + per) % per;
 
-      // For 4x4 small cells, use fully random web-style point placement across the cell domain
-      // so points wander naturally without any rigid grid skeleton or square box lines.
-      const px = per === 4
+      // For 3x3 (medium) and 4x4 (small) cells, use fully random free-floating Voronoi points
+      // so cells wander naturally without any rigid grid skeleton or square box lines.
+      const px = per >= 3
         ? ix + hash01(wx, wy, seed ^ 0x3c6ef3)
         : ix + (wy % 2) * 0.5 + 0.16 + hash01(wx, wy, seed ^ 0x3c6ef3) * 0.55;
-      const py = per === 4
+      const py = per >= 3
         ? iy + hash01(wx, wy, seed ^ 0xa54ff5)
         : iy + 0.16 + hash01(wx, wy, seed ^ 0xa54ff5) * 0.55;
 
@@ -143,9 +116,9 @@ function cellsField(x: number, y: number, seed: number, per = 2): number {
     }
   }
 
-  // F2-F1 is small on a Voronoi boundary. For 4x4 cells on a 16px raster, a 1.6 boundary
-  // multiplier matches webField while ensuring boundary lines stay continuous.
-  const boundaryMult = per === 4 ? 1.6 : 2.4;
+  // F2-F1 is small on a Voronoi boundary. Tune boundary multiplier for raster thickness
+  // to ensure continuous boundary lines across integer pixel samples.
+  const boundaryMult = per === 4 ? 1.6 : per === 3 ? 2.0 : 2.4;
   const boundary = 1 - Math.min(1, (f2 - f1) * boundaryMult);
   const interior = 0.10 + 0.14 * hash01(nearestX, nearestY, seed ^ 0x510e52);
   return Math.max(interior, boundary);
@@ -278,8 +251,8 @@ export function textureShadeAt(
   // Baked art, not a field: it already knows which tone each pixel is.
   if (texture === 'weave') return weaveShade(x, y, s, amount, shades);
   const n = texture === 'ripple' ? rippleField(x, y, s)
-    : texture === 'web' ? webField(x, y, s)
-      : texture === 'cells' ? cellsField(x, y, s, 2)
+    : texture === 'cells' ? cellsField(x, y, s, 2)
+      : texture === 'medium_cells' ? cellsField(x, y, s, 3)
         : texture === 'small_cells' ? cellsField(x, y, s, 4)
           : texture === 'brick' ? brickField(x, y, s)
             : texture === 'carpet' ? carpetField(x, y, s)

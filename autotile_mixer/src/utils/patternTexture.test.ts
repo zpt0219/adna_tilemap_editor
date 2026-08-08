@@ -246,6 +246,20 @@ describe('geometric textures', () => {
     expect(shades.size).toBeGreaterThan(2);
   });
 
+  it('medium_cells generates a 3x3 cellular grid', () => {
+    const sparse = lit('medium_cells', 0.35);
+    expect(sparse.length).toBeGreaterThan(0);
+    expect(sparse.length).toBeLessThan(256);
+
+    const shades = new Set<number>();
+    for (let y = 0; y < 16; y++) {
+      for (let x = 0; x < 16; x++) {
+        shades.add(textureShadeAt('medium_cells', x, y, 0, 1, MAX_TEXTURE_SHADES));
+      }
+    }
+    expect(shades.size).toBeGreaterThan(2);
+  });
+
   it('small_cells generates a dense 4x4 cellular grid', () => {
     const sparse = lit('small_cells', 0.35);
     expect(sparse.length).toBeGreaterThan(0);
