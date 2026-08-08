@@ -10,7 +10,6 @@
 // compactly. patternPaint.test.ts locks every pattern's pixels.
 
 import { GENERATED_FIELDS } from './patterns/generated';
-import { canonicalizeBlobMask } from './blob47';
 
 export type PatternRole = 'terrainA' | 'terrainB' | 'edge';
 
