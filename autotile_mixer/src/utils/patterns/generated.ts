@@ -12,7 +12,7 @@
 //
 // Reviewed through the parameters that produced them, not their pixels:
 //
-//   sharp    cornerRounding=0.00, bands=(3.5, 3.5, 4.5, 4.5)
+//   sharp    cornerRounding=0.00, bands=(3.5, 4.5, 5.5, 6.5)
 //   rounded  cornerRounding=0.55, bands=(3.5, 4.5, 5.5, 6.5)
 //   bold     cornerRounding=0.35, bands=(2.5, 3.5, 5.5, 6.5)
 //   jagged   cornerRounding=0.15, bands=(3.5, 4.5, 5.5, 6.5), value noise=1.90 scale=4 seed=7

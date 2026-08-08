@@ -348,9 +348,11 @@ describe('transition-band steps', () => {
     if (bandsFor(id, 4)[1] > bandsFor(id, 4)[0]) expect(softSeen).toBeGreaterThan(0);
   });
 
-  it('is a no-op on a pattern whose B shade is already collapsed', () => {
-    // sharp is the one that was authored this way; the flag must not shift it.
-    expect(bandsFor('sharp', 4, true)).toEqual(bandsFor('sharp', 4));
+  it('hard B edge on sharp collapses the B shade', () => {
+    const soft = bandsFor('sharp', 4);
+    const hard = bandsFor('sharp', 4, true);
+    expect(hard[1]).toBe(hard[0]);
+    expect(hard[2] - hard[1]).toBeCloseTo(soft[2] - soft[1], 9);
   });
 
   it.each(ALL_PATTERNS)('%s hard B edge still keeps the boundary off the border', (id) => {
@@ -370,16 +372,11 @@ describe('transition-band steps', () => {
     }
   });
 
-  it('sharp has zero-width shade bands on purpose, and keeps them', () => {
-    // It is the "hard 1px outline" pattern: terrain meets outline meets terrain
-    // with no shading between. Added steps give it an inner falloff without
-    // reviving the shade levels it deliberately collapsed.
+  it('sharp has full shade bands matching rounded', () => {
     const b = PATTERN_BANDS.sharp;
-    expect(b[0]).toBe(b[1]);
-    expect(b[2]).toBe(b[3]);
+    expect(b[1] - b[0]).toBe(1);
+    expect(b[3] - b[2]).toBe(1);
     const five = bandsFor('sharp', MAX_BAND_STEPS);
-    expect(five[0]).toBe(five[1]);
-    expect(five[2]).toBe(five[3]);
     expect(five[5]).toBeGreaterThan(five[4]);
   });
 
@@ -489,7 +486,7 @@ describe('painting', () => {
   // Regenerate with the baker if a pattern is deliberately redesigned.
   const LOCKS = [
     ['rounded', 0xee2a3175],
-    ['sharp', 0x4bc96dd5],
+    ['sharp', 0xaad91055],
     ['jagged', 0xa4c760e7],
     ['gravel', 0x0e0e4c37],
     ['boulder', 0xae807907],

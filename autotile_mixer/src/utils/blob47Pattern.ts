@@ -141,7 +141,7 @@ const CHAR_VALUE: number[] = (() => {
  * field's floor-quantisation cannot straddle one.
  */
 export const PATTERN_BANDS: Record<PatternId, readonly [number, number, number, number]> = {
-  sharp: [3.5, 3.5, 4.5, 4.5],
+  sharp: [3.5, 4.5, 5.5, 6.5],
   rounded: [3.5, 4.5, 5.5, 6.5],
   jagged: [3.5, 4.5, 5.5, 6.5],
   gravel: [3.5, 4.5, 5.5, 6.5],
