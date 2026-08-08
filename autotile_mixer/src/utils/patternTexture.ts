@@ -115,6 +115,11 @@ function cellsField(x: number, y: number, seed: number, per = 2): number {
   let f1 = 9, f2 = 9;
   let nearestX = 0, nearestY = 0;
 
+  // Scale jitter so 4x4 micro-cells stay well-spaced on a 16px grid without
+  // squishing adjacent feature points into pixel-level gaps.
+  const jitter = per === 4 ? 0.45 : 0.68;
+  const baseOffset = per === 4 ? 0.27 : 0.16;
+
   for (let dy = -1; dy <= 1; dy++) {
     for (let dx = -1; dx <= 1; dx++) {
       const ix = cx + dx;
@@ -123,8 +128,8 @@ function cellsField(x: number, y: number, seed: number, per = 2): number {
       const wy = ((iy % per) + per) % per;
       // Keep the points away from lattice corners so cells stay readable at
       // 16px, while the second hash gives each cell an independent y offset.
-      const px = ix + 0.16 + hash01(wx, wy, seed ^ 0x3c6ef3) * 0.68;
-      const py = iy + 0.16 + hash01(wx, wy, seed ^ 0xa54ff5) * 0.68;
+      const px = ix + baseOffset + hash01(wx, wy, seed ^ 0x3c6ef3) * jitter;
+      const py = iy + baseOffset + hash01(wx, wy, seed ^ 0xa54ff5) * jitter;
       const d = Math.hypot(px - fx, py - fy);
       if (d < f1) {
         f2 = f1;
@@ -137,9 +142,10 @@ function cellsField(x: number, y: number, seed: number, per = 2): number {
     }
   }
 
-  // F2-F1 is small on a Voronoi boundary. A modest cell-local floor keeps the
-  // interiors from becoming empty when the user selects all texture shades.
-  const boundaryMult = per === 4 ? 3.0 : 2.4;
+  // F2-F1 is small on a Voronoi boundary. For 4x4 cells on a 16px raster, a lower
+  // boundary multiplier (1.7 vs 2.4) ensures the boundary thickness covers integer
+  // pixel samples continuously without leaving diagonal gaps.
+  const boundaryMult = per === 4 ? 1.7 : 2.4;
   const boundary = 1 - Math.min(1, (f2 - f1) * boundaryMult);
   const interior = 0.12 + 0.16 * hash01(nearestX, nearestY, seed ^ 0x510e52);
   return Math.max(interior, boundary);
