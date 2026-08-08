@@ -241,13 +241,23 @@ export function paintPatternTileRGBA(
 
         let isTargetEnabled = false;
         if (baseRole === 'terrainB') {
-          isTargetEnabled = noiseTargets.includes('terrainB');
+          if (step < 0) {
+            isTargetEnabled = noiseTargets.includes('terrainB');
+          } else if (step > 0) {
+            isTargetEnabled = noiseTargets.includes('terrainB') && noiseTargets.includes('edge');
+          }
         } else if (baseRole === 'terrainA') {
-          isTargetEnabled = noiseTargets.includes('terrainA');
+          if (step > 0) {
+            isTargetEnabled = noiseTargets.includes('terrainA');
+          } else if (step < 0) {
+            isTargetEnabled = noiseTargets.includes('terrainA') && noiseTargets.includes('edge');
+          }
         } else if (baseRole === 'edge') {
-          isTargetEnabled = noiseTargets.includes('edge') ||
-            (step < 0 && noiseTargets.includes('terrainB')) ||
-            (step > 0 && noiseTargets.includes('terrainA'));
+          if (step < 0) {
+            isTargetEnabled = noiseTargets.includes('edge') || noiseTargets.includes('terrainB');
+          } else if (step > 0) {
+            isTargetEnabled = noiseTargets.includes('edge') || noiseTargets.includes('terrainA');
+          }
         }
 
         if (!isTargetEnabled) step = 0;
