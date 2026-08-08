@@ -19,13 +19,14 @@ import type { RGB } from './patternPaint';
  * with the band grain. The last two are geometric rather than noisy — for those
  * `amount` reads as line weight instead of scatter density.
  */
-export type TextureId = 'none' | NoiseId | 'ripple' | 'web' | 'cells' | 'brick' | 'carpet' | 'weave';
+export type TextureId = 'none' | NoiseId | 'ripple' | 'web' | 'cells' | 'small_cells' | 'brick' | 'carpet' | 'weave';
 
 export const TEXTURE_PRESETS: readonly { id: TextureId; zh: string; en: string }[] = [
   { id: 'none', zh: '无纹理', en: 'None' },
   { id: 'ripple', zh: '波纹 · 横向短划（水面）', en: 'Ripples — short horizontal dashes' },
   { id: 'web', zh: '涟漪网 · 细线连成的网', en: 'Web — thin connected veins' },
-  { id: 'cells', zh: '细胞 · 多边形裂纹', en: 'Cells — polygonal cell boundaries' },
+  { id: 'cells', zh: '大细胞 · 2x2 多边形', en: 'Large Cells — 2x2 polygonal cells' },
+  { id: 'small_cells', zh: '小细胞 · 4x4 细小多边形', en: 'Small Cells — 4x4 fine polygonal cells' },
   { id: 'brick', zh: '方砖路面 · 错缝铺装', en: 'Paving — square flags, running bond' },
   { id: 'carpet', zh: '地毯花纹 · 菱格团花', en: 'Carpet — diamond lattice medallions' },
   { id: 'weave', zh: '斜铺砖 · 菱格编织', en: 'Weave — diagonal interlocking bricks' },
@@ -103,13 +104,10 @@ function webField(x: number, y: number, seed: number): number {
  * A tileable Voronoi cell field. Unlike `webField`, this keeps a little of the
  * nearest cell's identity in the interior, so full strength reads as softly
  * varied polygon tiles with darker shared boundaries rather than as a vein
- * network. The lattice is 2x2 over the 16px period; all cell coordinates are
- * wrapped before hashing, which makes the field agree exactly at every seam.
+ * network.
+ * `per` defines the number of cells across the 16px tile (2 for 2x2 cells, 4 for 4x4 cells).
  */
-function cellsField(x: number, y: number, seed: number): number {
-  // Two cells across the 16px period gives the larger, more legible cells in
-  // the reference instead of the dense 4x4 micro-cell look.
-  const per = 2;
+function cellsField(x: number, y: number, seed: number, per = 2): number {
   const fx = (x / 16) * per;
   const fy = (y / 16) * per;
   const cx = Math.floor(fx);
@@ -125,8 +123,8 @@ function cellsField(x: number, y: number, seed: number): number {
       const wy = ((iy % per) + per) % per;
       // Keep the points away from lattice corners so cells stay readable at
       // 16px, while the second hash gives each cell an independent y offset.
-      const px = ix + 0.16 + hash01(wx, wy, seed ^ 0x3c6ef3);
-      const py = iy + 0.16 + hash01(wx, wy, seed ^ 0xa54ff5);
+      const px = ix + 0.16 + hash01(wx, wy, seed ^ 0x3c6ef3) * 0.68;
+      const py = iy + 0.16 + hash01(wx, wy, seed ^ 0xa54ff5) * 0.68;
       const d = Math.hypot(px - fx, py - fy);
       if (d < f1) {
         f2 = f1;
@@ -141,7 +139,8 @@ function cellsField(x: number, y: number, seed: number): number {
 
   // F2-F1 is small on a Voronoi boundary. A modest cell-local floor keeps the
   // interiors from becoming empty when the user selects all texture shades.
-  const boundary = 1 - Math.min(1, (f2 - f1) * 2.4);
+  const boundaryMult = per === 4 ? 3.0 : 2.4;
+  const boundary = 1 - Math.min(1, (f2 - f1) * boundaryMult);
   const interior = 0.12 + 0.16 * hash01(nearestX, nearestY, seed ^ 0x510e52);
   return Math.max(interior, boundary);
 }
@@ -274,10 +273,11 @@ export function textureShadeAt(
   if (texture === 'weave') return weaveShade(x, y, s, amount, shades);
   const n = texture === 'ripple' ? rippleField(x, y, s)
     : texture === 'web' ? webField(x, y, s)
-      : texture === 'cells' ? cellsField(x, y, s)
-        : texture === 'brick' ? brickField(x, y, s)
-          : texture === 'carpet' ? carpetField(x, y, s)
-            : sample(texture, x, y, s);
+      : texture === 'cells' ? cellsField(x, y, s, 2)
+        : texture === 'small_cells' ? cellsField(x, y, s, 4)
+          : texture === 'brick' ? brickField(x, y, s)
+            : texture === 'carpet' ? carpetField(x, y, s)
+              : sample(texture, x, y, s);
   const cut = 1 - Math.min(1, amount);
   if (n < cut) return 0;
   const u = cut >= 1 ? 1 : (n - cut) / (1 - cut);
