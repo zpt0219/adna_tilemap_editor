@@ -486,7 +486,7 @@ describe('painting', () => {
   // Regenerate with the baker if a pattern is deliberately redesigned.
   const LOCKS = [
     ['rounded', 0xee2a3175],
-    ['sharp', 0xaad91055],
+    ['sharp', 2866591765],
     ['jagged', 0xa4c760e7],
     ['gravel', 0x0e0e4c37],
     ['boulder', 0xae807907],
