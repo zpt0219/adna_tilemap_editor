@@ -241,13 +241,29 @@ export function paintPatternTileRGBA(
 
         if (step !== 0) {
           const nextLvl = Math.max(0, Math.min(solid, level + step));
-          const baseRole = levelDefs[level]?.role;
+          const fromRole = levelDefs[level]?.role;
           const nextRole = levelDefs[nextLvl]?.role;
 
-          // Step 2: Filter mask — keep noise if either base role or target role is enabled in noiseTargets
+          // Step 2: the band is partitioned into three zones — the outline, the
+          // terrain-A side and the terrain-B side — and a displacement touches
+          // TWO of them, so both ends are checked. Either one alone leaks, and
+          // both leaks are visible on the outline:
+          //
+          //   source only      a B-side pixel is promoted INTO the outline
+          //                    level, scattering outline-coloured specks along
+          //                    the band;
+          //   destination only an outline pixel is demoted to the B side,
+          //                    punching terrain-coloured holes in the outline.
+          //
+          // The guard is deliberately asymmetric rather than "both roles must
+          // be targeted": moving OUT of a targeted zone is always allowed, so
+          // that targeting the outline alone still dissolves it outward instead
+          // of becoming a checkbox that does nothing. Only moving INTO the
+          // outline is gated, because the outline is the one zone whose job is
+          // to stay a readable line.
           const keepNoise =
-            Boolean(baseRole && noiseTargets.includes(baseRole)) ||
-            Boolean(nextRole && noiseTargets.includes(nextRole));
+            Boolean(fromRole && noiseTargets.includes(fromRole)) &&
+            (nextRole !== 'edge' || noiseTargets.includes('edge'));
 
           if (keepNoise) {
             if (nextRole === 'edge' && customNoiseColours?.edge) {

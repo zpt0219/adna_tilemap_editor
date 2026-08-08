@@ -641,6 +641,21 @@ describe('re-rolling an irregular edge', () => {
         }
         expect(diffCount).toBeGreaterThan(0);
 
+        // A zone can only be disturbed if the pattern actually HAS one. `sharp`
+        // is authored with zero-width shade levels (PATTERN_BANDS), so its band
+        // is nothing but outline and targeting either terrain side is correctly
+        // a no-op. Derived from the level grid rather than naming the pattern.
+        const zoneGrid = patternLevelsForMask(patternId, mask, 0, tileSize, 3);
+        const zoneDefs = patternLevelsFor(3);
+        const lastLvl = zoneDefs.length - 1;
+        const hasZone = (role: string) => {
+          for (let p = 0; p < tileSize * tileSize; p++) {
+            const l = zoneGrid.charCodeAt(p) - 48;
+            if (l > 0 && l < lastLvl && zoneDefs[l].role === role) return true;
+          }
+          return false;
+        };
+
         // Test 1: Only 'terrainB' target enabled
         const noisyBOnly = paintPatternTileRGBA(
           patternId, mask, REFERENCE_ROLE_COLOURS, tileSize, [...noises], 0, seed, 1, 3,
@@ -656,7 +671,7 @@ describe('re-rolling an irregular edge', () => {
             bDiffCount++;
           }
         }
-        expect(bDiffCount).toBeGreaterThan(0);
+        expect(bDiffCount > 0).toBe(hasZone('terrainB'));
 
         // Strict verification: When only 'terrainB' is enabled, Terrain A base region must have ZERO noise leak
         const gridStr = patternLevelsForMask(patternId, mask, 0, tileSize, 3);
@@ -694,7 +709,7 @@ describe('re-rolling an irregular edge', () => {
             aDiffCount++;
           }
         }
-        expect(aDiffCount).toBeGreaterThan(0);
+        expect(aDiffCount > 0).toBe(hasZone('terrainA'));
 
         // Strict verification: When only 'terrainA' is enabled, Terrain B base region must have ZERO noise leak
         let aOnlyBDiffCount = 0;
@@ -730,6 +745,9 @@ describe('re-rolling an irregular edge', () => {
             edgeDiffCount++;
           }
         }
+        // Targeting the outline lets outline pixels dissolve OUTWARD, which is
+        // why the destination guard is asymmetric — this stays meaningful even
+        // for `sharp`, whose band is nothing but outline.
         expect(edgeDiffCount).toBeGreaterThan(0);
 
         // Test 4: All noise targets disabled (empty array [])

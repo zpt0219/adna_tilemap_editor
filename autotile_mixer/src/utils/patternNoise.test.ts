@@ -1,10 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import {
   NOISE_PRESETS, DEFAULT_NOISES, DEFAULT_NOISE_STRENGTH, MAX_NOISE_STRENGTH,
-  noiseStep, type NoiseId,
+  noiseStep, type NoiseId, type NoiseTargetId,
 } from './patternNoise';
 import { REFERENCE_ROLE_COLOURS, paintPatternTileRGBA, patternRamp, toHexColour } from './patternPaint';
-import { DEFAULT_PATTERN } from './blob47Pattern';
+import {
+  DEFAULT_PATTERN, PATTERN_TILE_SIZE, patternLevelsFor, patternLevelsForMask,
+} from './blob47Pattern';
+import { BLOB47_MASKS } from './blob47';
 
 const ALL: NoiseId[] = NOISE_PRESETS.map((n) => n.id);
 const SINGLES = ALL.map((id) => [id] as NoiseId[]);
@@ -329,5 +332,89 @@ describe('noise applied to a pattern', () => {
     const clean = paintPatternTileRGBA('rounded', 110, REFERENCE_ROLE_COLOURS, 16, []);
     const grainy = paintPatternTileRGBA('rounded', 110, REFERENCE_ROLE_COLOURS, 16, ['blue']);
     expect(Array.from(grainy)).not.toEqual(Array.from(clean));
+  });
+});
+
+// The band is partitioned into three zones — outline, terrain-A side, terrain-B
+// side — and a grain displacement touches two of them, so both ends are gated.
+// The pre-existing region tests only asserted "something changed" and "the
+// source zone was spared", which is why grain kept showing up on the outline.
+describe('grain respects the three band zones', () => {
+  const TS = PATTERN_TILE_SIZE;
+  const STEPS = 3;
+  const NOISES: NoiseId[] = ['white', 'blue'];
+  const SUBSETS: readonly NoiseTargetId[][] = [
+    ['terrainB'], ['terrainA'], ['edge'],
+    ['terrainA', 'terrainB'], ['edge', 'terrainB'], ['edge', 'terrainA'],
+  ];
+
+  const render = (mask: number, targets: readonly NoiseTargetId[] | null) =>
+    paintPatternTileRGBA(
+      'rounded', mask, REFERENCE_ROLE_COLOURS, TS, targets ? NOISES : [], 0, 7, 1, STEPS,
+      undefined, false, 0, undefined, undefined, targets ?? undefined
+    );
+
+  const sameAt = (a: Uint8ClampedArray, b: Uint8ClampedArray, i: number) =>
+    a[i] === b[i] && a[i + 1] === b[i + 1] && a[i + 2] === b[i + 2];
+
+  // The guarantee the user actually cares about, stated directly.
+  it.each(SUBSETS.filter((s) => !s.includes('edge')).map((s) => [s.join('+'), s] as const))(
+    'targeting %s leaves the outline byte-identical',
+    (_name, targets) => {
+      const levelDefs = patternLevelsFor(STEPS);
+      const ramp = patternRamp(REFERENCE_ROLE_COLOURS, STEPS);
+      const edgeLvl = levelDefs.findIndex((l) => l.role === 'edge');
+      const edgeRGB = ramp[edgeLvl];
+
+      for (const mask of BLOB47_MASKS) {
+        const clean = render(mask, null);
+        const noisy = render(mask, targets);
+        const grid = patternLevelsForMask('rounded', mask, 0, TS, STEPS);
+
+        for (let p = 0; p < TS * TS; p++) {
+          const i = p * 4;
+          // (a) no outline pixel may be disturbed
+          if (grid.charCodeAt(p) - 48 === edgeLvl) {
+            expect(sameAt(clean, noisy, i)).toBe(true);
+          }
+          // (b) nothing may become outline-coloured that was not already
+          const becameEdge =
+            noisy[i] === edgeRGB.r && noisy[i + 1] === edgeRGB.g && noisy[i + 2] === edgeRGB.b;
+          if (becameEdge) expect(sameAt(clean, noisy, i)).toBe(true);
+        }
+      }
+    }
+  );
+
+  it.each(SUBSETS.map((s) => [s.join('+'), s] as const))(
+    'targeting %s only ever disturbs pixels whose own zone is targeted',
+    (_name, targets) => {
+      const levelDefs = patternLevelsFor(STEPS);
+      const solid = levelDefs.length - 1;
+      let changed = 0;
+
+      for (const mask of BLOB47_MASKS) {
+        const clean = render(mask, null);
+        const noisy = render(mask, targets);
+        const grid = patternLevelsForMask('rounded', mask, 0, TS, STEPS);
+
+        for (let p = 0; p < TS * TS; p++) {
+          if (sameAt(clean, noisy, p * 4)) continue;
+          changed++;
+          const from = grid.charCodeAt(p) - 48;
+          expect(from).toBeGreaterThan(0);      // never a solid terrain
+          expect(from).toBeLessThan(solid);
+          expect(targets).toContain(levelDefs[from].role);
+        }
+      }
+      // Every subset must still do something, or the filter is simply off.
+      expect(changed).toBeGreaterThan(0);
+    }
+  );
+
+  it('does nothing at all when no zone is targeted', () => {
+    for (const mask of BLOB47_MASKS) {
+      expect([...render(mask, [])]).toEqual([...render(mask, null)]);
+    }
   });
 });
