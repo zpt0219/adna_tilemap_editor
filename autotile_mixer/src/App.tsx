@@ -35,6 +35,12 @@ const ROWS = 10;
 /** The sheet is 16px art; 32 is resampled from the field, past that is nothing. */
 const TILE_SIZES = [16, 32];
 
+/** Seeds are typed as well as rolled, so the bound belongs in one place. */
+const SEED_MAX = 99999;
+const clampSeed = (raw: string) => Math.max(0, Math.min(SEED_MAX, parseInt(raw) || 0));
+/** From 1, so a roll never lands on 0 — that value means "exactly as baked". */
+const rollSeed = () => Math.floor(Math.random() * SEED_MAX) + 1;
+
 /**
  * A label's long explanation, parked behind a marker. Purely presentational —
  * hover and focus are handled in CSS so nothing here re-renders on mouse move.
@@ -45,6 +51,82 @@ function InfoTip({ text }: { text: string }) {
       <button type="button" className="infotip-btn" aria-label={text}>?</button>
       <span className="infotip-panel" role="tooltip">{text}</span>
     </span>
+  );
+}
+
+/**
+ * A colour well the whole area of which is clickable.
+ *
+ * `<input type="color">` cannot be styled, so the swatch is a div wearing the
+ * colour with the real input stretched invisibly over it — that is why the
+ * input is oversized and transparent rather than hidden, which would take it
+ * out of the hit area along with the picker.
+ */
+function ColourSwatch({ hex, onChange, title, isCustom = false, disabled = false }: {
+  hex: string;
+  onChange: (hex: string) => void;
+  title: string;
+  isCustom?: boolean;
+  disabled?: boolean;
+}) {
+  return (
+    <div
+      className={`colour-swatch${isCustom ? ' is-custom' : ''}${disabled ? ' is-disabled' : ''}`}
+      title={title}
+      style={{ background: hex }}
+    >
+      {disabled && (
+        <svg className="swatch-cross" viewBox="0 0 100 100" preserveAspectRatio="none">
+          <line x1="0" y1="0" x2="100" y2="100" stroke="rgba(0,0,0,0.6)" strokeWidth="16" />
+          <line x1="100" y1="0" x2="0" y2="100" stroke="rgba(0,0,0,0.6)" strokeWidth="16" />
+          <line x1="0" y1="0" x2="100" y2="100" stroke="#ef4444" strokeWidth="10" />
+          <line x1="100" y1="0" x2="0" y2="100" stroke="#ef4444" strokeWidth="10" />
+        </svg>
+      )}
+      <input
+        type="color"
+        value={hex}
+        disabled={disabled}
+        aria-label={title}
+        onChange={(e) => onChange(e.target.value)}
+      />
+    </div>
+  );
+}
+
+/** Typed seed plus a dice roll. Used by both the edge and the grain seed. */
+function SeedField({ value, onChange, diceTitle }: {
+  value: number;
+  onChange: (seed: number) => void;
+  diceTitle: string;
+}) {
+  return (
+    <div className="seed-field">
+      <input
+        type="number"
+        className="text-input"
+        min={0}
+        max={SEED_MAX}
+        value={value}
+        onChange={(e) => onChange(clampSeed(e.target.value))}
+      />
+      <button className="btn-action btn-secondary btn-dice" onClick={() => onChange(rollSeed())} title={diceTitle}>
+        🎲
+      </button>
+    </div>
+  );
+}
+
+/** "Back to the derived colours." Shown only while an override is in force. */
+function ResetLink({ label, title, onClick }: {
+  label: string;
+  title: string;
+  onClick: () => void;
+}) {
+  return (
+    <button className="btn-action btn-secondary btn-reset" onClick={onClick} title={title}>
+      ↺ {label}
+    </button>
   );
 }
 
@@ -66,7 +148,6 @@ export default function App() {
     terrainB: parseHexColour(roleHex.terrainB),
     edge: parseHexColour(roleHex.edge),
   }), [roleHex]);
-  const roleHexKey = `${roleHex.terrainA}|${roleHex.terrainB}|${roleHex.edge}`;
 
   // Which built-in pattern the colours are painted onto.
   const [patternId, setPatternId] = useState<PatternId>(DEFAULT_PATTERN);
@@ -78,7 +159,6 @@ export default function App() {
   // Grain on the pattern's transition band. The algorithms stack, so this is a
   // set; empty means no grain.
   const [patternNoise, setPatternNoise] = useState<NoiseId[]>([...DEFAULT_NOISES]);
-  const patternNoiseKey = patternNoise.join(',');
   const [patternNoiseSeed, setPatternNoiseSeed] = useState(DEFAULT_NOISE_SEED);
   const [patternNoiseStrength, setPatternNoiseStrength] = useState(DEFAULT_NOISE_STRENGTH);
 
@@ -97,7 +177,9 @@ export default function App() {
     terrainA: toHexColour(DEFAULT_TEXTURE_COLOURS.terrainA),
     terrainB: toHexColour(DEFAULT_TEXTURE_COLOURS.terrainB),
   });
-  const textureOpts = {
+  // Memoised, not built inline: the render effects key off object identity, so
+  // a fresh object every render would repaint all 48 tiles on every keystroke.
+  const textureOpts = useMemo(() => ({
     algoA: textureAlgoA,
     algoB: textureAlgoB,
     amountA: textureAmountA,
@@ -106,11 +188,9 @@ export default function App() {
     seed: patternNoiseSeed,
     colourA: parseHexColour(texHex.terrainA),
     colourB: parseHexColour(texHex.terrainB),
-  };
-  const textureKey = [
-    textureAlgoA, textureAlgoB, textureAmountA, textureAmountB,
-    textureShades, texHex.terrainA, texHex.terrainB,
-  ].join('|');
+  }), [textureAlgoA, textureAlgoB, textureAmountA, textureAmountB,
+       textureShades, patternNoiseSeed, texHex]);
+
   const TEXTURE_SHADE_CHOICES = Array.from(
     { length: MAX_TEXTURE_SHADES - MIN_TEXTURE_SHADES + 1 },
     (_, i) => MIN_TEXTURE_SHADES + i
@@ -131,10 +211,10 @@ export default function App() {
   // usable range — a fixed pixel slider would be mostly dead travel on the
   // noisier ones. See PATTERN_OFFSET_RANGE.
   const [bandBias, setBandBias] = useState(0);
-  const bandOffsetPx = (() => {
+  const bandOffsetPx = useMemo(() => {
     const [lo, hi] = PATTERN_OFFSET_RANGE[patternId];
     return bandBias < 0 ? -bandBias * lo : bandBias * hi;
-  })();
+  }, [patternId, bandBias]);
   const toggleNoise = (id: NoiseId) =>
     setPatternNoise((prev) =>
       prev.includes(id) ? prev.filter((n) => n !== id) : [...prev, id]
@@ -187,8 +267,6 @@ export default function App() {
     return derivedRamp;
   }, [customShadesHex, derivedRamp]);
 
-  const customShadesKey = useMemo(() => (customShadesHex ? customShadesHex.join(',') : ''), [customShadesHex]);
-
   // Custom noise colors state (null = derived from band ramp)
   const [customNoiseHex, setCustomNoiseHex] = useState<{ b?: string; edge?: string; a?: string } | null>(null);
 
@@ -201,11 +279,6 @@ export default function App() {
     };
   }, [customNoiseHex]);
 
-  const customNoiseKey = useMemo(() => {
-    if (!customNoiseHex) return '';
-    return `${customNoiseHex.b || ''}_${customNoiseHex.edge || ''}_${customNoiseHex.a || ''}`;
-  }, [customNoiseHex]);
-
   // Noise target regions
   const [noiseTargets, setNoiseTargets] = useState<NoiseTargetId[]>(['edge', 'terrainA', 'terrainB']);
 
@@ -215,7 +288,25 @@ export default function App() {
     );
   };
 
-  const noiseTargetKey = useMemo(() => [...noiseTargets].sort().join(','), [noiseTargets]);
+  /**
+   * Everything paintPatternTileRGBA needs, in one memoised object.
+   *
+   * Both render effects depend on this and nothing else, so the list of things
+   * that change a tile is written down ONCE. It used to be spread over two
+   * hand-maintained dependency arrays plus six string keys (`roleHexKey`,
+   * `textureKey`, …), which meant a new parameter had to be remembered in three
+   * places and a miss showed up as "I changed it and nothing happened".
+   *
+   * Every entry is either a primitive or already memoised, so the identity of
+   * this object changes exactly when the pixels would.
+   */
+  const paintArgs = useMemo(() => ({
+    patternId, roleColours, patternNoise, bandOffsetPx, patternNoiseSeed,
+    patternNoiseStrength, bandSteps, textureOpts, hardEdgeB, edgeSeed,
+    ramp: currentRampRGB, customNoiseColours, noiseTargets,
+  }), [patternId, roleColours, patternNoise, bandOffsetPx, patternNoiseSeed,
+       patternNoiseStrength, bandSteps, textureOpts, hardEdgeB, edgeSeed,
+       currentRampRGB, customNoiseColours, noiseTargets]);
 
   // Canvas refs
   const tilesetCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -249,11 +340,12 @@ export default function App() {
     if (!cleanCtx) return;
     cleanCtx.clearRect(0, 0, cleanCanvas.width, cleanCanvas.height);
 
+    const a = paintArgs;
     const paint = (mask: number) => new ImageData(
       paintPatternTileRGBA(
-        patternId, mask, roleColours, tileSize, patternNoise, bandOffsetPx,
-        patternNoiseSeed, patternNoiseStrength, bandSteps, textureOpts, hardEdgeB, edgeSeed,
-        currentRampRGB, customNoiseColours, noiseTargets
+        a.patternId, mask, a.roleColours, tileSize, a.patternNoise, a.bandOffsetPx,
+        a.patternNoiseSeed, a.patternNoiseStrength, a.bandSteps, a.textureOpts,
+        a.hardEdgeB, a.edgeSeed, a.ramp, a.customNoiseColours, a.noiseTargets
       ),
       tileSize, tileSize
     );
@@ -297,8 +389,7 @@ export default function App() {
         ctx.stroke();
       }
     }
-  }, [tileSize, showGrid, roleHexKey, patternId, patternNoiseKey, bandOffsetPx,
-      patternNoiseSeed, patternNoiseStrength, bandSteps, textureKey, hardEdgeB, edgeSeed, customShadesKey, customNoiseKey, noiseTargetKey]);
+  }, [tileSize, showGrid, paintArgs]);
 
   // Re-draw playground
   useEffect(() => {
@@ -364,8 +455,10 @@ export default function App() {
         ctx.stroke();
       }
     }
-  }, [blobCells, tileSize, showGrid, showCellDots, roleHexKey, patternId, patternNoiseKey,
-      bandOffsetPx, patternNoiseSeed, patternNoiseStrength, bandSteps, textureKey, hardEdgeB, edgeSeed, customShadesKey, customNoiseKey, noiseTargetKey]);
+  // `paintArgs` is here for its side effect on the sheet: the playground blits
+  // out of cleanSheetCanvasRef, so it has to redraw after the sheet effect has
+  // refilled it. Depending on the same object is what orders the two.
+  }, [blobCells, tileSize, showCellDots, paintArgs]);
 
   // Painting interaction logic
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -560,24 +653,7 @@ export default function App() {
                 <span className="slider-name">{t.edgeSeed}<InfoTip text={t.edgeRerollHint} /></span>
                 {edgeSeed === 0 && <span className="slider-val">{t.edgeSeedOriginal}</span>}
               </div>
-              <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                <input
-                  type="number"
-                  className="text-input"
-                  style={{ flex: 1 }}
-                  min={0} max={99999}
-                  value={edgeSeed}
-                  onChange={(e) => setEdgeSeed(
-                    Math.max(0, Math.min(99999, parseInt(e.target.value) || 0))
-                  )}
-                />
-                <button
-                  className="btn-action btn-secondary"
-                  style={{ padding: '4px 10px', fontSize: '14px' }}
-                  onClick={() => setEdgeSeed(Math.floor(Math.random() * 99999) + 1)}
-                  title={lang === 'zh' ? '随机种子' : 'Randomize seed'}
-                >🎲</button>
-              </div>
+              <SeedField value={edgeSeed} onChange={setEdgeSeed} diceTitle={t.randomSeed} />
             </>)}
 
             <div className="slider-header" style={{ margin: '14px 0 6px' }}>
@@ -598,87 +674,40 @@ export default function App() {
             <div className="slider-header" style={{ margin: '12px 0 6px' }}>
               <span className="slider-name" style={{ fontSize: '11px' }}>{t.patternShades}</span>
               {customShadesHex && bandShadeIndices.some((idx: number) => Boolean(customShadesHex[idx])) && (
-                <button
-                  className="btn-action btn-secondary"
-                  style={{ fontSize: '11px', padding: '1px 6px', height: '20px' }}
+                <ResetLink
+                  label={t.reset}
+                  title={t.resetShadesHint}
                   onClick={() => setCustomShadesHex(null)}
-                  title={lang === 'zh' ? '恢复为自动计算色阶' : 'Restore derived shades'}
-                >
-                  ↺ {lang === 'zh' ? '重置' : 'Reset'}
-                </button>
+                />
               )}
             </div>
-            <div style={{ display: 'flex', gap: '6px', marginBottom: '10px' }}>
+            <div className="swatch-row" style={{ marginBottom: '10px' }}>
               {bandShadeIndices.map((idx: number) => {
-                const c = currentRampRGB[idx];
-                const hex = toHexColour(c);
-                const isCustom = Boolean(customShadesHex && customShadesHex[idx]);
+                const hex = toHexColour(currentRampRGB[idx]);
+                // hardEdgeB collapses the terrain-B shade, so its swatch has
+                // nothing left to colour.
                 const isDisabled = hardEdgeB && idx === 1;
-                const lvlInfo = levels[idx];
-                const roleLabel = lvlInfo.role === 'terrainA'
-                  ? (lang === 'zh' ? '地形 A 侧过渡' : 'Terrain A side shade')
-                  : (lang === 'zh' ? '地形 B 侧过渡' : 'Terrain B side shade');
+                const roleLabel = levels[idx].role === 'terrainA' ? t.shadeSideA : t.shadeSideB;
                 return (
-                  <div
+                  <ColourSwatch
                     key={idx}
-                    title={
-                      isDisabled
-                        ? (lang === 'zh' ? `${roleLabel}（硬边模式下停用）` : `${roleLabel} (Disabled in hard-edge mode)`)
-                        : `${roleLabel} (${hex}) - ${lang === 'zh' ? '点击可单独改色' : 'Click to customize'}`
-                    }
-                    style={{
-                      flex: 1, height: '26px', borderRadius: '4px',
-                      border: isCustom ? '2px solid var(--accent)' : '1px solid var(--line, rgba(255,255,255,.2))',
-                      background: hex,
-                      position: 'relative',
-                      cursor: isDisabled ? 'not-allowed' : 'pointer',
-                      overflow: 'hidden',
-                      opacity: isDisabled ? 0.45 : 1,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      userSelect: 'none',
+                    hex={hex}
+                    disabled={isDisabled}
+                    isCustom={Boolean(customShadesHex && customShadesHex[idx])}
+                    title={isDisabled
+                      ? `${roleLabel} — ${t.shadeDisabled}`
+                      : `${roleLabel} (${hex}) — ${t.clickToCustomize}`}
+                    onChange={(next) => {
+                      // Start from the derived ramp unless an override of the
+                      // RIGHT LENGTH is already in force — a stale one from a
+                      // different step count would mis-index.
+                      const base = (customShadesHex && customShadesHex.length === derivedRamp.length)
+                        ? [...customShadesHex]
+                        : derivedRamp.map(toHexColour);
+                      base[idx] = next;
+                      setCustomShadesHex(base);
                     }}
-                  >
-                    {isDisabled && (
-                      <svg
-                        style={{
-                          position: 'absolute',
-                          top: 0,
-                          left: 0,
-                          width: '100%',
-                          height: '100%',
-                          pointerEvents: 'none',
-                          zIndex: 2,
-                        }}
-                        viewBox="0 0 100 100"
-                        preserveAspectRatio="none"
-                      >
-                        <line x1="0" y1="0" x2="100" y2="100" stroke="rgba(0,0,0,0.6)" strokeWidth="16" />
-                        <line x1="100" y1="0" x2="0" y2="100" stroke="rgba(0,0,0,0.6)" strokeWidth="16" />
-                        <line x1="0" y1="0" x2="100" y2="100" stroke="#ef4444" strokeWidth="10" />
-                        <line x1="100" y1="0" x2="0" y2="100" stroke="#ef4444" strokeWidth="10" />
-                      </svg>
-                    )}
-                    <input
-                      type="color"
-                      value={hex}
-                      disabled={isDisabled}
-                      onChange={(e) => {
-                        if (isDisabled) return;
-                        const base = (customShadesHex && customShadesHex.length === derivedRamp.length)
-                          ? [...customShadesHex]
-                          : derivedRamp.map(toHexColour);
-                        base[idx] = e.target.value;
-                        setCustomShadesHex(base);
-                      }}
-                      style={{
-                        position: 'absolute', top: '-10px', left: '-10px',
-                        width: '200%', height: '200%',
-                        opacity: 0,
-                        cursor: isDisabled ? 'not-allowed' : 'pointer',
-                        pointerEvents: isDisabled ? 'none' : 'auto',
-                      }}
-                    />
-                  </div>
+                  />
                 );
               })}
             </div>
@@ -768,24 +797,11 @@ export default function App() {
                 <div className="slider-header" style={{ marginBottom: '6px' }}>
                   <span className="slider-name">{t.noiseSeed}<InfoTip text={t.noiseSeedHint} /></span>
                 </div>
-                <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                  <input
-                    type="number"
-                    className="text-input"
-                    style={{ flex: 1 }}
-                    min={0} max={99999}
-                    value={patternNoiseSeed}
-                    onChange={(e) => setPatternNoiseSeed(
-                      Math.max(0, Math.min(99999, parseInt(e.target.value) || 0))
-                    )}
-                  />
-                  <button
-                    className="btn-action btn-secondary"
-                    style={{ padding: '4px 10px', fontSize: '14px' }}
-                    onClick={() => setPatternNoiseSeed(Math.floor(Math.random() * 99999) + 1)}
-                    title={lang === 'zh' ? '随机种子' : 'Randomize seed'}
-                  >🎲</button>
-                </div>
+                <SeedField
+                  value={patternNoiseSeed}
+                  onChange={setPatternNoiseSeed}
+                  diceTitle={t.randomSeed}
+                />
 
                 <div className="slider-header" style={{ margin: '10px 0 4px' }}>
                   <span className="slider-name" style={{ fontSize: '11px' }}>{t.noiseTargets}</span>
@@ -807,56 +823,35 @@ export default function App() {
                 <div className="slider-header" style={{ margin: '12px 0 6px' }}>
                   <span className="slider-name" style={{ fontSize: '11px' }}>{t.noiseColours}</span>
                   {customNoiseHex && (customNoiseHex.b || customNoiseHex.edge || customNoiseHex.a) && (
-                    <button
-                      className="btn-action btn-secondary"
-                      style={{ fontSize: '11px', padding: '1px 6px', height: '20px' }}
+                    <ResetLink
+                      label={t.reset}
+                      title={t.resetNoiseColoursHint}
                       onClick={() => setCustomNoiseHex(null)}
-                      title={lang === 'zh' ? '恢复为自动跟随过渡带颜色' : 'Restore derived grain colors'}
-                    >
-                      ↺ {lang === 'zh' ? '重置' : 'Reset'}
-                    </button>
+                    />
                   )}
                 </div>
-                <div style={{ display: 'flex', gap: '6px', marginBottom: '12px' }}>
+                <div className="swatch-row" style={{ marginBottom: '12px' }}>
                   {(['b', 'edge', 'a'] as const).map((side) => {
-                    const defaultHex = side === 'b'
-                      ? toHexColour(derivedRamp[1])
-                      : side === 'edge'
-                      ? toHexColour(derivedRamp[2])
-                      : toHexColour(derivedRamp[derivedRamp.length - 2]);
-                    const hex = (customNoiseHex && customNoiseHex[side]) ? customNoiseHex[side]! : defaultHex;
-                    const isCustom = Boolean(customNoiseHex && customNoiseHex[side]);
-                    const label = side === 'b' ? t.noiseColourB : side === 'edge' ? t.noiseColourEdge : t.noiseColourA;
+                    // Three pickers over a band that can have up to five steps:
+                    // each stands for a DIRECTION the grain nudges a pixel, not
+                    // for one particular level.
+                    const defaultHex = toHexColour(
+                      side === 'b' ? derivedRamp[1]
+                      : side === 'edge' ? derivedRamp[2]
+                      : derivedRamp[derivedRamp.length - 2]
+                    );
+                    const hex = customNoiseHex?.[side] ?? defaultHex;
+                    const label = side === 'b' ? t.noiseColourB
+                      : side === 'edge' ? t.noiseColourEdge : t.noiseColourA;
                     return (
-                      <div key={side} style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <span style={{ fontSize: '10px', color: 'var(--muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</span>
-                        <div
-                          title={`${label} (${hex}) - ${lang === 'zh' ? '点击修改噪点颗粒颜色' : 'Click to customize'}`}
-                          style={{
-                            height: '26px', borderRadius: '4px',
-                            border: isCustom ? '2px solid var(--accent)' : '1px solid var(--line, rgba(255,255,255,.2))',
-                            background: hex,
-                            position: 'relative',
-                            cursor: 'pointer',
-                            overflow: 'hidden',
-                          }}
-                        >
-                          <input
-                            type="color"
-                            value={hex}
-                            onChange={(e) => {
-                              setCustomNoiseHex(prev => ({
-                                ...prev,
-                                [side]: e.target.value,
-                              }));
-                            }}
-                            style={{
-                              position: 'absolute', top: '-10px', left: '-10px',
-                              width: '200%', height: '200%',
-                              opacity: 0, cursor: 'pointer'
-                            }}
-                          />
-                        </div>
+                      <div key={side} className="swatch-cell">
+                        <span className="swatch-cell-label">{label}</span>
+                        <ColourSwatch
+                          hex={hex}
+                          isCustom={Boolean(customNoiseHex?.[side])}
+                          title={`${label} (${hex}) — ${t.clickToCustomize}`}
+                          onChange={(next) => setCustomNoiseHex((prev) => ({ ...prev, [side]: next }))}
+                        />
                       </div>
                     );
                   })}
@@ -1064,10 +1059,10 @@ export default function App() {
               />
             </div>
             <div className="action-bar" style={{ marginTop: '16px' }}>
-              <button className="btn-action btn-secondary" onClick={fillPlaygroundA} title={lang === 'zh' ? '全铺地形 A' : 'Fill all Terrain A'}>
+              <button className="btn-action btn-secondary" onClick={fillPlaygroundA} title={t.fillPlaygroundAHint}>
                 🎨 {t.fillPlaygroundA}
               </button>
-              <button className="btn-action btn-secondary" onClick={clearPlayground} title={lang === 'zh' ? '重置为地形 B' : 'Clear to Terrain B'}>
+              <button className="btn-action btn-secondary" onClick={clearPlayground} title={t.clearPlaygroundHint}>
                 🗑️ {t.clearPlayground}
               </button>
             </div>

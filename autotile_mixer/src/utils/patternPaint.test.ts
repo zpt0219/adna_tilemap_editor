@@ -5,7 +5,7 @@ import {
   PATTERNS, PATTERN_GROUPS, DEFAULT_PATTERN, PATTERN_BANDS, PATTERN_OFFSET_RANGE,
   FIELD_STEP, FIELD_CHARS, clampOffset, bandsFor, bandNoiseSpan, patternLevelsFor,
   MIN_BAND_STEPS, MAX_BAND_STEPS, DEFAULT_BAND_STEPS,
-  RESEEDABLE_PATTERNS, edgeJitterAmplitude, type PatternId,
+  RESEEDABLE_PATTERNS, edgeJitterAmplitude, LEVEL_CACHE_MAX, levelCacheSize, type PatternId,
 } from './blob47Pattern';
 import {
   REFERENCE_ROLE_COLOURS,
@@ -13,6 +13,7 @@ import {
   patternRamp,
   shadeColour,
   toHexColour,
+  type RGB,
 } from './patternPaint';
 
 // The pattern is art, so these tests are a lock, not a specification: they fail
@@ -749,5 +750,152 @@ describe('re-rolling an irregular edge', () => {
         expect(noneDiffCount).toBe(0);
       }
     );
+  });
+});
+
+// The two colour overrides are the app's only way to leave the derived palette.
+// Neither had any coverage, and both fail QUIETLY when wrong — a mis-indexed
+// ramp still paints a plausible-looking tile, and a leaked grain colour looks
+// like a texture rather than a bug.
+describe('custom colour overrides', () => {
+  const PATTERN = DEFAULT_PATTERN;
+  const MASK = 0; // an island: the largest transition band of any tile
+  const TS = PATTERN_TILE_SIZE;
+
+  /** Loud colours no shade recipe can produce from the reference palette. */
+  const MAGENTA: RGB = { r: 255, g: 0, b: 255 };
+  const CYAN: RGB = { r: 0, g: 255, b: 255 };
+  const YELLOW: RGB = { r: 255, g: 255, b: 0 };
+
+  const derived = () => patternRamp(REFERENCE_ROLE_COLOURS, DEFAULT_BAND_STEPS);
+  const levelsOf = (steps = DEFAULT_BAND_STEPS) =>
+    patternLevelsForMask(PATTERN, MASK, 0, TS, steps);
+
+  /** Indices of the pixels painted exactly `c`. */
+  const pixelsOf = (buf: Uint8ClampedArray, c: RGB): number[] => {
+    const hits: number[] = [];
+    for (let p = 0; p < TS * TS; p++) {
+      const i = p * 4;
+      if (buf[i] === c.r && buf[i + 1] === c.g && buf[i + 2] === c.b) hits.push(p);
+    }
+    return hits;
+  };
+
+  it('repaints exactly the pixels of the level it overrides', () => {
+    const ramp = derived();
+    const target = 2; // the outline
+    const custom = ramp.map((c, i) => (i === target ? MAGENTA : c));
+
+    const px = paintPatternTileRGBA(
+      PATTERN, MASK, REFERENCE_ROLE_COLOURS, TS, [], 0, 0, 1, DEFAULT_BAND_STEPS,
+      undefined, false, 0, custom
+    );
+
+    const grid = levelsOf();
+    const expected: number[] = [];
+    for (let p = 0; p < TS * TS; p++) {
+      if (grid.charCodeAt(p) - 48 === target) expected.push(p);
+    }
+    expect(expected.length).toBeGreaterThan(0);
+    // Exact set equality, not a count: an off-by-one in the ramp index would
+    // recolour a band of the same size one level over and still "pass" a count.
+    expect(pixelsOf(px, MAGENTA)).toEqual(expected);
+  });
+
+  it('ignores an override of the wrong length instead of mis-indexing', () => {
+    // The ramp length is tied to the step count, so a custom ramp saved at 3
+    // steps must not be indexed into a 4-step band.
+    const stale = derived().map(() => MAGENTA); // right colours, wrong length
+    expect(stale.length).not.toBe(patternRamp(REFERENCE_ROLE_COLOURS, 4).length);
+
+    const withStale = paintPatternTileRGBA(
+      PATTERN, MASK, REFERENCE_ROLE_COLOURS, TS, [], 0, 0, 1, 4,
+      undefined, false, 0, stale
+    );
+    const withNone = paintPatternTileRGBA(
+      PATTERN, MASK, REFERENCE_ROLE_COLOURS, TS, [], 0, 0, 1, 4
+    );
+
+    expect(pixelsOf(withStale, MAGENTA)).toEqual([]);
+    expect([...withStale]).toEqual([...withNone]);
+  });
+
+  it('applies grain in the picked colours', () => {
+    const px = paintPatternTileRGBA(
+      PATTERN, MASK, REFERENCE_ROLE_COLOURS, TS, ['white'], 0, 7, 1, DEFAULT_BAND_STEPS,
+      undefined, false, 0, undefined,
+      { b: CYAN, edge: YELLOW, a: MAGENTA }
+    );
+    // The grain pushes pixels both ways, so both directions must show up.
+    expect(pixelsOf(px, CYAN).length).toBeGreaterThan(0);
+    expect(pixelsOf(px, MAGENTA).length).toBeGreaterThan(0);
+  });
+
+  it('keeps grain colours inside the transition band', () => {
+    // The whole point of gating grain on `0 < level < solid`: a custom colour
+    // reaching a solid terrain would tile as speckle across open ground.
+    const px = paintPatternTileRGBA(
+      PATTERN, MASK, REFERENCE_ROLE_COLOURS, TS, ['white', 'clumped'], 0, 7, 2, DEFAULT_BAND_STEPS,
+      undefined, false, 0, undefined,
+      { b: CYAN, edge: YELLOW, a: MAGENTA }
+    );
+    const grid = levelsOf();
+    const solid = derived().length - 1;
+    for (const c of [CYAN, YELLOW, MAGENTA]) {
+      for (const p of pixelsOf(px, c)) {
+        const level = grid.charCodeAt(p) - 48;
+        expect(level).toBeGreaterThan(0);
+        expect(level).toBeLessThan(solid);
+      }
+    }
+  });
+
+  it('is inert when no grain algorithm is selected', () => {
+    const plain = paintPatternTileRGBA(
+      PATTERN, MASK, REFERENCE_ROLE_COLOURS, TS, [], 0, 7, 1, DEFAULT_BAND_STEPS
+    );
+    const withColours = paintPatternTileRGBA(
+      PATTERN, MASK, REFERENCE_ROLE_COLOURS, TS, [], 0, 7, 1, DEFAULT_BAND_STEPS,
+      undefined, false, 0, undefined,
+      { b: CYAN, edge: YELLOW, a: MAGENTA }
+    );
+    expect([...withColours]).toEqual([...plain]);
+  });
+
+  it('lets the two overrides combine without either shadowing the other', () => {
+    const custom = derived().map((c, i) => (i === 2 ? YELLOW : c));
+    const px = paintPatternTileRGBA(
+      PATTERN, MASK, REFERENCE_ROLE_COLOURS, TS, ['white'], 0, 7, 1, DEFAULT_BAND_STEPS,
+      undefined, false, 0, custom, { b: CYAN, a: MAGENTA }
+    );
+    expect(pixelsOf(px, YELLOW).length).toBeGreaterThan(0); // ramp override survives
+    expect(pixelsOf(px, CYAN).length).toBeGreaterThan(0);   // grain override survives
+    expect(pixelsOf(px, MAGENTA).length).toBeGreaterThan(0);
+  });
+});
+
+describe('level-grid cache', () => {
+  // The cache key includes offset, tile size, step count, hard edge and seed, so
+  // unlike the field cache its key space is unbounded: dragging the position
+  // slider or rolling the edge seed mints entries nothing will ask for again.
+  it('stays bounded as distinct configurations pile up', () => {
+    const before = levelCacheSize();
+    // `jagged` is reseedable and has positive offset headroom at 0, so every
+    // seed produces a genuinely distinct key.
+    for (let seed = 1; seed <= LEVEL_CACHE_MAX + 200; seed++) {
+      patternLevelsForMask('jagged', 0, 0, PATTERN_TILE_SIZE, 3, false, seed);
+    }
+    expect(before).toBeLessThanOrEqual(LEVEL_CACHE_MAX);
+    expect(levelCacheSize()).toBeLessThanOrEqual(LEVEL_CACHE_MAX);
+  });
+
+  it('is a pure optimisation — an evicted grid recomputes identically', () => {
+    const args = ['jagged', 0, 0, PATTERN_TILE_SIZE, 3, false, 424242] as const;
+    const first = patternLevelsForMask(...args);
+    // Push well past the cap so the entry above is certainly gone.
+    for (let seed = 900000; seed < 900000 + LEVEL_CACHE_MAX + 50; seed++) {
+      patternLevelsForMask('jagged', 0, 0, PATTERN_TILE_SIZE, 3, false, seed);
+    }
+    expect(patternLevelsForMask(...args)).toBe(first);
   });
 });

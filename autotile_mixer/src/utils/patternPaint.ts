@@ -231,7 +231,7 @@ export function paintPatternTileRGBA(
   const out = new Uint8ClampedArray(new ArrayBuffer(tileSize * tileSize * 4));
   for (let y = 0; y < tileSize; y++) {
     for (let x = 0; x < tileSize; x++) {
-      let level = grid.charCodeAt(y * tileSize + x) - 48;
+      const level = grid.charCodeAt(y * tileSize + x) - 48;
       let rgb = ramp[level];
       // Grain lives on the transition band only, and is sampled in OUTPUT
       // space so it gets finer along with the art instead of blocking up.

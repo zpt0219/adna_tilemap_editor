@@ -185,8 +185,43 @@ const FIELDS: Record<PatternId, Record<number, string>> = {
   billow: GENERATED_FIELDS.billow,
 };
 
+/** Bounded by the art itself: 10 patterns x 47 canonical masks. */
 const FIELD_CACHE = new Map<string, string>();
+
+/**
+ * Level grids are keyed by every knob that changes them — offset, tile size,
+ * step count, hard edge, seed — so unlike FIELD_CACHE the key space is
+ * unbounded. One drag of the band-position slider mints 41 offsets x 47 masks,
+ * and every roll of the edge-seed dice mints 47 more that nothing will ever ask
+ * for again. Left uncapped it only ever grows.
+ *
+ * A working set is the 47 masks of one configuration, so this holds about 20 of
+ * them — enough to drag a slider back and forth without re-thresholding. At
+ * 32px a grid is 1024 chars, putting the ceiling near 2 MB.
+ */
+export const LEVEL_CACHE_MAX = 1024;
 const LEVEL_CACHE = new Map<string, string>();
+
+/** Exposed for the eviction test; nothing in the app needs it. */
+export const levelCacheSize = () => LEVEL_CACHE.size;
+
+/** A hit re-inserts, which is what makes Map's insertion order an LRU order. */
+function levelCacheGet(key: string): string | undefined {
+  const hit = LEVEL_CACHE.get(key);
+  if (hit === undefined) return undefined;
+  LEVEL_CACHE.delete(key);
+  LEVEL_CACHE.set(key, hit);
+  return hit;
+}
+
+function levelCacheSet(key: string, value: string): void {
+  LEVEL_CACHE.set(key, value);
+  while (LEVEL_CACHE.size > LEVEL_CACHE_MAX) {
+    const oldest = LEVEL_CACHE.keys().next();
+    if (oldest.done) break;
+    LEVEL_CACHE.delete(oldest.value);
+  }
+}
 
 /** Flat 256-char distance field for a canonical mask. */
 export function patternFieldForMask(pattern: PatternId, mask: number): string {
@@ -369,7 +404,7 @@ export function patternLevelsForMask(
   // drops out rather than being computed and multiplied by zero.
   const amp = edgeSeed === 0 ? 0 : edgeJitterAmplitude(pattern, off);
   const key = `${pattern}:${mask}:${off}:${tileSize}:${bandSteps}:${hardEdgeB}:${amp > 0 ? edgeSeed : 0}`;
-  let levels = LEVEL_CACHE.get(key);
+  let levels = levelCacheGet(key);
   if (levels === undefined) {
     const field = patternFieldForMask(pattern, mask);
     const bands = bandsFor(pattern, bandSteps, hardEdgeB);
@@ -389,7 +424,7 @@ export function patternLevelsForMask(
       }
     }
     levels = out;
-    LEVEL_CACHE.set(key, levels);
+    levelCacheSet(key, levels);
   }
   return levels;
 }
