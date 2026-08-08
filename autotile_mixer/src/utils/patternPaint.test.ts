@@ -467,6 +467,16 @@ describe('resolution', () => {
     expect(countOutline(2.0)).toBeGreaterThan(countOutline(1.0));
   });
 
+  it('moves shade bands outward alongside outline when outlineWidth increases', () => {
+    const base = bandsFor('rounded', 3, false, 1.0);
+    const wider = bandsFor('rounded', 3, false, 2.5);
+    expect(wider[2] - wider[1]).toBeCloseTo(2.5, 9);
+    expect(wider[1] - wider[0]).toBeCloseTo(base[1] - base[0], 9);
+    expect(wider[3] - wider[2]).toBeCloseTo(base[3] - base[2], 9);
+    expect(wider[1]).toBeLessThan(base[1]);
+    expect(wider[2]).toBeGreaterThan(base[2]);
+  });
+
   it('paints RGBA at whatever size was asked for', () => {
     for (const ts of [16, 32]) {
       const px = paintPatternTileRGBA(DEFAULT_PATTERN, 110, REFERENCE_ROLE_COLOURS, ts);

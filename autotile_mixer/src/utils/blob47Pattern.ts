@@ -257,8 +257,12 @@ export function bandsFor(
   const adjusted = [...base] as [number, number, number, number];
   if (outlineWidth !== undefined) {
     const mid = (base[1] + base[2]) / 2;
+    const wShadeB = base[1] - base[0];
+    const wShadeA = base[3] - base[2];
     adjusted[1] = mid - outlineWidth / 2;
     adjusted[2] = mid + outlineWidth / 2;
+    adjusted[0] = adjusted[1] - wShadeB;
+    adjusted[3] = adjusted[2] + wShadeA;
   }
   const extra = Math.max(0, Math.min(MAX_BAND_STEPS, steps) - MIN_BAND_STEPS);
   const out: number[] = [...adjusted];
