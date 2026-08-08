@@ -20,7 +20,8 @@ import {
   type PatternRole,
 } from './blob47Pattern';
 import {
-  DEFAULT_NOISES, DEFAULT_NOISE_SEED, DEFAULT_NOISE_STRENGTH, noiseStep, type NoiseId,
+  DEFAULT_NOISES, DEFAULT_NOISE_SEED, DEFAULT_NOISE_STRENGTH, DEFAULT_NOISE_TARGETS,
+  noiseStep, type NoiseId, type NoiseTargetId,
 } from './patternNoise';
 import {
   DEFAULT_TEXTURE, DEFAULT_TEXTURE_SHADES, textureColour, textureRamp, textureShadeAt,
@@ -203,7 +204,8 @@ export function paintPatternTileRGBA(
   hardEdgeB = false,
   edgeSeed = 0,
   customRamp?: readonly RGB[],
-  customNoiseColours?: { b?: RGB; edge?: RGB; a?: RGB }
+  customNoiseColours?: { b?: RGB; edge?: RGB; a?: RGB },
+  noiseTargets: readonly NoiseTargetId[] = DEFAULT_NOISE_TARGETS
 ): Uint8ClampedArray<ArrayBuffer> {
   const derived = patternRamp(colours, bandSteps);
   const ramp = customRamp && customRamp.length === derived.length ? customRamp : derived;
@@ -234,7 +236,21 @@ export function paintPatternTileRGBA(
       // Grain lives on the transition band only, and is sampled in OUTPUT
       // space so it gets finer along with the art instead of blocking up.
       if (level > 0 && level < solid && noises.length > 0) {
-        const step = noiseStep(noises, x, y, noiseSeed, noiseStrength) * span;
+        const baseRole = levelDefs[level]?.role;
+        let step = noiseStep(noises, x, y, noiseSeed, noiseStrength) * span;
+
+        if (step < 0) {
+          // Pushing toward Terrain B
+          const isEnabled = noiseTargets.includes('terrainB') ||
+            (baseRole === 'edge' && noiseTargets.includes('edge'));
+          if (!isEnabled) step = 0;
+        } else if (step > 0) {
+          // Pushing toward Terrain A
+          const isEnabled = noiseTargets.includes('terrainA') ||
+            (baseRole === 'edge' && noiseTargets.includes('edge'));
+          if (!isEnabled) step = 0;
+        }
+
         if (step !== 0) {
           const nextLvl = Math.max(0, Math.min(solid, level + step));
           const targetRole = levelDefs[nextLvl]?.role;

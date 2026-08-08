@@ -12,12 +12,22 @@
 
 export type NoiseId = 'white' | 'blue' | 'clumped' | 'ordered';
 
+export type NoiseTargetId = 'edge' | 'terrainA' | 'terrainB';
+
 export const NOISE_PRESETS: readonly { id: NoiseId; zh: string; en: string }[] = [
   { id: 'blue', zh: '蓝噪点 · 均匀细颗粒', en: 'Blue noise — even fine grain' },
   { id: 'white', zh: '白噪点 · 随机沙粒', en: 'White noise — random sand' },
   { id: 'clumped', zh: '云斑 · 成团斑驳', en: 'Clumped — patchy blotches' },
   { id: 'ordered', zh: '有序网点 · 规则半调', en: 'Ordered — regular halftone' },
 ];
+
+export const NOISE_TARGETS: readonly { id: NoiseTargetId; zh: string; en: string }[] = [
+  { id: 'edge', zh: '描边上', en: 'Outline edge' },
+  { id: 'terrainA', zh: '地形 A 侧', en: 'Terrain A side' },
+  { id: 'terrainB', zh: '地形 B 侧', en: 'Terrain B side' },
+];
+
+export const DEFAULT_NOISE_TARGETS: readonly NoiseTargetId[] = ['edge', 'terrainA', 'terrainB'];
 
 /** Nothing selected = no grain. */
 export const DEFAULT_NOISES: readonly NoiseId[] = [];

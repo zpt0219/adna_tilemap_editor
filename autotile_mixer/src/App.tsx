@@ -15,8 +15,8 @@ import {
   MIN_BAND_STEPS, MAX_BAND_STEPS, DEFAULT_BAND_STEPS, patternLevelsFor, type PatternId,
 } from './utils/blob47Pattern';
 import {
-  NOISE_PRESETS, DEFAULT_NOISES, DEFAULT_NOISE_SEED, DEFAULT_NOISE_STRENGTH,
-  MAX_NOISE_STRENGTH, type NoiseId,
+  NOISE_PRESETS, NOISE_TARGETS, DEFAULT_NOISES, DEFAULT_NOISE_SEED, DEFAULT_NOISE_STRENGTH,
+  MAX_NOISE_STRENGTH, type NoiseId, type NoiseTargetId,
 } from './utils/patternNoise';
 import {
   TEXTURE_PRESETS, DEFAULT_TEXTURE, DEFAULT_TEXTURE_SHADES,
@@ -206,6 +206,17 @@ export default function App() {
     return `${customNoiseHex.b || ''}_${customNoiseHex.edge || ''}_${customNoiseHex.a || ''}`;
   }, [customNoiseHex]);
 
+  // Noise target regions
+  const [noiseTargets, setNoiseTargets] = useState<NoiseTargetId[]>(['edge', 'terrainA', 'terrainB']);
+
+  const toggleNoiseTarget = (id: NoiseTargetId) => {
+    setNoiseTargets(prev =>
+      prev.includes(id) ? prev.filter(t => t !== id) : [...prev, id]
+    );
+  };
+
+  const noiseTargetKey = useMemo(() => [...noiseTargets].sort().join(','), [noiseTargets]);
+
   // Canvas refs
   const tilesetCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const playgroundCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -242,7 +253,7 @@ export default function App() {
       paintPatternTileRGBA(
         patternId, mask, roleColours, tileSize, patternNoise, bandOffsetPx,
         patternNoiseSeed, patternNoiseStrength, bandSteps, textureOpts, hardEdgeB, edgeSeed,
-        currentRampRGB, customNoiseColours
+        currentRampRGB, customNoiseColours, noiseTargets
       ),
       tileSize, tileSize
     );
@@ -287,7 +298,7 @@ export default function App() {
       }
     }
   }, [tileSize, showGrid, roleHexKey, patternId, patternNoiseKey, bandOffsetPx,
-      patternNoiseSeed, patternNoiseStrength, bandSteps, textureKey, hardEdgeB, edgeSeed, customShadesKey, customNoiseKey]);
+      patternNoiseSeed, patternNoiseStrength, bandSteps, textureKey, hardEdgeB, edgeSeed, customShadesKey, customNoiseKey, noiseTargetKey]);
 
   // Re-draw playground
   useEffect(() => {
@@ -354,7 +365,7 @@ export default function App() {
       }
     }
   }, [blobCells, tileSize, showGrid, showCellDots, roleHexKey, patternId, patternNoiseKey,
-      bandOffsetPx, patternNoiseSeed, patternNoiseStrength, bandSteps, textureKey, hardEdgeB, edgeSeed, customShadesKey, customNoiseKey]);
+      bandOffsetPx, patternNoiseSeed, patternNoiseStrength, bandSteps, textureKey, hardEdgeB, edgeSeed, customShadesKey, customNoiseKey, noiseTargetKey]);
 
   // Painting interaction logic
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -774,6 +785,23 @@ export default function App() {
                     onClick={() => setPatternNoiseSeed(Math.floor(Math.random() * 99999) + 1)}
                     title={lang === 'zh' ? '随机种子' : 'Randomize seed'}
                   >🎲</button>
+                </div>
+
+                <div className="slider-header" style={{ margin: '10px 0 4px' }}>
+                  <span className="slider-name" style={{ fontSize: '11px' }}>{t.noiseTargets}</span>
+                </div>
+                <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
+                  {NOISE_TARGETS.map((tTarget) => (
+                    <label key={tTarget.id} className="checkbox-group" style={{ fontSize: '11px', cursor: 'pointer', margin: 0 }}>
+                      <input
+                        type="checkbox"
+                        className="checkbox-input"
+                        checked={noiseTargets.includes(tTarget.id)}
+                        onChange={() => toggleNoiseTarget(tTarget.id)}
+                      />
+                      <span className="checkbox-label">{lang === 'zh' ? tTarget.zh : tTarget.en}</span>
+                    </label>
+                  ))}
                 </div>
 
                 <div className="slider-header" style={{ margin: '12px 0 6px' }}>
