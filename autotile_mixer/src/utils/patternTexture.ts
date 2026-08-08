@@ -115,10 +115,10 @@ function cellsField(x: number, y: number, seed: number, per = 2): number {
   let f1 = 9, f2 = 9;
   let nearestX = 0, nearestY = 0;
 
-  // Scale jitter so 4x4 micro-cells stay well-spaced on a 16px grid without
-  // squishing adjacent feature points into pixel-level gaps.
-  const jitter = per === 4 ? 0.45 : 0.68;
-  const baseOffset = per === 4 ? 0.27 : 0.16;
+  // Stagger odd rows horizontally by 0.5 cell units (hexagonal / honeycomb lattice)
+  // to avoid rigid 4-way square grid intersections and produce natural organic polygons.
+  const jitter = per === 4 ? 0.40 : 0.55;
+  const baseOffset = per === 4 ? 0.20 : 0.16;
 
   for (let dy = -1; dy <= 1; dy++) {
     for (let dx = -1; dx <= 1; dx++) {
@@ -126,9 +126,10 @@ function cellsField(x: number, y: number, seed: number, per = 2): number {
       const iy = cy + dy;
       const wx = ((ix % per) + per) % per;
       const wy = ((iy % per) + per) % per;
-      // Keep the points away from lattice corners so cells stay readable at
-      // 16px, while the second hash gives each cell an independent y offset.
-      const px = ix + baseOffset + hash01(wx, wy, seed ^ 0x3c6ef3) * jitter;
+
+      const rowShift = (wy % 2) * 0.5;
+
+      const px = ix + rowShift + baseOffset + hash01(wx, wy, seed ^ 0x3c6ef3) * jitter;
       const py = iy + baseOffset + hash01(wx, wy, seed ^ 0xa54ff5) * jitter;
       const d = Math.hypot(px - fx, py - fy);
       if (d < f1) {
