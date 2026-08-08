@@ -981,7 +981,7 @@ export default function App() {
                 <div className="scale-selector">
                   <span className="scale-label" style={{ fontSize: '11px', color: 'var(--muted)', fontWeight: 600 }}>SCALE:</span>
                   <div className="scale-tabs">
-                    {[1, 2, 3, 4, 6, 8].map((s) => (
+                    {[1, 2, 4, 8].map((s) => (
                       <button
                         key={s}
                         className={`scale-tab-btn ${zoom === s ? 'active' : ''}`}
@@ -1017,7 +1017,7 @@ export default function App() {
               <h2 className="panel-title" style={{ margin: 0 }}>{t.playgroundTitle}</h2>
               <div style={{
                 display: 'flex', alignItems: 'center', gap: '14px', marginLeft: 'auto',
-                // Narrow panels cannot fit markers + six scale tabs on one line;
+                // Narrow panels cannot fit markers + scale tabs on one line;
                 // let them stack rather than run off the edge.
                 flexWrap: 'wrap', justifyContent: 'flex-end',
               }}>
@@ -1033,7 +1033,7 @@ export default function App() {
                 <div className="scale-selector">
                   <span className="scale-label" style={{ fontSize: '11px', color: 'var(--muted)', fontWeight: 600 }}>SCALE:</span>
                   <div className="scale-tabs">
-                    {[1, 2, 4].map((s) => (
+                    {[1, 2, 4, 8].map((s) => (
                       <button key={s} className={`scale-tab-btn ${playgroundZoom === s ? 'active' : ''}`} onClick={() => setPlaygroundZoom(s)}>{s}x</button>
                     ))}
                   </div>
