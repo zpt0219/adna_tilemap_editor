@@ -459,8 +459,15 @@ describe('resolution', () => {
   it('scales the band with the tile, so the art reads the same size', () => {
     // An outline 1px wide at 16 should be 2px wide at 32, not still 1px.
     const width = (ts: number) =>
-      [...patternLevelsForMask('bold', 110, 0, ts)].filter((c) => c === '2').length / ts;
+      [...patternLevelsForMask('rounded', 110, 0, ts)].filter((c) => c === '2').length / ts;
     expect(width(32)).toBeGreaterThan(width(16) * 1.6);
+  });
+
+  it('adjusts outline width when outlineWidth parameter is provided', () => {
+    const ts = 16;
+    const countOutline = (w: number) =>
+      [...patternLevelsForMask('rounded', 110, 0, ts, 3, false, 0, w)].filter((c) => c === '2').length;
+    expect(countOutline(2.0)).toBeGreaterThan(countOutline(1.0));
   });
 
   it('paints RGBA at whatever size was asked for', () => {
@@ -483,7 +490,6 @@ describe('painting', () => {
   const LOCKS = [
     ['rounded', 0xee2a3175],
     ['sharp', 0x4bc96dd5],
-    ['bold', 0xc42e9d95],
     ['jagged', 0xa4c760e7],
     ['gravel', 0x0e0e4c37],
     ['boulder', 0xae807907],
@@ -510,7 +516,7 @@ describe('re-rolling an irregular edge', () => {
 
   it('only offers a re-roll on patterns baked from a noisy field', () => {
     expect(RESEEDABLE.length).toBeGreaterThan(0);
-    expect(CLEAN).toEqual(['rounded', 'sharp', 'bold']);
+    expect(CLEAN).toEqual(['rounded', 'sharp']);
     for (const id of CLEAN) expect(edgeJitterAmplitude(id)).toBe(0);
     for (const id of RESEEDABLE) expect(edgeJitterAmplitude(id)).toBeGreaterThan(0);
   });

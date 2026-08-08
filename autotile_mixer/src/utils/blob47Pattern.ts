@@ -14,8 +14,14 @@ import { GENERATED_FIELDS } from './patterns/generated';
 export type PatternRole = 'terrainA' | 'terrainB' | 'edge';
 
 export type PatternId =
-  | 'sharp' | 'rounded' | 'bold'
+  | 'sharp' | 'rounded'
   | 'jagged' | 'gravel' | 'boulder' | 'thorn' | 'coast' | 'moss' | 'billow';
+
+/** Outline width limits in pixels. */
+export const MIN_OUTLINE_WIDTH = 0.5;
+export const MAX_OUTLINE_WIDTH = 3;
+export const OUTLINE_WIDTH_STEP = 0.25;
+export const DEFAULT_OUTLINE_WIDTH = 1.0;
 
 /**
  * Menu contents, grouped. The "clean" group thresholds the distance field
@@ -30,8 +36,7 @@ export const PATTERN_GROUPS: readonly {
     zh: '规整边缘', en: 'Clean edges',
     items: [
       { id: 'rounded', zh: '圆润 · 全四级过渡', en: 'Rounded — soft corners, full ramp' },
-      { id: 'sharp', zh: '硬边 · 直角细描边', en: 'Sharp — square corners, 1px outline' },
-      { id: 'bold', zh: '粗描边 · 2px 轮廓', en: 'Bold — heavy 2px outline' },
+      { id: 'sharp', zh: '硬边 · 直角描边', en: 'Sharp — square corners, outline' },
     ],
   },
   {
@@ -138,7 +143,6 @@ const CHAR_VALUE: number[] = (() => {
 export const PATTERN_BANDS: Record<PatternId, readonly [number, number, number, number]> = {
   sharp: [3.5, 3.5, 4.5, 4.5],
   rounded: [3.5, 4.5, 5.5, 6.5],
-  bold: [2.5, 3.5, 5.5, 6.5],
   jagged: [3.5, 4.5, 5.5, 6.5],
   gravel: [3.5, 4.5, 5.5, 6.5],
   boulder: [4, 5, 6, 7],
@@ -162,7 +166,6 @@ export const PATTERN_BANDS: Record<PatternId, readonly [number, number, number, 
 export const PATTERN_OFFSET_RANGE: Record<PatternId, readonly [number, number]> = {
   sharp: [-4, 2.75],
   rounded: [-1.75, 2.75],
-  bold: [-3.5, 1.75],
   jagged: [-5, 1],
   gravel: [-5, 1.5],
   boulder: [-2.25, 1.25],
@@ -175,7 +178,6 @@ export const PATTERN_OFFSET_RANGE: Record<PatternId, readonly [number, number]> 
 const FIELDS: Record<PatternId, Record<number, string>> = {
   sharp: GENERATED_FIELDS.sharp,
   rounded: GENERATED_FIELDS.rounded,
-  bold: GENERATED_FIELDS.bold,
   jagged: GENERATED_FIELDS.jagged,
   gravel: GENERATED_FIELDS.gravel,
   boulder: GENERATED_FIELDS.boulder,
@@ -244,12 +246,19 @@ export function patternFieldForMask(pattern: PatternId, mask: number): string {
 export function bandsFor(
   pattern: PatternId,
   steps: number = DEFAULT_BAND_STEPS,
-  hardEdgeB = false
+  hardEdgeB = false,
+  outlineWidth?: number
 ): number[] {
   const base = PATTERN_BANDS[pattern];
+  const adjusted = [...base] as [number, number, number, number];
+  if (outlineWidth !== undefined) {
+    const mid = (base[1] + base[2]) / 2;
+    adjusted[1] = mid - outlineWidth / 2;
+    adjusted[2] = mid + outlineWidth / 2;
+  }
   const extra = Math.max(0, Math.min(MAX_BAND_STEPS, steps) - MIN_BAND_STEPS);
-  const out: number[] = [...base];
-  for (let k = 1; k <= extra; k++) out.push(base[3] + BAND_STEP_PX * k);
+  const out: number[] = [...adjusted];
+  for (let k = 1; k <= extra; k++) out.push(adjusted[3] + BAND_STEP_PX * k);
   if (!hardEdgeB) return out;
   // Collapse the terrain-B shade so open terrain meets the outline with nothing
   // in between, and pull the rest out by the width that freed up — the outline
@@ -396,18 +405,20 @@ export function patternLevelsForMask(
   tileSize: number = PATTERN_TILE_SIZE,
   bandSteps: number = DEFAULT_BAND_STEPS,
   hardEdgeB = false,
-  edgeSeed = 0
+  edgeSeed = 0,
+  outlineWidth?: number
 ): string {
   if (mask < 0) return '0'.repeat(tileSize * tileSize);
   const off = clampOffset(pattern, offsetPx);
   // Seed 0 means "the silhouette exactly as baked", so the whole displacement
   // drops out rather than being computed and multiplied by zero.
   const amp = edgeSeed === 0 ? 0 : edgeJitterAmplitude(pattern, off);
-  const key = `${pattern}:${mask}:${off}:${tileSize}:${bandSteps}:${hardEdgeB}:${amp > 0 ? edgeSeed : 0}`;
+  const owKey = outlineWidth !== undefined ? outlineWidth : '';
+  const key = `${pattern}:${mask}:${off}:${tileSize}:${bandSteps}:${hardEdgeB}:${amp > 0 ? edgeSeed : 0}:${owKey}`;
   let levels = levelCacheGet(key);
   if (levels === undefined) {
     const field = patternFieldForMask(pattern, mask);
-    const bands = bandsFor(pattern, bandSteps, hardEdgeB);
+    const bands = bandsFor(pattern, bandSteps, hardEdgeB, outlineWidth);
     const scale = PATTERN_TILE_SIZE / tileSize;
     let out = '';
     for (let y = 0; y < tileSize; y++) {

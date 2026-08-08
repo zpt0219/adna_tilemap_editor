@@ -83,8 +83,8 @@ const server = http.createServer((req, res) => {
   let parsedUrl = new URL(req.url, `http://${req.headers.host}`);
   let pathname = parsedUrl.pathname;
 
-  // Normalize pathname to prevent directory traversal
-  pathname = path.normalize(pathname).replace(/^(\.\.[\/\\])+/, '');
+  // Normalize pathname to prevent directory traversal and handle Windows backslashes
+  pathname = path.normalize(pathname).replace(/\\/g, '/').replace(/^(\.\.[\/\\])+/, '');
 
   // Redirect /app to /app/ to fix relative asset URLs
   for (const app of APPS) {

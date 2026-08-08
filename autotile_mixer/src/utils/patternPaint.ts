@@ -205,13 +205,14 @@ export function paintPatternTileRGBA(
   edgeSeed = 0,
   customRamp?: readonly RGB[],
   customNoiseColours?: { b?: RGB; edge?: RGB; a?: RGB },
-  noiseTargets: readonly NoiseTargetId[] = DEFAULT_NOISE_TARGETS
+  noiseTargets: readonly NoiseTargetId[] = DEFAULT_NOISE_TARGETS,
+  outlineWidth?: number
 ): Uint8ClampedArray<ArrayBuffer> {
   const derived = patternRamp(colours, bandSteps);
   const ramp = customRamp && customRamp.length === derived.length ? customRamp : derived;
   const levelDefs = patternLevelsFor(bandSteps);
   const grid = patternLevelsForMask(
-    pattern, mask, offsetPx, tileSize, bandSteps, hardEdgeB, edgeSeed
+    pattern, mask, offsetPx, tileSize, bandSteps, hardEdgeB, edgeSeed, outlineWidth
   );
   const solid = ramp.length - 1;
 

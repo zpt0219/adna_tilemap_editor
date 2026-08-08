@@ -231,6 +231,20 @@ describe('geometric textures', () => {
     expect(on.length).toBeLessThan(256);
     expect(on.length).toBeGreaterThan(0);
   });
+
+  it('cells has sparse boundaries at low amount and varied interiors at full amount', () => {
+    const sparse = lit('cells', 0.35);
+    expect(sparse.length).toBeGreaterThan(0);
+    expect(sparse.length).toBeLessThan(256);
+
+    const shades = new Set<number>();
+    for (let y = 0; y < 16; y++) {
+      for (let x = 0; x < 16; x++) {
+        shades.add(textureShadeAt('cells', x, y, 0, 1, MAX_TEXTURE_SHADES));
+      }
+    }
+    expect(shades.size).toBeGreaterThan(2);
+  });
 });
 
 describe('texture colour', () => {

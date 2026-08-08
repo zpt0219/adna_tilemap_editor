@@ -13,6 +13,7 @@ import {
 import {
   PATTERN_GROUPS, DEFAULT_PATTERN, PATTERN_OFFSET_RANGE, RESEEDABLE_PATTERNS,
   MIN_BAND_STEPS, MAX_BAND_STEPS, DEFAULT_BAND_STEPS, patternLevelsFor, type PatternId,
+  DEFAULT_OUTLINE_WIDTH, MIN_OUTLINE_WIDTH, MAX_OUTLINE_WIDTH, OUTLINE_WIDTH_STEP,
 } from './utils/blob47Pattern';
 import {
   NOISE_PRESETS, NOISE_TARGETS, DEFAULT_NOISES, DEFAULT_NOISE_SEED, DEFAULT_NOISE_STRENGTH,
@@ -203,6 +204,9 @@ export default function App() {
     (_, i) => MIN_BAND_STEPS + i
   );
 
+  // Stroke outline width in pixels.
+  const [outlineWidth, setOutlineWidth] = useState<number>(DEFAULT_OUTLINE_WIDTH);
+
   // Collapse the terrain-B shade so open terrain meets the outline hard.
   const [hardEdgeB, setHardEdgeB] = useState(false);
 
@@ -303,10 +307,10 @@ export default function App() {
   const paintArgs = useMemo(() => ({
     patternId, roleColours, patternNoise, bandOffsetPx, patternNoiseSeed,
     patternNoiseStrength, bandSteps, textureOpts, hardEdgeB, edgeSeed,
-    ramp: currentRampRGB, customNoiseColours, noiseTargets,
+    ramp: currentRampRGB, customNoiseColours, noiseTargets, outlineWidth,
   }), [patternId, roleColours, patternNoise, bandOffsetPx, patternNoiseSeed,
        patternNoiseStrength, bandSteps, textureOpts, hardEdgeB, edgeSeed,
-       currentRampRGB, customNoiseColours, noiseTargets]);
+       currentRampRGB, customNoiseColours, noiseTargets, outlineWidth]);
 
   // Canvas refs
   const tilesetCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -345,7 +349,8 @@ export default function App() {
       paintPatternTileRGBA(
         a.patternId, mask, a.roleColours, tileSize, a.patternNoise, a.bandOffsetPx,
         a.patternNoiseSeed, a.patternNoiseStrength, a.bandSteps, a.textureOpts,
-        a.hardEdgeB, a.edgeSeed, a.ramp, a.customNoiseColours, a.noiseTargets
+        a.hardEdgeB, a.edgeSeed, a.ramp, a.customNoiseColours, a.noiseTargets,
+        a.outlineWidth
       ),
       tileSize, tileSize
     );
@@ -711,6 +716,20 @@ export default function App() {
                 );
               })}
             </div>
+
+            <div className="slider-header" style={{ margin: '12px 0 6px' }}>
+              <span className="slider-name">{t.outlineWidth}<InfoTip text={t.outlineWidthHint} /></span>
+              <span className="slider-val">{outlineWidth.toFixed(2)} px</span>
+            </div>
+            <input
+              type="range"
+              className="slider-input"
+              min={MIN_OUTLINE_WIDTH}
+              max={MAX_OUTLINE_WIDTH}
+              step={OUTLINE_WIDTH_STEP}
+              value={outlineWidth}
+              onChange={(e) => setOutlineWidth(parseFloat(e.target.value))}
+            />
 
             {/* The marker sits outside the <label>: inside it, clicking the
                 button would count as a click on the label and toggle the box. */}
