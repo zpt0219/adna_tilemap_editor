@@ -485,6 +485,7 @@ describe('painting', () => {
   // Locks art, shade recipes, sheet layout and rounding in one number each.
   // Regenerate with the baker if a pattern is deliberately redesigned.
   const LOCKS = [
+    ['square', 0xfc5eefe5],
     ['rounded', 0xee2a3175],
     ['sharp', 2866591765],
     ['jagged', 0xa4c760e7],
@@ -513,7 +514,7 @@ describe('re-rolling an irregular edge', () => {
 
   it('only offers a re-roll on patterns baked from a noisy field', () => {
     expect(RESEEDABLE.length).toBeGreaterThan(0);
-    expect(CLEAN).toEqual(['rounded', 'sharp']);
+    expect(CLEAN.sort()).toEqual(['square', 'rounded', 'sharp'].sort());
     for (const id of CLEAN) expect(edgeJitterAmplitude(id)).toBe(0);
     for (const id of RESEEDABLE) expect(edgeJitterAmplitude(id)).toBeGreaterThan(0);
   });

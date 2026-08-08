@@ -10,11 +10,12 @@
 // compactly. patternPaint.test.ts locks every pattern's pixels.
 
 import { GENERATED_FIELDS } from './patterns/generated';
+import { canonicalizeBlobMask } from './blob47';
 
 export type PatternRole = 'terrainA' | 'terrainB' | 'edge';
 
 export type PatternId =
-  | 'sharp' | 'rounded'
+  | 'square' | 'sharp' | 'rounded'
   | 'jagged' | 'gravel' | 'boulder' | 'thorn' | 'coast' | 'moss' | 'billow';
 
 /** Outline width limits in pixels. */
@@ -35,8 +36,9 @@ export const PATTERN_GROUPS: readonly {
   {
     zh: '规整边缘', en: 'Clean edges',
     items: [
+      { id: 'square', zh: '纯直角 · 方角描边', en: 'Square — 90° right angles' },
       { id: 'rounded', zh: '圆润 · 全四级过渡', en: 'Rounded — soft corners, full ramp' },
-      { id: 'sharp', zh: '硬边 · 直角描边', en: 'Sharp — square corners, outline' },
+      { id: 'sharp', zh: '硬边 · 弧角描边', en: 'Sharp — rounded corners, outline' },
     ],
   },
   {
@@ -141,6 +143,7 @@ const CHAR_VALUE: number[] = (() => {
  * field's floor-quantisation cannot straddle one.
  */
 export const PATTERN_BANDS: Record<PatternId, readonly [number, number, number, number]> = {
+  square: [3.5, 4.5, 5.5, 6.5],
   sharp: [3.5, 4.5, 5.5, 6.5],
   rounded: [3.5, 4.5, 5.5, 6.5],
   jagged: [3.5, 4.5, 5.5, 6.5],
@@ -164,6 +167,7 @@ export const PATTERN_BANDS: Record<PatternId, readonly [number, number, number, 
  * which is why the range is per pattern rather than global.
  */
 export const PATTERN_OFFSET_RANGE: Record<PatternId, readonly [number, number]> = {
+  square: [-4, 2.75],
   sharp: [-4, 2.75],
   rounded: [-1.75, 2.75],
   jagged: [-5, 1],
@@ -176,6 +180,7 @@ export const PATTERN_OFFSET_RANGE: Record<PatternId, readonly [number, number]> 
 };
 
 const FIELDS: Record<PatternId, Record<number, string>> = {
+  square: GENERATED_FIELDS.square,
   sharp: GENERATED_FIELDS.sharp,
   rounded: GENERATED_FIELDS.rounded,
   jagged: GENERATED_FIELDS.jagged,
