@@ -236,43 +236,29 @@ export function paintPatternTileRGBA(
       // Grain lives on the transition band only, and is sampled in OUTPUT
       // space so it gets finer along with the art instead of blocking up.
       if (level > 0 && level < solid && noises.length > 0) {
-        const baseRole = levelDefs[level]?.role;
-        let step = noiseStep(noises, x, y, noiseSeed, noiseStrength) * span;
-
-        let isTargetEnabled = false;
-        if (baseRole === 'terrainB') {
-          if (step < 0) {
-            isTargetEnabled = noiseTargets.includes('terrainB');
-          } else if (step > 0) {
-            isTargetEnabled = noiseTargets.includes('terrainB') && noiseTargets.includes('edge');
-          }
-        } else if (baseRole === 'terrainA') {
-          if (step > 0) {
-            isTargetEnabled = noiseTargets.includes('terrainA');
-          } else if (step < 0) {
-            isTargetEnabled = noiseTargets.includes('terrainA') && noiseTargets.includes('edge');
-          }
-        } else if (baseRole === 'edge') {
-          if (step < 0) {
-            isTargetEnabled = noiseTargets.includes('edge') || noiseTargets.includes('terrainB');
-          } else if (step > 0) {
-            isTargetEnabled = noiseTargets.includes('edge') || noiseTargets.includes('terrainA');
-          }
-        }
-
-        if (!isTargetEnabled) step = 0;
+        // Step 1: Generate natural, un-warped noise displacement step
+        const step = noiseStep(noises, x, y, noiseSeed, noiseStrength) * span;
 
         if (step !== 0) {
           const nextLvl = Math.max(0, Math.min(solid, level + step));
-          const targetRole = levelDefs[nextLvl]?.role;
-          if (targetRole === 'edge' && customNoiseColours?.edge) {
-            rgb = customNoiseColours.edge;
-          } else if (step < 0 && customNoiseColours?.b) {
-            rgb = customNoiseColours.b;
-          } else if (step > 0 && customNoiseColours?.a) {
-            rgb = customNoiseColours.a;
-          } else {
-            rgb = ramp[nextLvl];
+          const baseRole = levelDefs[level]?.role;
+          const nextRole = levelDefs[nextLvl]?.role;
+
+          // Step 2: Filter mask — keep noise if either base role or target role is enabled in noiseTargets
+          const keepNoise =
+            Boolean(baseRole && noiseTargets.includes(baseRole)) ||
+            Boolean(nextRole && noiseTargets.includes(nextRole));
+
+          if (keepNoise) {
+            if (nextRole === 'edge' && customNoiseColours?.edge) {
+              rgb = customNoiseColours.edge;
+            } else if (step < 0 && customNoiseColours?.b) {
+              rgb = customNoiseColours.b;
+            } else if (step > 0 && customNoiseColours?.a) {
+              rgb = customNoiseColours.a;
+            } else {
+              rgb = ramp[nextLvl];
+            }
           }
         }
       }
