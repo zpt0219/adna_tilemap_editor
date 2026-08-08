@@ -657,6 +657,27 @@ describe('re-rolling an irregular edge', () => {
         }
         expect(bDiffCount).toBeGreaterThan(0);
 
+        // Strict verification: When only 'terrainB' is enabled, Terrain A base region must have ZERO noise leak
+        const gridStr = patternLevelsForMask(patternId, mask, 0, tileSize, 3);
+        const levelDefs = patternLevelsFor(3);
+        let bOnlyADiffCount = 0;
+        for (let y = 0; y < tileSize; y++) {
+          for (let x = 0; x < tileSize; x++) {
+            const lvl = gridStr.charCodeAt(y * tileSize + x) - 48;
+            if (levelDefs[lvl]?.role === 'terrainA') {
+              const i = (y * tileSize + x) * 4;
+              if (
+                cleanRGBA[i] !== noisyBOnly[i] ||
+                cleanRGBA[i + 1] !== noisyBOnly[i + 1] ||
+                cleanRGBA[i + 2] !== noisyBOnly[i + 2]
+              ) {
+                bOnlyADiffCount++;
+              }
+            }
+          }
+        }
+        expect(bOnlyADiffCount).toBe(0);
+
         // Test 2: Only 'terrainA' target enabled
         const noisyAOnly = paintPatternTileRGBA(
           patternId, mask, REFERENCE_ROLE_COLOURS, tileSize, [...noises], 0, seed, 1, 3,
@@ -674,6 +695,25 @@ describe('re-rolling an irregular edge', () => {
         }
         expect(aDiffCount).toBeGreaterThan(0);
 
+        // Strict verification: When only 'terrainA' is enabled, Terrain B base region must have ZERO noise leak
+        let aOnlyBDiffCount = 0;
+        for (let y = 0; y < tileSize; y++) {
+          for (let x = 0; x < tileSize; x++) {
+            const lvl = gridStr.charCodeAt(y * tileSize + x) - 48;
+            if (levelDefs[lvl]?.role === 'terrainB') {
+              const i = (y * tileSize + x) * 4;
+              if (
+                cleanRGBA[i] !== noisyAOnly[i] ||
+                cleanRGBA[i + 1] !== noisyAOnly[i + 1] ||
+                cleanRGBA[i + 2] !== noisyAOnly[i + 2]
+              ) {
+                aOnlyBDiffCount++;
+              }
+            }
+          }
+        }
+        expect(aOnlyBDiffCount).toBe(0);
+
         // Test 3: Only 'edge' target enabled
         const noisyEdgeOnly = paintPatternTileRGBA(
           patternId, mask, REFERENCE_ROLE_COLOURS, tileSize, [...noises], 0, seed, 1, 3,
@@ -690,6 +730,23 @@ describe('re-rolling an irregular edge', () => {
           }
         }
         expect(edgeDiffCount).toBeGreaterThan(0);
+
+        // Test 4: All noise targets disabled (empty array [])
+        const noisyNone = paintPatternTileRGBA(
+          patternId, mask, REFERENCE_ROLE_COLOURS, tileSize, [...noises], 0, seed, 1, 3,
+          undefined, false, 0, undefined, undefined, []
+        );
+        let noneDiffCount = 0;
+        for (let i = 0; i < cleanRGBA.length; i += 4) {
+          if (
+            cleanRGBA[i] !== noisyNone[i] ||
+            cleanRGBA[i + 1] !== noisyNone[i + 1] ||
+            cleanRGBA[i + 2] !== noisyNone[i + 2]
+          ) {
+            noneDiffCount++;
+          }
+        }
+        expect(noneDiffCount).toBe(0);
       }
     );
   });

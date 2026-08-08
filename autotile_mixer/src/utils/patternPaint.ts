@@ -239,17 +239,18 @@ export function paintPatternTileRGBA(
         const baseRole = levelDefs[level]?.role;
         let step = noiseStep(noises, x, y, noiseSeed, noiseStrength) * span;
 
-        if (step < 0) {
-          // Pushing toward Terrain B
-          const isEnabled = noiseTargets.includes('terrainB') ||
-            (baseRole === 'edge' && noiseTargets.includes('edge'));
-          if (!isEnabled) step = 0;
-        } else if (step > 0) {
-          // Pushing toward Terrain A
-          const isEnabled = noiseTargets.includes('terrainA') ||
-            (baseRole === 'edge' && noiseTargets.includes('edge'));
-          if (!isEnabled) step = 0;
+        let isTargetEnabled = false;
+        if (baseRole === 'terrainB') {
+          isTargetEnabled = noiseTargets.includes('terrainB');
+        } else if (baseRole === 'terrainA') {
+          isTargetEnabled = noiseTargets.includes('terrainA');
+        } else if (baseRole === 'edge') {
+          isTargetEnabled = noiseTargets.includes('edge') ||
+            (step < 0 && noiseTargets.includes('terrainB')) ||
+            (step > 0 && noiseTargets.includes('terrainA'));
         }
+
+        if (!isTargetEnabled) step = 0;
 
         if (step !== 0) {
           const nextLvl = Math.max(0, Math.min(solid, level + step));
