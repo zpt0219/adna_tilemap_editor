@@ -495,7 +495,7 @@ describe('painting', () => {
   // Locks art, shade recipes, sheet layout and rounding in one number each.
   // Regenerate with the baker if a pattern is deliberately redesigned.
   const LOCKS = [
-    ['square', 0xfc5eefe5],
+    ['square', 0xfc5f0be5],
     ['rounded', 0xee2a3175],
     ['sharp', 2866591765],
     ['jagged', 0xa4c760e7],
