@@ -115,11 +115,6 @@ function cellsField(x: number, y: number, seed: number, per = 2): number {
   let f1 = 9, f2 = 9;
   let nearestX = 0, nearestY = 0;
 
-  // Stagger odd rows horizontally by 0.5 cell units (hexagonal / honeycomb lattice)
-  // to avoid rigid 4-way square grid intersections and produce natural organic polygons.
-  const jitter = per === 4 ? 0.40 : 0.55;
-  const baseOffset = per === 4 ? 0.20 : 0.16;
-
   for (let dy = -1; dy <= 1; dy++) {
     for (let dx = -1; dx <= 1; dx++) {
       const ix = cx + dx;
@@ -127,10 +122,15 @@ function cellsField(x: number, y: number, seed: number, per = 2): number {
       const wx = ((ix % per) + per) % per;
       const wy = ((iy % per) + per) % per;
 
-      const rowShift = (wy % 2) * 0.5;
+      // For 4x4 small cells, use fully random web-style point placement across the cell domain
+      // so points wander naturally without any rigid grid skeleton or square box lines.
+      const px = per === 4
+        ? ix + hash01(wx, wy, seed ^ 0x3c6ef3)
+        : ix + (wy % 2) * 0.5 + 0.16 + hash01(wx, wy, seed ^ 0x3c6ef3) * 0.55;
+      const py = per === 4
+        ? iy + hash01(wx, wy, seed ^ 0xa54ff5)
+        : iy + 0.16 + hash01(wx, wy, seed ^ 0xa54ff5) * 0.55;
 
-      const px = ix + rowShift + baseOffset + hash01(wx, wy, seed ^ 0x3c6ef3) * jitter;
-      const py = iy + baseOffset + hash01(wx, wy, seed ^ 0xa54ff5) * jitter;
       const d = Math.hypot(px - fx, py - fy);
       if (d < f1) {
         f2 = f1;
@@ -143,12 +143,11 @@ function cellsField(x: number, y: number, seed: number, per = 2): number {
     }
   }
 
-  // F2-F1 is small on a Voronoi boundary. For 4x4 cells on a 16px raster, a lower
-  // boundary multiplier (1.7 vs 2.4) ensures the boundary thickness covers integer
-  // pixel samples continuously without leaving diagonal gaps.
-  const boundaryMult = per === 4 ? 1.7 : 2.4;
+  // F2-F1 is small on a Voronoi boundary. For 4x4 cells on a 16px raster, a 1.6 boundary
+  // multiplier matches webField while ensuring boundary lines stay continuous.
+  const boundaryMult = per === 4 ? 1.6 : 2.4;
   const boundary = 1 - Math.min(1, (f2 - f1) * boundaryMult);
-  const interior = 0.12 + 0.16 * hash01(nearestX, nearestY, seed ^ 0x510e52);
+  const interior = 0.10 + 0.14 * hash01(nearestX, nearestY, seed ^ 0x510e52);
   return Math.max(interior, boundary);
 }
 
