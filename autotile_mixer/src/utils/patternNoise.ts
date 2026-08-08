@@ -21,10 +21,20 @@ export const NOISE_PRESETS: readonly { id: NoiseId; zh: string; en: string }[] =
   { id: 'ordered', zh: '有序网点 · 规则半调', en: 'Ordered — regular halftone' },
 ];
 
+/**
+ * The three zones the transition band is cut into, named after their position
+ * RELATIVE TO THE OUTLINE.
+ *
+ * They used to be called "terrain A side" / "terrain B side", which reads as
+ * the terrains themselves — and those are ~75% of a sheet and are never touched
+ * by band grain (see the level gate in paintPatternTileRGBA). Each of these
+ * zones is one ~1px ring hugging the outline, so the names have to say so or
+ * the control looks broken.
+ */
 export const NOISE_TARGETS: readonly { id: NoiseTargetId; zh: string; en: string }[] = [
-  { id: 'edge', zh: '描边上', en: 'Outline edge' },
-  { id: 'terrainA', zh: '地形 A 侧', en: 'Terrain A side' },
-  { id: 'terrainB', zh: '地形 B 侧', en: 'Terrain B side' },
+  { id: 'terrainA', zh: '描边内侧（A 侧）', en: 'Inside the outline (A side)' },
+  { id: 'edge', zh: '描边本身', en: 'The outline itself' },
+  { id: 'terrainB', zh: '描边外侧（B 侧）', en: 'Outside the outline (B side)' },
 ];
 
 export const DEFAULT_NOISE_TARGETS: readonly NoiseTargetId[] = ['edge', 'terrainA', 'terrainB'];

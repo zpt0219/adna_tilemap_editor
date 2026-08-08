@@ -806,6 +806,11 @@ export default function App() {
                 <div className="slider-header" style={{ margin: '10px 0 4px' }}>
                   <span className="slider-name" style={{ fontSize: '11px' }}>{t.noiseTargets}</span>
                 </div>
+                {/* Kept always visible rather than parked behind an InfoTip:
+                    the old labels read as the terrains themselves, which are
+                    never touched by band grain, so this is the note that stops
+                    the control looking broken. */}
+                <p className="field-note">{t.noiseTargetsHint}</p>
                 <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
                   {NOISE_TARGETS.map((tTarget) => (
                     <label key={tTarget.id} className="checkbox-group" style={{ fontSize: '11px', cursor: 'pointer', margin: 0 }}>
