@@ -205,8 +205,8 @@ describe('seeding', () => {
   });
 
   it('repaints a tile when only the seed changes', () => {
-    const s0 = paintPatternTileRGBA(DEFAULT_PATTERN, 110, REFERENCE_ROLE_COLOURS, 16, ['blue'], 0, 0);
-    const s9 = paintPatternTileRGBA(DEFAULT_PATTERN, 110, REFERENCE_ROLE_COLOURS, 16, ['blue'], 0, 9);
+    const s0 = paintPatternTileRGBA(DEFAULT_PATTERN, 110, REFERENCE_ROLE_COLOURS, { tileSize: 16, noises: ['blue'], noiseSeed: 0 });
+    const s9 = paintPatternTileRGBA(DEFAULT_PATTERN, 110, REFERENCE_ROLE_COLOURS, { tileSize: 16, noises: ['blue'], noiseSeed: 9 });
     expect(Array.from(s9)).not.toEqual(Array.from(s0));
   });
 });
@@ -277,14 +277,14 @@ describe('grain amount', () => {
   });
 
   it('leaves the tile untouched at 0 even with algorithms ticked', () => {
-    const bare = paintPatternTileRGBA(DEFAULT_PATTERN, 110, REFERENCE_ROLE_COLOURS, 16, []);
-    const zero = paintPatternTileRGBA(DEFAULT_PATTERN, 110, REFERENCE_ROLE_COLOURS, 16, ALL, 0, 0, 0);
+    const bare = paintPatternTileRGBA(DEFAULT_PATTERN, 110, REFERENCE_ROLE_COLOURS, { tileSize: 16, noises: [] });
+    const zero = paintPatternTileRGBA(DEFAULT_PATTERN, 110, REFERENCE_ROLE_COLOURS, { tileSize: 16, noises: ALL, noiseStrength: 0 });
     expect(Array.from(zero)).toEqual(Array.from(bare));
   });
 
   it('keeps the solid interior clean however loud it gets', () => {
-    const px = paintPatternTileRGBA(
-      DEFAULT_PATTERN, 255, REFERENCE_ROLE_COLOURS, 16, ALL, 0, 0, MAX_NOISE_STRENGTH);
+    const px = paintPatternTileRGBA(DEFAULT_PATTERN, 255, REFERENCE_ROLE_COLOURS,
+      { tileSize: 16, noises: ALL, noiseStrength: MAX_NOISE_STRENGTH });
     const solid = patternRamp(REFERENCE_ROLE_COLOURS)[4];
     for (let i = 0; i < px.length; i += 4) {
       expect([px[i], px[i + 1], px[i + 2]]).toEqual([solid.r, solid.g, solid.b]);
@@ -297,7 +297,7 @@ describe('noise applied to a pattern', () => {
 
   it.each(SELECTIONS)('%s leaves a solid interior tile untouched', (...sel) => {
     // Mask 255 is entirely level 4 — the grain must not speckle open terrain.
-    const px = paintPatternTileRGBA(DEFAULT_PATTERN,255, REFERENCE_ROLE_COLOURS, 16, sel as NoiseId[]);
+    const px = paintPatternTileRGBA(DEFAULT_PATTERN, 255, REFERENCE_ROLE_COLOURS, { tileSize: 16, noises: sel as NoiseId[] });
     const solid = patternRamp(REFERENCE_ROLE_COLOURS)[4];
     for (let i = 0; i < px.length; i += 4) {
       expect([px[i], px[i + 1], px[i + 2]]).toEqual([solid.r, solid.g, solid.b]);
@@ -305,7 +305,7 @@ describe('noise applied to a pattern', () => {
   });
 
   it.each(SELECTIONS)('%s leaves the background tile untouched', (...sel) => {
-    const px = paintPatternTileRGBA(DEFAULT_PATTERN,-1, REFERENCE_ROLE_COLOURS, 16, sel as NoiseId[]);
+    const px = paintPatternTileRGBA(DEFAULT_PATTERN, -1, REFERENCE_ROLE_COLOURS, { tileSize: 16, noises: sel as NoiseId[] });
     const field = patternRamp(REFERENCE_ROLE_COLOURS)[0];
     for (let i = 0; i < px.length; i += 4) {
       expect([px[i], px[i + 1], px[i + 2]]).toEqual([field.r, field.g, field.b]);
@@ -315,7 +315,7 @@ describe('noise applied to a pattern', () => {
   it.each(SELECTIONS)('%s stays inside the five-colour ramp', (...sel) => {
     const allowed = new Set(patternRamp(REFERENCE_ROLE_COLOURS).map(toHexColour));
     for (const mask of [0, 31, 110, 175, 255]) {
-      const px = paintPatternTileRGBA('rounded', mask, REFERENCE_ROLE_COLOURS, 16, sel as NoiseId[]);
+      const px = paintPatternTileRGBA('rounded', mask, REFERENCE_ROLE_COLOURS, { tileSize: 16, noises: sel as NoiseId[] });
       for (let i = 0; i < px.length; i += 4) {
         expect(allowed).toContain(toHexColour({ r: px[i], g: px[i + 1], b: px[i + 2] }));
       }
@@ -323,14 +323,14 @@ describe('noise applied to a pattern', () => {
   });
 
   it('an empty selection paints exactly the untouched pattern', () => {
-    const bare = paintPatternTileRGBA('rounded', 110, REFERENCE_ROLE_COLOURS, 16);
-    const empty = paintPatternTileRGBA('rounded', 110, REFERENCE_ROLE_COLOURS, 16, []);
+    const bare = paintPatternTileRGBA('rounded', 110, REFERENCE_ROLE_COLOURS, { tileSize: 16 });
+    const empty = paintPatternTileRGBA('rounded', 110, REFERENCE_ROLE_COLOURS, { tileSize: 16, noises: [] });
     expect(Array.from(empty)).toEqual(Array.from(bare));
   });
 
   it('actually changes the band when switched on', () => {
-    const clean = paintPatternTileRGBA('rounded', 110, REFERENCE_ROLE_COLOURS, 16, []);
-    const grainy = paintPatternTileRGBA('rounded', 110, REFERENCE_ROLE_COLOURS, 16, ['blue']);
+    const clean = paintPatternTileRGBA('rounded', 110, REFERENCE_ROLE_COLOURS, { tileSize: 16, noises: [] });
+    const grainy = paintPatternTileRGBA('rounded', 110, REFERENCE_ROLE_COLOURS, { tileSize: 16, noises: ['blue'] });
     expect(Array.from(grainy)).not.toEqual(Array.from(clean));
   });
 });
@@ -349,10 +349,10 @@ describe('grain respects the three band zones', () => {
   ];
 
   const render = (mask: number, targets: readonly NoiseTargetId[] | null) =>
-    paintPatternTileRGBA(
-      'rounded', mask, REFERENCE_ROLE_COLOURS, TS, targets ? NOISES : [], 0, 7, 1, STEPS,
-      undefined, false, 0, undefined, undefined, targets ?? undefined
-    );
+    paintPatternTileRGBA('rounded', mask, REFERENCE_ROLE_COLOURS, {
+      tileSize: TS, bandSteps: STEPS, noiseSeed: 7,
+      noises: targets ? NOISES : [], noiseTargets: targets ?? undefined,
+    });
 
   const sameAt = (a: Uint8ClampedArray, b: Uint8ClampedArray, i: number) =>
     a[i] === b[i] && a[i + 1] === b[i + 1] && a[i + 2] === b[i + 2];

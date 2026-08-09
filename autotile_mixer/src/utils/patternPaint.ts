@@ -13,9 +13,11 @@ import {
   PATTERN_TILE_SIZE,
   SHADE_RECIPES,
   DEFAULT_BAND_STEPS,
+  outlineWidthPx,
   bandNoiseSpan,
   patternLevelsFor,
   patternLevelsForMask,
+  patternBandCoords,
   type PatternId,
   type PatternRole,
 } from './blob47Pattern';
@@ -23,6 +25,9 @@ import {
   DEFAULT_NOISES, DEFAULT_NOISE_SEED, DEFAULT_NOISE_STRENGTH, DEFAULT_NOISE_TARGETS,
   noiseStep, type NoiseId, type NoiseTargetId,
 } from './patternNoise';
+import {
+  NO_RIBBON, ribbonShadeAt, type RibbonOptions,
+} from './patternRibbon';
 import {
   DEFAULT_TEXTURE, DEFAULT_TEXTURE_SHADES, textureColour, textureRamp, textureShadeAt,
   type TextureId,
@@ -196,30 +201,68 @@ export function patternRamp(colours: RoleColours, bandSteps?: number): RGB[] {
 }
 
 /**
+ * Everything that changes a tile's pixels beyond its pattern, mask and palette.
+ *
+ * An options object rather than the positional list this used to be: the band
+ * refactor took it past sixteen parameters, at which point a call site is a row
+ * of bare `undefined`s and adding one in the middle silently shifts the rest.
+ */
+export interface PaintOptions {
+  /** Must be a multiple of PATTERN_TILE_SIZE — see the seam note below. */
+  tileSize?: number;
+  offsetPx?: number;
+  bandSteps?: number;
+  hardEdgeB?: boolean;
+  /** Re-roll of the baked silhouette; 0 means exactly as baked. Also the
+   *  ribbon motif's phase, because one edge should answer to one dice. */
+  edgeSeed?: number;
+  outlineWidth?: number;
+  /** Grain on the transition band. The algorithms stack; empty means none. */
+  noises?: readonly NoiseId[];
+  noiseSeed?: number;
+  noiseStrength?: number;
+  /** Which of the band's three zones the grain may move a pixel out of. */
+  noiseTargets?: readonly NoiseTargetId[];
+  /** Picked colours for the grain, one per direction it nudges a pixel. */
+  noiseColours?: { b?: RGB; edge?: RGB; a?: RGB };
+  /** What is painted inside the outline. */
+  ribbon?: RibbonOptions;
+  /** Speckle inside the two solid terrains. */
+  texture?: TextureOptions;
+  /** Overrides the whole derived level ramp; ignored unless it matches length. */
+  ramp?: readonly RGB[];
+}
+
+/**
  * One tile as RGBA bytes.
  *
  * `tileSize` must be a multiple of PATTERN_TILE_SIZE. That is not cosmetic: the
- * grain repeats every 16 output pixels, so seams (which fall every `tileSize`
- * pixels) only line up with it when 16 divides `tileSize`.
+ * texture fields repeat every 16 or 32 output pixels, so seams (which fall every
+ * `tileSize` pixels) only line up with them when that period divides `tileSize`.
  */
 export function paintPatternTileRGBA(
   pattern: PatternId,
   mask: number,
   colours: RoleColours,
-  tileSize: number = PATTERN_TILE_SIZE,
-  noises: readonly NoiseId[] = DEFAULT_NOISES,
-  offsetPx = 0,
-  noiseSeed = DEFAULT_NOISE_SEED,
-  noiseStrength = DEFAULT_NOISE_STRENGTH,
-  bandSteps = DEFAULT_BAND_STEPS,
-  texture: TextureOptions = NO_TEXTURE,
-  hardEdgeB = false,
-  edgeSeed = 0,
-  customRamp?: readonly RGB[],
-  customNoiseColours?: { b?: RGB; edge?: RGB; a?: RGB },
-  noiseTargets: readonly NoiseTargetId[] = DEFAULT_NOISE_TARGETS,
-  outlineWidth?: number
+  opts: PaintOptions = {}
 ): Uint8ClampedArray<ArrayBuffer> {
+  const {
+    tileSize = PATTERN_TILE_SIZE,
+    offsetPx = 0,
+    bandSteps = DEFAULT_BAND_STEPS,
+    hardEdgeB = false,
+    edgeSeed = 0,
+    outlineWidth,
+    noises = DEFAULT_NOISES,
+    noiseSeed = DEFAULT_NOISE_SEED,
+    noiseStrength = DEFAULT_NOISE_STRENGTH,
+    noiseTargets = DEFAULT_NOISE_TARGETS,
+    noiseColours,
+    ribbon = NO_RIBBON,
+    texture = NO_TEXTURE,
+    ramp: customRamp,
+  } = opts;
+
   const derived = patternRamp(colours, bandSteps);
   const ramp = customRamp && customRamp.length === derived.length ? customRamp : derived;
   const levelDefs = patternLevelsFor(bandSteps);
@@ -239,20 +282,40 @@ export function paintPatternTileRGBA(
   const texB = texture.algoB !== 'none' && texture.amountB > 0
     ? textureRamp(colours.terrainB, texture.colourB, shadesB, fitRamp(texture.rampB, shadesB))
     : null;
+
+  // The outline is one level, whatever the step count — extra steps are added
+  // on the terrain-A side, so its index is found rather than assumed.
+  const edgeLevel = levelDefs.findIndex((l) => l.role === 'edge');
+  const ribShades = Math.max(1, ribbon.shades);
+  const ribbonOn = ribbon.algo !== 'none' && ribbon.amount > 0 && mask >= 0;
+  const ribRamp = ribbonOn
+    ? textureRamp(ramp[edgeLevel], ribbon.colour, ribShades, fitRamp(ribbon.ramp, ribShades))
+    : null;
+  const coords = ribbonOn
+    ? patternBandCoords(
+        pattern, mask, offsetPx, tileSize, bandSteps, hardEdgeB, edgeSeed, outlineWidth
+      )
+    : null;
+  const ribWidth = ribbonOn
+    ? Math.max(1, outlineWidthPx(pattern, bandSteps, hardEdgeB, outlineWidth, tileSize))
+    : 1;
+
   // Grain displacement scales with the band so it keeps reading as the band
   // widens; at the default step count this is 1 and nothing changes.
   const span = bandNoiseSpan(pattern, bandSteps);
+
   // Backed by a plain ArrayBuffer (not ArrayBufferLike) so the result can be
   // handed straight to `new ImageData(...)`.
   const out = new Uint8ClampedArray(new ArrayBuffer(tileSize * tileSize * 4));
   for (let y = 0; y < tileSize; y++) {
     for (let x = 0; x < tileSize; x++) {
-      const level = grid.charCodeAt(y * tileSize + x) - 48;
+      const p = y * tileSize + x;
+      const level = grid.charCodeAt(p) - 48;
       let rgb = ramp[level];
       // Grain lives on the transition band only, and is sampled in OUTPUT
       // space so it gets finer along with the art instead of blocking up.
+      let grained = false;
       if (level > 0 && level < solid && noises.length > 0) {
-        // Step 1: Generate natural, un-warped noise displacement step
         const step = noiseStep(noises, x, y, noiseSeed, noiseStrength) * span;
 
         if (step !== 0) {
@@ -260,7 +323,7 @@ export function paintPatternTileRGBA(
           const fromRole = levelDefs[level]?.role;
           const nextRole = levelDefs[nextLvl]?.role;
 
-          // Step 2: the band is partitioned into three zones — the outline, the
+          // The band is partitioned into three zones — the outline, the
           // terrain-A side and the terrain-B side — and a displacement touches
           // TWO of them, so both ends are checked. Either one alone leaks, and
           // both leaks are visible on the outline:
@@ -282,19 +345,29 @@ export function paintPatternTileRGBA(
             (nextRole !== 'edge' || noiseTargets.includes('edge'));
 
           if (keepNoise) {
-            if (nextRole === 'edge' && customNoiseColours?.edge) {
-              rgb = customNoiseColours.edge;
-            } else if (step < 0 && customNoiseColours?.b) {
-              rgb = customNoiseColours.b;
-            } else if (step > 0 && customNoiseColours?.a) {
-              rgb = customNoiseColours.a;
+            grained = true;
+            if (nextRole === 'edge' && noiseColours?.edge) {
+              rgb = noiseColours.edge;
+            } else if (step < 0 && noiseColours?.b) {
+              rgb = noiseColours.b;
+            } else if (step > 0 && noiseColours?.a) {
+              rgb = noiseColours.a;
             } else {
               rgb = ramp[nextLvl];
             }
           }
         }
       }
-      if (texA && level === solid) {
+      // A grained pixel has already left the outline, so the motif does not get
+      // to paint over it — the grain is what is eating the line, and a motif
+      // drawn on top would fill the holes back in.
+      if (!grained && ribRamp && coords && level === edgeLevel) {
+        const k = ribbonShadeAt(
+          ribbon.algo, coords.s[p], coords.depth[p], ribWidth,
+          ribbon.seed, ribbon.amount, ribShades, ribbon.period, ribbon.invert
+        );
+        if (k > 0) rgb = ribRamp[k];
+      } else if (texA && level === solid) {
         const k = textureShadeAt(texture.algoA, x, y, texture.seedA, texture.amountA, shadesA);
         if (k > 0) rgb = texA[k];
       } else if (texB && level === 0) {
@@ -302,7 +375,7 @@ export function paintPatternTileRGBA(
         if (k > 0) rgb = texB[k];
       }
       const { r, g, b } = rgb;
-      const i = (y * tileSize + x) * 4;
+      const i = p * 4;
       out[i] = r;
       out[i + 1] = g;
       out[i + 2] = b;

@@ -371,6 +371,18 @@ body {
   color: var(--muted);
 }
 
+/* The same note when it is reporting that the current setting cannot take
+   effect — an outline too narrow for the motif picked. Louder than .field-note
+   because it explains why the canvas did not change. */
+.field-warn {
+  margin-top: 6px;
+  padding: 6px 8px;
+  border-left: 2px solid #d97706;
+  border-radius: 3px;
+  background: rgba(217, 119, 6, 0.12);
+  color: #b45309;
+}
+
 /* Seed field: typed value plus a dice roll. */
 .seed-field {
   display: flex;

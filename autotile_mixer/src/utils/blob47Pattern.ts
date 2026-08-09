@@ -278,9 +278,19 @@ export function bandsFor(
     const mid = (base[1] + base[2]) / 2;
     const wShadeB = base[1] - base[0];
     const wShadeA = base[3] - base[2];
-    adjusted[1] = mid - outlineWidth / 2;
-    adjusted[2] = mid + outlineWidth / 2;
-    adjusted[0] = adjusted[1] - wShadeB;
+    // The outline grows about the drawn boundary, but `base[0]` is PINNED: it is
+    // the band's outer edge, and every offset limit and displacement budget in
+    // this file was measured against it. Letting the width push it outward broke
+    // the inset invariant outright — at the maximum offset a 3px outline put
+    // 5196 band pixels on open cell borders, where the neighbour draws plain
+    // terrain and the boundary reads as a straight clipped line.
+    //
+    // So the terrain-B ring is what gives way. It is squeezed to nothing and
+    // then the outline slides inward, keeping the width that was asked for
+    // rather than being clipped to fit.
+    adjusted[1] = Math.max(base[0], mid - outlineWidth / 2);
+    adjusted[2] = adjusted[1] + outlineWidth;
+    adjusted[0] = Math.max(base[0], adjusted[1] - wShadeB);
     adjusted[3] = adjusted[2] + wShadeA;
   }
   const extra = Math.max(0, Math.min(MAX_BAND_STEPS, steps) - MIN_BAND_STEPS);
@@ -293,6 +303,18 @@ export function bandsFor(
   // `out[0]` is untouched, which is what keeps every offset limit valid.
   const w = out[1] - out[0];
   return out.map((b, i) => (i === 0 ? b : b - w));
+}
+
+/** The outline's own width, in output pixels — how wide the ribbon canvas is. */
+export function outlineWidthPx(
+  pattern: PatternId,
+  steps: number = DEFAULT_BAND_STEPS,
+  hardEdgeB = false,
+  outlineWidth?: number,
+  tileSize: number = PATTERN_TILE_SIZE
+): number {
+  const b = bandsFor(pattern, steps, hardEdgeB, outlineWidth);
+  return ((b[2] - b[1]) * tileSize) / PATTERN_TILE_SIZE;
 }
 
 /**
@@ -354,6 +376,7 @@ export const RESEEDABLE_PATTERNS: ReadonlySet<PatternId> = new Set<PatternId>([
  * The consequence to know about: pushing the band all the way toward the border
  * spends the whole budget, and the re-roll goes quiet. That is not a bug to fix
  * — it is the same headroom being asked for twice.
+ *
  */
 export function edgeJitterAmplitude(pattern: PatternId, offsetPx = 0): number {
   if (!RESEEDABLE_PATTERNS.has(pattern)) return 0;
@@ -460,4 +483,183 @@ export function patternLevelsForMask(
     levelCacheSet(key, levels);
   }
   return levels;
+}
+
+/**
+ * Ribbon coordinates for every pixel: `s` along the outline and `depth` across
+ * it. Only meaningful where the level grid says the pixel is the outline; the
+ * rest is filled but never read.
+ *
+ * `depth` comes free — it is the distance the level grid already computes and
+ * then throws away by quantising into a digit.
+ *
+ * `s` is the part with a real constraint behind it. True arc length is a global
+ * quantity and a tile knows nothing about its neighbours, so it cannot be had.
+ * What can: classify the local tangent into one of four orientations and take
+ * the world coordinate that runs along it. On any straight run that IS arc
+ * length exactly, it is a pure function of global position so it agrees across
+ * seams, and it only jumps phase where the orientation class changes — around a
+ * corner, where a one-pixel hitch in the dash spacing is invisible.
+ *
+ * The diagonals are `x±y` UN-normalised, and that is forced rather than chosen.
+ * A tile is painted in local coordinates, so `s` is only usable if it is
+ * congruent to the global one modulo the motif's period. `x` and `y` shift by
+ * exactly 32 per tile, and `x±y` by 32*(col±row) — all multiples of 32, so any
+ * period dividing 32 keeps its phase across every seam. Dividing by sqrt(2) for
+ * euclidean spacing would make the per-tile shift 22.63 and every diagonal run
+ * would restart its motif at each seam. The price is that a 45° run advances at
+ * a different rate than a straight one, so motifs read about 1.4x larger there.
+ * That is why RIBBON_PERIODS holds only divisors of 32.
+ *
+ * The gradient is taken from the STORED field, ignoring the re-roll's
+ * displacement — the re-roll rewrites where the boundary sits, not which way it
+ * runs, and central differences of the jitter would cost four more noise
+ * evaluations per pixel to swing the classification by a fraction of a bucket.
+ */
+export interface BandCoords {
+  /** Distance along the outline, in output pixels. Outline pixels only. */
+  s: Float32Array;
+  /** 0 at the terrain-B face of the outline, 1 at the terrain-A face. */
+  depth: Float32Array;
+}
+
+/**
+ * Smaller than LEVEL_CACHE because an entry is 8 KB rather than 1 KB: 128
+ * covers two full 47-mask working sets, which is what a slider drag touches.
+ */
+export const BAND_CACHE_MAX = 128;
+const BAND_CACHE = new Map<string, BandCoords>();
+
+export const bandCacheSize = () => BAND_CACHE.size;
+
+/**
+ * Half-width of the stencil the outline's direction is estimated over.
+ *
+ * A one-pixel central difference is far too local to survive the noise baked
+ * into the irregular silhouettes: measured as the share of ADJACENT outline
+ * pixels that land in different orientation buckets — which is what makes a
+ * motif re-phase — a single-pixel gradient gives 39% on moss and 36% on thorn,
+ * against 6.4% on square. Averaging the difference over seven rows brings those
+ * to 16% and 12% while leaving the clean patterns untouched to the digit
+ * (square 6.4%, sharp 5.5%), because it smooths the direction estimate without
+ * touching where the boundary actually sits.
+ *
+ * Seven is where it stops: that is already the width of the whole transition
+ * band, and a wider stencil starts reading across thin features instead of
+ * along them.
+ */
+const GRAD_RADIUS = 3;
+
+/**
+ * One component of the field's gradient, per unit distance, averaged across the
+ * stencil.
+ *
+ * The one-sided cases matter more than they look. `sampleField` clamps, so a
+ * plain central difference at the last column subtracts a replicated sample and
+ * comes out HALF the size it should be — which does not change its sign but
+ * skews gx against gy, and with it the bucket. Scaling by the span that was
+ * actually spanned is what keeps a border column comparable with the tile next
+ * to it.
+ */
+function derivative(field: string, u: number, v: number, horizontal: boolean): number {
+  const N = PATTERN_TILE_SIZE;
+  const at = (d: number, k: number) =>
+    horizontal ? sampleField(field, u + d, v + k) : sampleField(field, u + k, v + d);
+  const c = horizontal ? u : v;
+  const r = radiusAt(c, N);
+  const lo = Math.max(-r, -c);
+  const hi = Math.min(r, N - 1 - c);
+  const span = hi - lo;
+  if (span <= 0) return 0;
+  let total = 0;
+  let n = 0;
+  for (let k = -r; k <= r; k++) {
+    total += at(hi, k) - at(lo, k);
+    n++;
+  }
+  return total / (n * span);
+}
+
+/**
+ * The stencil shrinks as it nears a tile border, and that is the whole seam
+ * story.
+ *
+ * A wide stencil at the last column can only look BACKWARD, while the first
+ * column of the tile beside it can only look forward — two disjoint seven-pixel
+ * windows on opposite sides of the seam, which on a noisy silhouette routinely
+ * disagree. Measured with a fixed radius of 3: `billow` re-phased at 78% of its
+ * seam pixel pairs against 18% inside a tile, and `coast` at 46% against 12%.
+ * Narrowing to a single pixel exactly at the border makes the two windows
+ * adjacent instead of disjoint, which is the closest a tile can get to reading
+ * its neighbour, and brings the seam rate back down to the in-tile one. Only two
+ * columns and two rows per tile pay the noisier estimate.
+ */
+function radiusAt(c: number, n: number): number {
+  return Math.max(1, Math.min(GRAD_RADIUS, Math.min(c, n - 1 - c)));
+}
+
+export function patternBandCoords(
+  pattern: PatternId,
+  mask: number,
+  offsetPx = 0,
+  tileSize: number = PATTERN_TILE_SIZE,
+  bandSteps: number = DEFAULT_BAND_STEPS,
+  hardEdgeB = false,
+  edgeSeed = 0,
+  outlineWidth?: number
+): BandCoords {
+  const off = clampOffset(pattern, offsetPx);
+  const amp = edgeSeed === 0 || mask < 0 ? 0 : edgeJitterAmplitude(pattern, off);
+  const owKey = outlineWidth !== undefined ? outlineWidth : '';
+  const key = `${pattern}:${mask}:${off}:${tileSize}:${bandSteps}:${hardEdgeB}:${amp > 0 ? edgeSeed : 0}:${owKey}`;
+  const hit = BAND_CACHE.get(key);
+  if (hit) {
+    BAND_CACHE.delete(key);
+    BAND_CACHE.set(key, hit);
+    return hit;
+  }
+  const n = tileSize * tileSize;
+  const coords: BandCoords = { s: new Float32Array(n), depth: new Float32Array(n) };
+  if (mask >= 0) {
+    const field = patternFieldForMask(pattern, mask);
+    const bands = bandsFor(pattern, bandSteps, hardEdgeB, outlineWidth);
+    const inner = bands[1];
+    const width = Math.max(1e-6, bands[2] - bands[1]);
+    const scale = PATTERN_TILE_SIZE / tileSize;
+    for (let y = 0; y < tileSize; y++) {
+      const v = (y + 0.5) * scale - 0.5;
+      for (let x = 0; x < tileSize; x++) {
+        const u = (x + 0.5) * scale - 0.5;
+        const jitter = amp > 0 ? amp * edgeNoise(u, v, edgeSeed) : 0;
+        const d = sampleField(field, u, v) + off + jitter;
+        const i = y * tileSize + x;
+        coords.depth[i] = Math.max(0, Math.min(1, (d - inner) / width));
+        // Only the outline is ever asked for its `s`, and the stencil below is
+        // 7x7 — so skipping the ~85% of a tile that is solid terrain is most of
+        // the cost of this pass.
+        if (d < inner || d >= bands[2]) continue;
+        const gx = derivative(field, u, v, true);
+        const gy = derivative(field, u, v, false);
+        // The tangent is the gradient turned a quarter turn. Its sign does not
+        // matter — an edge running east is the same edge running west — so the
+        // angle is folded into [0, pi) before it is bucketed.
+        let ang = Math.atan2(gx, -gy);
+        if (ang < 0) ang += Math.PI;
+        if (ang >= Math.PI) ang -= Math.PI;
+        const bucket = Math.floor((ang + Math.PI / 8) / (Math.PI / 4)) % 4;
+        coords.s[i] =
+          bucket === 0 ? x
+          : bucket === 1 ? x + y
+          : bucket === 2 ? y
+          : x - y;
+      }
+    }
+  }
+  BAND_CACHE.set(key, coords);
+  while (BAND_CACHE.size > BAND_CACHE_MAX) {
+    const oldest = BAND_CACHE.keys().next();
+    if (oldest.done) break;
+    BAND_CACHE.delete(oldest.value);
+  }
+  return coords;
 }

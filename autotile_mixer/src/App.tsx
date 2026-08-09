@@ -14,12 +14,17 @@ import {
   PATTERN_GROUPS, DEFAULT_PATTERN, PATTERN_OFFSET_RANGE, RESEEDABLE_PATTERNS,
   MIN_BAND_STEPS, MAX_BAND_STEPS, DEFAULT_BAND_STEPS, patternLevelsFor, type PatternId,
   DEFAULT_OUTLINE_WIDTH, MIN_OUTLINE_WIDTH, MAX_OUTLINE_WIDTH, OUTLINE_WIDTH_STEP,
-  PATTERN_TILE_SIZE,
+  outlineWidthPx, PATTERN_TILE_SIZE,
 } from './utils/blob47Pattern';
 import {
   NOISE_PRESETS, NOISE_TARGETS, DEFAULT_NOISES, DEFAULT_NOISE_SEED, DEFAULT_NOISE_STRENGTH,
   MAX_NOISE_STRENGTH, type NoiseId, type NoiseTargetId,
 } from './utils/patternNoise';
+import {
+  RIBBON_GROUPS, RIBBON_MIN_WIDTH, RIBBON_PERIODS, DEFAULT_RIBBON, DEFAULT_RIBBON_AMOUNT,
+  DEFAULT_RIBBON_PERIOD, DEFAULT_RIBBON_SHADES, MIN_RIBBON_SHADES, MAX_RIBBON_SHADES,
+  ribbonUsesInvert, ribbonUsesPeriod, usedRibbonShades, type RibbonId,
+} from './utils/patternRibbon';
 import {
   TEXTURE_PRESETS, DEFAULT_TEXTURE, DEFAULT_TEXTURE_SHADES, textureRamp, usedTextureShades,
   MIN_TEXTURE_SHADES, MAX_TEXTURE_SHADES, DEFAULT_TEXTURE_SEED, WATER_DOT_COLOUR, type TextureId,
@@ -169,6 +174,15 @@ export default function App() {
   const [patternNoiseSeed, setPatternNoiseSeed] = useState(DEFAULT_NOISE_SEED);
   const [patternNoiseStrength, setPatternNoiseStrength] = useState(DEFAULT_NOISE_STRENGTH);
 
+  // What is painted INSIDE the outline. The other half of the same split: the
+  // outline is a canvas with width, the rings either side of it are a dither.
+  const [ribbonAlgo, setRibbonAlgo] = useState<RibbonId>(DEFAULT_RIBBON);
+  const [ribbonAmount, setRibbonAmount] = useState(DEFAULT_RIBBON_AMOUNT);
+  const [ribbonPeriod, setRibbonPeriod] = useState<number>(DEFAULT_RIBBON_PERIOD);
+  const [ribbonShades, setRibbonShades] = useState(DEFAULT_RIBBON_SHADES);
+  const [ribbonInvert, setRibbonInvert] = useState(false);
+  const [customRibbonHex, setCustomRibbonHex] = useState<(string | undefined)[] | null>(null);
+
   // Speckle inside the solid terrains, so a filled region reads as a material.
   // Per terrain: the two solid regions are different materials, so paving under
   // grass wants a different field from the grass.
@@ -255,7 +269,6 @@ export default function App() {
     setPatternNoise((prev) =>
       prev.includes(id) ? prev.filter((n) => n !== id) : [...prev, id]
     );
-
   // Grid helper
   const [showGrid, setShowGrid] = useState(true);
 
@@ -289,6 +302,10 @@ export default function App() {
       .filter(({ lvl }) => lvl.shade > 0)
       .map(({ idx }) => idx);
   }, [levels]);
+
+  /** Which level is the outline. Extra band steps go on the terrain-A side, so
+   *  its index moves with the step count rather than being a constant 2. */
+  const outlineLevel = useMemo(() => levels.findIndex((l) => l.role === 'edge'), [levels]);
 
   const derivedRamp = useMemo(() => patternRamp(roleColours, bandSteps), [roleColours, bandSteps]);
 
@@ -357,6 +374,46 @@ export default function App() {
     );
   };
 
+  /** The outline is the ribbon's canvas, so its width decides what fits on it. */
+  const ribbonWidthPx = useMemo(
+    () => outlineWidthPx(patternId, bandSteps, hardEdgeB, outlineWidth, TILE_SIZE),
+    [patternId, bandSteps, hardEdgeB, outlineWidth]
+  );
+  const ribbonTooNarrow = ribbonAlgo !== 'none' && ribbonWidthPx < RIBBON_MIN_WIDTH[ribbonAlgo];
+
+  /** The ribbon's own ramp, walked from the outline colour the band ramp names. */
+  const ribbonRamp = useMemo(() => {
+    const custom = customRibbonHex?.length === ribbonShades + 1
+      ? customRibbonHex.map((h) => (h ? parseHexColour(h) : undefined))
+      : undefined;
+    return textureRamp(currentRampRGB[outlineLevel], undefined, ribbonShades, custom);
+  }, [currentRampRGB, outlineLevel, ribbonShades, customRibbonHex]);
+
+  /** Which ribbon shades the current motif actually paints. */
+  const ribbonReachable = useMemo(
+    () => usedRibbonShades(ribbonAlgo, ribbonWidthPx, ribbonAmount, ribbonShades, ribbonPeriod, ribbonInvert),
+    [ribbonAlgo, ribbonWidthPx, ribbonAmount, ribbonShades, ribbonPeriod, ribbonInvert]
+  );
+
+  const RIBBON_SHADE_CHOICES = Array.from(
+    { length: MAX_RIBBON_SHADES - MIN_RIBBON_SHADES + 1 },
+    (_, i) => MIN_RIBBON_SHADES + i
+  );
+
+  const ribbon = useMemo(() => ({
+    algo: ribbonAlgo,
+    amount: ribbonAmount,
+    period: ribbonPeriod,
+    shades: ribbonShades,
+    // One dice for the edge: the silhouette re-roll and the motif's phase both
+    // follow it, so rolling once changes the edge rather than one aspect of it.
+    seed: edgeSeed,
+    invert: ribbonInvert,
+    ramp: customRibbonHex?.length === ribbonShades + 1
+      ? customRibbonHex.map((h) => (h ? parseHexColour(h) : undefined))
+      : undefined,
+  }), [ribbonAlgo, ribbonAmount, ribbonPeriod, ribbonShades, edgeSeed, ribbonInvert, customRibbonHex]);
+
   /**
    * Everything paintPatternTileRGBA needs, in one memoised object.
    *
@@ -370,12 +427,27 @@ export default function App() {
    * this object changes exactly when the pixels would.
    */
   const paintArgs = useMemo(() => ({
-    patternId, roleColours, patternNoise, bandOffsetPx, patternNoiseSeed,
-    patternNoiseStrength, bandSteps, textureOpts, hardEdgeB, edgeSeed,
-    ramp: currentRampRGB, customNoiseColours, noiseTargets, outlineWidth,
-  }), [patternId, roleColours, patternNoise, bandOffsetPx, patternNoiseSeed,
-       patternNoiseStrength, bandSteps, textureOpts, hardEdgeB, edgeSeed,
-       currentRampRGB, customNoiseColours, noiseTargets, outlineWidth]);
+    patternId,
+    roleColours,
+    opts: {
+      tileSize: TILE_SIZE,
+      offsetPx: bandOffsetPx,
+      bandSteps,
+      hardEdgeB,
+      edgeSeed,
+      outlineWidth,
+      noises: patternNoise,
+      noiseSeed: patternNoiseSeed,
+      noiseStrength: patternNoiseStrength,
+      noiseTargets,
+      noiseColours: customNoiseColours,
+      ribbon,
+      texture: textureOpts,
+      ramp: currentRampRGB,
+    },
+  }), [patternId, roleColours, bandOffsetPx, bandSteps, textureOpts, hardEdgeB,
+       edgeSeed, currentRampRGB, outlineWidth, patternNoise, patternNoiseSeed,
+       patternNoiseStrength, noiseTargets, customNoiseColours, ribbon]);
 
   // Canvas refs
   const tilesetCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -411,12 +483,7 @@ export default function App() {
 
     const a = paintArgs;
     const paint = (mask: number) => new ImageData(
-      paintPatternTileRGBA(
-        a.patternId, mask, a.roleColours, TILE_SIZE, a.patternNoise, a.bandOffsetPx,
-        a.patternNoiseSeed, a.patternNoiseStrength, a.bandSteps, a.textureOpts,
-        a.hardEdgeB, a.edgeSeed, a.ramp, a.customNoiseColours, a.noiseTargets,
-        a.outlineWidth
-      ),
+      paintPatternTileRGBA(a.patternId, mask, a.roleColours, a.opts),
       TILE_SIZE, TILE_SIZE
     );
 
@@ -838,6 +905,143 @@ export default function App() {
         <aside className="sidebar sidebar-right">
           <section className="panel-card">
             <h2 className="panel-title">{t.sectionGrain}</h2>
+
+            {/* The outline is a ribbon with width, so it gets a motif of its
+                own. Separate from the band grain below, which erodes the band
+                rather than decorating the line inside it. */}
+            <div className="slider-header" style={{ marginBottom: '4px' }}>
+              <span className="slider-name">{t.ribbonAlgo}<InfoTip text={t.ribbonHint} /></span>
+            </div>
+            <select
+              className="text-input"
+              value={ribbonAlgo}
+              onChange={(e) => setRibbonAlgo(e.target.value as RibbonId)}
+            >
+              {RIBBON_GROUPS.map((g) => (
+                <optgroup key={g.en} label={lang === 'zh' ? g.zh : g.en}>
+                  {g.items.map((r) => (
+                    <option key={r.id} value={r.id}>{lang === 'zh' ? r.zh : r.en}</option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+
+            {ribbonAlgo !== 'none' && (<>
+              {/* Said outright rather than dropping the motif from the menu: a
+                  motif that needs three pixels is a reason to widen the outline,
+                  not a reason to hide it. */}
+              {ribbonTooNarrow && (
+                <p className="field-note field-warn">
+                  {t.ribbonTooNarrow
+                    .replace('{n}', String(RIBBON_MIN_WIDTH[ribbonAlgo]))
+                    .replace('{w}', String(Math.round(ribbonWidthPx * 10) / 10))}
+                </p>
+              )}
+
+              <div className="slider-header" style={{ margin: '8px 0 4px' }}>
+                <span className="slider-name">
+                  {t.ribbonAmount}<InfoTip text={t.ribbonAmountHint} />
+                </span>
+                <span className="slider-val">
+                  {ribbonAmount === 0 ? t.noiseOff : `${Math.round(ribbonAmount * 100)}%`}
+                </span>
+              </div>
+              <input
+                type="range"
+                className="slider-input"
+                min={0} max={1} step={0.05}
+                value={ribbonAmount}
+                onChange={(e) => setRibbonAmount(parseFloat(e.target.value))}
+              />
+
+              {ribbonUsesPeriod(ribbonAlgo) && (<>
+                <div className="slider-header" style={{ margin: '10px 0 4px' }}>
+                  <span className="slider-name" style={{ fontSize: '11px' }}>
+                    {t.ribbonPeriod}<InfoTip text={t.ribbonPeriodHint} />
+                  </span>
+                </div>
+                <div className="type-tabs" style={{ marginBottom: '6px' }}>
+                  {RIBBON_PERIODS.map((n) => (
+                    <button
+                      key={n}
+                      className={`tab-btn ${ribbonPeriod === n ? 'active' : ''}`}
+                      onClick={() => setRibbonPeriod(n)}
+                    >
+                      {n}
+                    </button>
+                  ))}
+                </div>
+              </>)}
+
+              {ribbonUsesInvert(ribbonAlgo) && (
+                <label className="checkbox-group" style={{ margin: '8px 0' }}>
+                  <input
+                    type="checkbox"
+                    className="checkbox-input"
+                    checked={ribbonInvert}
+                    onChange={(e) => setRibbonInvert(e.target.checked)}
+                  />
+                  <span className="checkbox-label">{t.ribbonInvert}</span>
+                </label>
+              )}
+
+              <div className="slider-header" style={{ margin: '8px 0 4px' }}>
+                <span className="slider-name" style={{ fontSize: '11px' }}>{t.ribbonColours}</span>
+                {customRibbonHex?.some(Boolean) && (
+                  <ResetLink
+                    label={t.reset}
+                    title={t.resetRibbonColoursHint}
+                    onClick={() => setCustomRibbonHex(null)}
+                  />
+                )}
+              </div>
+              <div className="swatch-row">
+                {Array.from({ length: MAX_RIBBON_SHADES }, (_, i) => i + 1).map((k) => {
+                  // Same rule as the terrain swatches: every slot is drawn so the
+                  // row never reflows, and the ones this motif cannot reach at
+                  // its current width and strength are crossed out rather than
+                  // silently doing nothing when clicked.
+                  const isDisabled = !ribbonReachable.has(k);
+                  const hex = toHexColour(ribbonRamp[Math.min(k, ribbonShades)]);
+                  return (
+                    <ColourSwatch
+                      key={k}
+                      hex={hex}
+                      disabled={isDisabled}
+                      isCustom={Boolean(customRibbonHex?.[k])}
+                      title={isDisabled
+                        ? `${t.ribbonColours} ${k} — ${t.textureShadeDisabled}`
+                        : `${t.ribbonColours} ${k} (${hex}) — ${t.clickToCustomize}`}
+                      onChange={(next) => setCustomRibbonHex((prev) => {
+                        // Start from an override of the RIGHT LENGTH; a stale one
+                        // from a different shade count would mis-index.
+                        const base = prev && prev.length === ribbonShades + 1
+                          ? [...prev]
+                          : new Array<string | undefined>(ribbonShades + 1).fill(undefined);
+                        base[k] = next;
+                        return base;
+                      })}
+                    />
+                  );
+                })}
+              </div>
+
+              <div className="slider-header" style={{ margin: '8px 0 4px' }}>
+                <span className="slider-name" style={{ fontSize: '11px' }}>{t.ribbonShades}</span>
+                <span className="slider-val">{ribbonShades}</span>
+              </div>
+              <div className="type-tabs" style={{ marginBottom: '6px' }}>
+                {RIBBON_SHADE_CHOICES.map((n) => (
+                  <button
+                    key={n}
+                    className={`tab-btn ${ribbonShades === n ? 'active' : ''}`}
+                    onClick={() => setRibbonShades(n)}
+                  >
+                    {n}
+                  </button>
+                ))}
+              </div>
+            </>)}
 
             <div className="slider-header" style={{ marginBottom: '6px' }}>
               <span className="slider-name">{t.patternNoise}<InfoTip text={t.noiseStackHint} /></span>

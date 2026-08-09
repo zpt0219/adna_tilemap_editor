@@ -8,7 +8,7 @@ import {
   REFERENCE_ROLE_COLOURS, paintPatternTileRGBA, patternRamp, toHexColour, NO_TEXTURE,
 } from './patternPaint';
 import { DEFAULT_PATTERN, patternLevelsForMask } from './blob47Pattern';
-import { sample } from './patternNoise';
+import { sample, type NoiseId } from './patternNoise';
 
 const ALGOS = TEXTURE_PRESETS.map((p) => p.id).filter((id) => id !== 'none');
 const DEEP_BLUE = { r: 0x00, g: 0x18, b: 0xa0 };
@@ -484,15 +484,16 @@ describe('texture ramp', () => {
 
 describe('texture applied to a tile', () => {
   const paint = (tex: Partial<typeof NO_TEXTURE>) =>
-    paintPatternTileRGBA(DEFAULT_PATTERN, 110, REFERENCE_ROLE_COLOURS, 16, [], 0, 0, 1, 3,
-      { ...NO_TEXTURE, ...tex });
+    paintPatternTileRGBA(DEFAULT_PATTERN, 110, REFERENCE_ROLE_COLOURS, {
+      tileSize: 16, texture: { ...NO_TEXTURE, ...tex },
+    });
   const paint32 = (
-    tex: Partial<typeof NO_TEXTURE>, noises: readonly ('white' | 'blue' | 'clumped' | 'ordered')[] = [],
+    tex: Partial<typeof NO_TEXTURE>,
+    noises: readonly NoiseId[] = [],
     noiseSeed = 0,
-  ) => paintPatternTileRGBA(
-    DEFAULT_PATTERN, 110, REFERENCE_ROLE_COLOURS, 32, noises, 0, noiseSeed, 1, 3,
-    { ...NO_TEXTURE, ...tex }
-  );
+  ) => paintPatternTileRGBA(DEFAULT_PATTERN, 110, REFERENCE_ROLE_COLOURS, {
+    tileSize: 32, texture: { ...NO_TEXTURE, ...tex }, noises, noiseSeed,
+  });
 
   const roleAt = (p: number, tileSize = 32) => {
     const level = patternLevelsForMask(DEFAULT_PATTERN, 110, 0, tileSize, 3).charCodeAt(p) - 48;
@@ -521,14 +522,14 @@ describe('texture applied to a tile', () => {
   });
 
   it('is inert when off', () => {
-    const bare = paintPatternTileRGBA(DEFAULT_PATTERN, 110, REFERENCE_ROLE_COLOURS, 16);
+    const bare = paintPatternTileRGBA(DEFAULT_PATTERN, 110, REFERENCE_ROLE_COLOURS, { tileSize: 16 });
     expect(Array.from(paint({}))).toEqual(Array.from(bare));
     expect(Array.from(paint({ algoA: 'white', algoB: 'white', amountA: 0, amountB: 0 })))
       .toEqual(Array.from(bare));
   });
 
   it('changes the solid interior but leaves the band alone', () => {
-    const bare = paintPatternTileRGBA(DEFAULT_PATTERN, 110, REFERENCE_ROLE_COLOURS, 16);
+    const bare = paintPatternTileRGBA(DEFAULT_PATTERN, 110, REFERENCE_ROLE_COLOURS, { tileSize: 16 });
     const tex = paint({ algoA: 'white', algoB: 'white', amountA: 0.6 });
     const bandColours = new Set(patternRamp(REFERENCE_ROLE_COLOURS, 3).slice(1, -1).map(toHexColour));
     let changed = 0;
@@ -616,18 +617,11 @@ describe('texture applied to a tile', () => {
   });
 
   it('keeps texture seeds independent from band noise seed', () => {
-    const base = paint32(
-      { algoA: 'white', algoB: 'white', amountA: 1, amountB: 1, seedA: 7, seedB: 11 },
-      ['white'], 21
-    );
-    const changedTexture = paint32(
-      { algoA: 'white', algoB: 'white', amountA: 1, amountB: 1, seedA: 8, seedB: 12 },
-      ['white'], 21
-    );
-    const changedNoise = paint32(
-      { algoA: 'white', algoB: 'white', amountA: 1, amountB: 1, seedA: 7, seedB: 11 },
-      ['white'], 22
-    );
+    const tex = (seedA: number, seedB: number) =>
+      ({ algoA: 'white' as const, algoB: 'white' as const, amountA: 1, amountB: 1, seedA, seedB });
+    const base = paint32(tex(7, 11), ['white'], 21);
+    const changedTexture = paint32(tex(8, 12), ['white'], 21);
+    const changedNoise = paint32(tex(7, 11), ['white'], 22);
     for (let p = 0; p < 32 * 32; p++) {
       const i = p * 4;
       if (roleAt(p) === 'band') {
@@ -639,8 +633,9 @@ describe('texture applied to a tile', () => {
   });
 
   it('leaves the background tile flat unless terrain B is textured', () => {
-    const flat = paintPatternTileRGBA(DEFAULT_PATTERN, -1, REFERENCE_ROLE_COLOURS, 16, [], 0, 0, 1, 3,
-      { ...NO_TEXTURE, algoA: 'white', algoB: 'white', amountA: 1 });
+    const flat = paintPatternTileRGBA(DEFAULT_PATTERN, -1, REFERENCE_ROLE_COLOURS, {
+      tileSize: 16, texture: { ...NO_TEXTURE, algoA: 'white', algoB: 'white', amountA: 1 },
+    });
     const b = REFERENCE_ROLE_COLOURS.terrainB;
     for (let i = 0; i < flat.length; i += 4) {
       expect([flat[i], flat[i + 1], flat[i + 2]]).toEqual([b.r, b.g, b.b]);

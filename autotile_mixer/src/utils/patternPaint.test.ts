@@ -4,7 +4,8 @@ import {
   PATTERN_TILE_SIZE, patternLevelsForMask, patternFieldForMask, PATTERN_BACKGROUND,
   PATTERNS, PATTERN_GROUPS, DEFAULT_PATTERN, PATTERN_BANDS, PATTERN_OFFSET_RANGE,
   FIELD_STEP, FIELD_CHARS, clampOffset, bandsFor, bandNoiseSpan, patternLevelsFor,
-  MIN_BAND_STEPS, MAX_BAND_STEPS, DEFAULT_BAND_STEPS,
+  MIN_BAND_STEPS, MAX_BAND_STEPS, DEFAULT_BAND_STEPS, outlineWidthPx,
+  MIN_OUTLINE_WIDTH, MAX_OUTLINE_WIDTH, OUTLINE_WIDTH_STEP, DEFAULT_OUTLINE_WIDTH,
   RESEEDABLE_PATTERNS, edgeJitterAmplitude, LEVEL_CACHE_MAX, levelCacheSize, type PatternId,
 } from './blob47Pattern';
 import {
@@ -15,6 +16,7 @@ import {
   toHexColour,
   type RGB,
 } from './patternPaint';
+import { NO_RIBBON, RIBBONS } from './patternRibbon';
 
 // The pattern is art, so these tests are a lock, not a specification: they fail
 // when the baked grids or the shade recipes drift, which would silently change
@@ -192,7 +194,7 @@ function sheetHash(id: PatternId): number {
   const h = BLOB47_ROWS * ts;
   const sheet = new Uint8ClampedArray(w * h * 4);
   BLOB47_LAYOUT.forEach((mask, slot) => {
-    const px = paintPatternTileRGBA(id, mask, REFERENCE_ROLE_COLOURS, ts);
+    const px = paintPatternTileRGBA(id, mask, REFERENCE_ROLE_COLOURS, { tileSize: ts });
     const ox = (slot % BLOB47_COLS) * ts;
     const oy = Math.floor(slot / BLOB47_COLS) * ts;
     for (let y = 0; y < ts; y++) {
@@ -207,8 +209,10 @@ function sheetHash(id: PatternId): number {
   return hash >>> 0;
 }
 
+/** Every band-step count the UI offers. */
+const COUNTS = [MIN_BAND_STEPS, 4, MAX_BAND_STEPS];
+
 describe('transition-band steps', () => {
-  const COUNTS = [MIN_BAND_STEPS, 4, MAX_BAND_STEPS];
 
   it('adds one colour per step', () => {
     for (const n of COUNTS) {
@@ -290,8 +294,8 @@ describe('transition-band steps', () => {
 
   it.each(ALL_PATTERNS)('%s grain reaches further at 5 steps than at 3', (id) => {
     const reach = (n: number) => {
-      const clean = paintPatternTileRGBA(id, 110, REFERENCE_ROLE_COLOURS, 32, [], 0, 0, 1, n);
-      const noisy = paintPatternTileRGBA(id, 110, REFERENCE_ROLE_COLOURS, 32, ['blue'], 0, 0, 1, n);
+      const clean = paintPatternTileRGBA(id, 110, REFERENCE_ROLE_COLOURS, { tileSize: 32, bandSteps: n });
+      const noisy = paintPatternTileRGBA(id, 110, REFERENCE_ROLE_COLOURS, { tileSize: 32, bandSteps: n, noises: ['blue'] });
       let worst = 0;
       for (let i = 0; i < clean.length; i += 4) {
         const d = Math.max(Math.abs(clean[i] - noisy[i]),
@@ -308,9 +312,10 @@ describe('transition-band steps', () => {
   it.each(ALL_PATTERNS)('%s grain never escapes the ramp, whatever the span', (id) => {
     const allowed = new Set(patternRamp(REFERENCE_ROLE_COLOURS, MAX_BAND_STEPS).map(toHexColour));
     for (const mask of [0, 31, 110, 255]) {
-      const px = paintPatternTileRGBA(
-        id, mask, REFERENCE_ROLE_COLOURS, PATTERN_TILE_SIZE, ['blue', 'white', 'clumped', 'ordered'],
-        0, 0, 2, MAX_BAND_STEPS);
+      const px = paintPatternTileRGBA(id, mask, REFERENCE_ROLE_COLOURS, {
+        tileSize: PATTERN_TILE_SIZE, bandSteps: MAX_BAND_STEPS, noiseStrength: 2,
+        noises: ['blue', 'white', 'clumped', 'ordered'],
+      });
       for (let i = 0; i < px.length; i += 4) {
         expect(allowed).toContain(toHexColour({ r: px[i], g: px[i + 1], b: px[i + 2] }));
       }
@@ -450,19 +455,51 @@ describe('resolution', () => {
     expect(countOutline(2.0)).toBeGreaterThan(countOutline(1.0));
   });
 
-  it('moves shade bands outward alongside outline when outlineWidth increases', () => {
+  it('grows the outline about the boundary, and squeezes the B ring to do it', () => {
     const base = bandsFor('rounded', 3, false, 1.0);
     const wider = bandsFor('rounded', 3, false, 2.5);
-    expect(wider[2] - wider[1]).toBeCloseTo(2.5, 9);
-    expect(wider[1] - wider[0]).toBeCloseTo(base[1] - base[0], 9);
-    expect(wider[3] - wider[2]).toBeCloseTo(base[3] - base[2], 9);
+    expect(wider[2] - wider[1]).toBeCloseTo(2.5, 9);   // exactly the width asked for
+    expect(wider[3] - wider[2]).toBeCloseTo(base[3] - base[2], 9);  // A ring unchanged
     expect(wider[1]).toBeLessThan(base[1]);
     expect(wider[2]).toBeGreaterThan(base[2]);
+    // The terrain-B ring is what gives way, because the band's outer edge is
+    // pinned — see bandsFor.
+    expect(wider[1] - wider[0]).toBeLessThan(base[1] - base[0]);
+  });
+
+  // The pin itself, over every pattern and every width the slider offers. It is
+  // the premise of PATTERN_OFFSET_RANGE, of edgeJitterAmplitude and of the
+  // dissolve budget, and it was broken: a 3px outline used to push the band
+  // 5196 pixels past open cell borders at maximum offset.
+  it.each(ALL_PATTERNS)('%s never moves the band outer edge, whatever the outline width', (id) => {
+    for (let w = MIN_OUTLINE_WIDTH; w <= MAX_OUTLINE_WIDTH; w += OUTLINE_WIDTH_STEP) {
+      for (const steps of COUNTS) {
+        for (const hard of [false, true]) {
+          const bands = bandsFor(id, steps, hard, w);
+          expect(bands[0]).toBeGreaterThanOrEqual(PATTERN_BANDS[id][0] - 1e-9);
+          expect(bands[1]).toBeGreaterThanOrEqual(bands[0] - 1e-9);
+          expect(bands[2] - bands[1]).toBeCloseTo(w, 9);
+        }
+      }
+    }
+  });
+
+  it.each(ALL_PATTERNS)('%s keeps a wide outline off every open border', (id) => {
+    const [, hi] = PATTERN_OFFSET_RANGE[id];
+    for (const w of [MIN_OUTLINE_WIDTH, DEFAULT_OUTLINE_WIDTH, MAX_OUTLINE_WIDTH]) {
+      for (const mask of BLOB47_MASKS) {
+        const g = patternLevelsForMask(id, mask, hi, PATTERN_TILE_SIZE, 3, false, 0, w);
+        for (const [bit, idx] of edgeIndices(PATTERN_TILE_SIZE)) {
+          if (mask & bit) continue;
+          for (const i of idx) expect(g[i]).toBe('0');
+        }
+      }
+    }
   });
 
   it('paints RGBA at whatever size was asked for', () => {
     for (const ts of [PATTERN_TILE_SIZE, PATTERN_TILE_SIZE * 2]) {
-      const px = paintPatternTileRGBA(DEFAULT_PATTERN, 110, REFERENCE_ROLE_COLOURS, ts);
+      const px = paintPatternTileRGBA(DEFAULT_PATTERN, 110, REFERENCE_ROLE_COLOURS, { tileSize: ts });
       expect(px).toHaveLength(ts * ts * 4);
     }
   });
@@ -470,7 +507,7 @@ describe('resolution', () => {
 
 describe('painting', () => {
   it('emits opaque RGBA at the requested size', () => {
-    const px = paintPatternTileRGBA(DEFAULT_PATTERN, 255, REFERENCE_ROLE_COLOURS, 32);
+    const px = paintPatternTileRGBA(DEFAULT_PATTERN, 255, REFERENCE_ROLE_COLOURS, { tileSize: 32 });
     expect(px).toHaveLength(32 * 32 * 4);
     for (let i = 3; i < px.length; i += 4) expect(px[i]).toBe(255);
   });
@@ -622,15 +659,14 @@ describe('re-rolling an irregular edge', () => {
         const noises = ['blue', 'white'] as const;
 
         // Render clean tile without noise
-        const cleanRGBA = paintPatternTileRGBA(
-          patternId, mask, REFERENCE_ROLE_COLOURS, tileSize, [], 0, 0, 1, 3
-        );
+        const cleanRGBA = paintPatternTileRGBA(patternId, mask, REFERENCE_ROLE_COLOURS,
+          { tileSize, bandSteps: 3 });
 
         // Render noisy tile with all 3 noiseTargets enabled
-        const noisyAllRGBA = paintPatternTileRGBA(
-          patternId, mask, REFERENCE_ROLE_COLOURS, tileSize, [...noises], 0, seed, 1, 3,
-          undefined, false, 0, undefined, undefined, ['edge', 'terrainA', 'terrainB']
-        );
+        const noisyAllRGBA = paintPatternTileRGBA(patternId, mask, REFERENCE_ROLE_COLOURS, {
+          tileSize, bandSteps: 3, noises: [...noises], noiseSeed: seed,
+          noiseTargets: ['edge', 'terrainA', 'terrainB'],
+        });
 
         // Verify that noise produced pixel differences compared to clean tile
         let diffCount = 0;
@@ -662,9 +698,9 @@ describe('re-rolling an irregular edge', () => {
 
         // Test 1: Only 'terrainB' target enabled
         const noisyBOnly = paintPatternTileRGBA(
-          patternId, mask, REFERENCE_ROLE_COLOURS, tileSize, [...noises], 0, seed, 1, 3,
-          undefined, false, 0, undefined, undefined, ['terrainB']
-        );
+patternId, mask, REFERENCE_ROLE_COLOURS, {
+          tileSize, bandSteps: 3, noises: [...noises], noiseSeed: seed, noiseTargets: ['terrainB'],
+        });
         let bDiffCount = 0;
         for (let i = 0; i < cleanRGBA.length; i += 4) {
           if (
@@ -700,9 +736,9 @@ describe('re-rolling an irregular edge', () => {
 
         // Test 2: Only 'terrainA' target enabled
         const noisyAOnly = paintPatternTileRGBA(
-          patternId, mask, REFERENCE_ROLE_COLOURS, tileSize, [...noises], 0, seed, 1, 3,
-          undefined, false, 0, undefined, undefined, ['terrainA']
-        );
+patternId, mask, REFERENCE_ROLE_COLOURS, {
+          tileSize, bandSteps: 3, noises: [...noises], noiseSeed: seed, noiseTargets: ['terrainA'],
+        });
         let aDiffCount = 0;
         for (let i = 0; i < cleanRGBA.length; i += 4) {
           if (
@@ -736,9 +772,9 @@ describe('re-rolling an irregular edge', () => {
 
         // Test 3: Only 'edge' target enabled
         const noisyEdgeOnly = paintPatternTileRGBA(
-          patternId, mask, REFERENCE_ROLE_COLOURS, tileSize, [...noises], 0, seed, 1, 3,
-          undefined, false, 0, undefined, undefined, ['edge']
-        );
+patternId, mask, REFERENCE_ROLE_COLOURS, {
+          tileSize, bandSteps: 3, noises: [...noises], noiseSeed: seed, noiseTargets: ['edge'],
+        });
         let edgeDiffCount = 0;
         for (let i = 0; i < cleanRGBA.length; i += 4) {
           if (
@@ -756,9 +792,9 @@ describe('re-rolling an irregular edge', () => {
 
         // Test 4: All noise targets disabled (empty array [])
         const noisyNone = paintPatternTileRGBA(
-          patternId, mask, REFERENCE_ROLE_COLOURS, tileSize, [...noises], 0, seed, 1, 3,
-          undefined, false, 0, undefined, undefined, []
-        );
+patternId, mask, REFERENCE_ROLE_COLOURS, {
+          tileSize, bandSteps: 3, noises: [...noises], noiseSeed: seed, noiseTargets: [],
+        });
         let noneDiffCount = 0;
         for (let i = 0; i < cleanRGBA.length; i += 4) {
           if (
@@ -775,10 +811,10 @@ describe('re-rolling an irregular edge', () => {
   });
 });
 
-// The two colour overrides are the app's only way to leave the derived palette.
-// Neither had any coverage, and both fail QUIETLY when wrong — a mis-indexed
-// ramp still paints a plausible-looking tile, and a leaked grain colour looks
-// like a texture rather than a bug.
+// The colour overrides are the app's only way to leave the derived palette, and
+// they fail QUIETLY when wrong — a mis-indexed ramp still paints a plausible
+// tile. The ribbon adds a second one, on a level the band ramp also names, so
+// the two have to be checked together.
 describe('custom colour overrides', () => {
   const PATTERN = DEFAULT_PATTERN;
   const MASK = 0; // an island: the largest transition band of any tile
@@ -808,10 +844,9 @@ describe('custom colour overrides', () => {
     const target = 2; // the outline
     const custom = ramp.map((c, i) => (i === target ? MAGENTA : c));
 
-    const px = paintPatternTileRGBA(
-      PATTERN, MASK, REFERENCE_ROLE_COLOURS, TS, [], 0, 0, 1, DEFAULT_BAND_STEPS,
-      undefined, false, 0, custom
-    );
+    const px = paintPatternTileRGBA(PATTERN, MASK, REFERENCE_ROLE_COLOURS, {
+      tileSize: TS, ramp: custom,
+    });
 
     const grid = levelsOf();
     const expected: number[] = [];
@@ -830,24 +865,22 @@ describe('custom colour overrides', () => {
     const stale = derived().map(() => MAGENTA); // right colours, wrong length
     expect(stale.length).not.toBe(patternRamp(REFERENCE_ROLE_COLOURS, 4).length);
 
-    const withStale = paintPatternTileRGBA(
-      PATTERN, MASK, REFERENCE_ROLE_COLOURS, TS, [], 0, 0, 1, 4,
-      undefined, false, 0, stale
-    );
-    const withNone = paintPatternTileRGBA(
-      PATTERN, MASK, REFERENCE_ROLE_COLOURS, TS, [], 0, 0, 1, 4
-    );
+    const withStale = paintPatternTileRGBA(PATTERN, MASK, REFERENCE_ROLE_COLOURS, {
+      tileSize: TS, bandSteps: 4, ramp: stale,
+    });
+    const withNone = paintPatternTileRGBA(PATTERN, MASK, REFERENCE_ROLE_COLOURS, {
+      tileSize: TS, bandSteps: 4,
+    });
 
     expect(pixelsOf(withStale, MAGENTA)).toEqual([]);
     expect([...withStale]).toEqual([...withNone]);
   });
 
-  it('applies grain in the picked colours', () => {
-    const px = paintPatternTileRGBA(
-      PATTERN, MASK, REFERENCE_ROLE_COLOURS, TS, ['white'], 0, 7, 1, DEFAULT_BAND_STEPS,
-      undefined, false, 0, undefined,
-      { b: CYAN, edge: YELLOW, a: MAGENTA }
-    );
+it('applies grain in the picked colours', () => {
+    const px = paintPatternTileRGBA(PATTERN, MASK, REFERENCE_ROLE_COLOURS, {
+      tileSize: TS, noises: ['white'], noiseSeed: 7,
+      noiseColours: { b: CYAN, edge: YELLOW, a: MAGENTA },
+    });
     // The grain pushes pixels both ways, so both directions must show up.
     expect(pixelsOf(px, CYAN).length).toBeGreaterThan(0);
     expect(pixelsOf(px, MAGENTA).length).toBeGreaterThan(0);
@@ -856,11 +889,10 @@ describe('custom colour overrides', () => {
   it('keeps grain colours inside the transition band', () => {
     // The whole point of gating grain on `0 < level < solid`: a custom colour
     // reaching a solid terrain would tile as speckle across open ground.
-    const px = paintPatternTileRGBA(
-      PATTERN, MASK, REFERENCE_ROLE_COLOURS, TS, ['white', 'clumped'], 0, 7, 2, DEFAULT_BAND_STEPS,
-      undefined, false, 0, undefined,
-      { b: CYAN, edge: YELLOW, a: MAGENTA }
-    );
+    const px = paintPatternTileRGBA(PATTERN, MASK, REFERENCE_ROLE_COLOURS, {
+      tileSize: TS, noises: ['white', 'clumped'], noiseSeed: 7, noiseStrength: 2,
+      noiseColours: { b: CYAN, edge: YELLOW, a: MAGENTA },
+    });
     const grid = levelsOf();
     const solid = derived().length - 1;
     for (const c of [CYAN, YELLOW, MAGENTA]) {
@@ -873,26 +905,102 @@ describe('custom colour overrides', () => {
   });
 
   it('is inert when no grain algorithm is selected', () => {
-    const plain = paintPatternTileRGBA(
-      PATTERN, MASK, REFERENCE_ROLE_COLOURS, TS, [], 0, 7, 1, DEFAULT_BAND_STEPS
-    );
-    const withColours = paintPatternTileRGBA(
-      PATTERN, MASK, REFERENCE_ROLE_COLOURS, TS, [], 0, 7, 1, DEFAULT_BAND_STEPS,
-      undefined, false, 0, undefined,
-      { b: CYAN, edge: YELLOW, a: MAGENTA }
-    );
+    const plain = paintPatternTileRGBA(PATTERN, MASK, REFERENCE_ROLE_COLOURS,
+      { tileSize: TS, noiseSeed: 7 });
+    const withColours = paintPatternTileRGBA(PATTERN, MASK, REFERENCE_ROLE_COLOURS, {
+      tileSize: TS, noiseSeed: 7, noiseColours: { b: CYAN, edge: YELLOW, a: MAGENTA },
+    });
     expect([...withColours]).toEqual([...plain]);
   });
 
   it('lets the two overrides combine without either shadowing the other', () => {
     const custom = derived().map((c, i) => (i === 2 ? YELLOW : c));
-    const px = paintPatternTileRGBA(
-      PATTERN, MASK, REFERENCE_ROLE_COLOURS, TS, ['white'], 0, 7, 1, DEFAULT_BAND_STEPS,
-      undefined, false, 0, custom, { b: CYAN, a: MAGENTA }
-    );
+    const px = paintPatternTileRGBA(PATTERN, MASK, REFERENCE_ROLE_COLOURS, {
+      tileSize: TS, noises: ['white'], noiseSeed: 7, ramp: custom,
+      noiseColours: { b: CYAN, a: MAGENTA },
+    });
     expect(pixelsOf(px, YELLOW).length).toBeGreaterThan(0); // ramp override survives
     expect(pixelsOf(px, CYAN).length).toBeGreaterThan(0);   // grain override survives
     expect(pixelsOf(px, MAGENTA).length).toBeGreaterThan(0);
+  });
+
+  it('paints the ribbon in its own picked colours', () => {
+    const px = paintPatternTileRGBA(PATTERN, MASK, REFERENCE_ROLE_COLOURS, {
+      tileSize: TS,
+      ribbon: { ...NO_RIBBON, algo: 'bevel', amount: 1, shades: 2, ramp: [undefined, CYAN, MAGENTA] },
+    });
+    expect(pixelsOf(px, CYAN).length).toBeGreaterThan(0);
+    expect(pixelsOf(px, MAGENTA).length).toBeGreaterThan(0);
+  });
+
+  it('keeps the ribbon inside the outline, whatever the motif', () => {
+    // The one containment rule the ribbon has: it is painted on the outline
+    // level and nowhere else, so a motif reaching a shade ring or a terrain
+    // would read as speckle across open ground.
+    const grid = levelsOf();
+    for (const algo of RIBBONS.map((r) => r.id)) {
+      if (algo === 'none') continue;
+      const px = paintPatternTileRGBA(PATTERN, MASK, REFERENCE_ROLE_COLOURS, {
+        tileSize: TS,
+        ribbon: {
+          ...NO_RIBBON, algo, amount: 1, shades: 2, period: 4,
+          ramp: [undefined, CYAN, MAGENTA],
+        },
+      });
+      for (const c of [CYAN, MAGENTA]) {
+        for (const p of pixelsOf(px, c)) expect(grid.charCodeAt(p) - 48).toBe(2);
+      }
+    }
+  });
+
+  it('is inert when the ribbon is off or empty', () => {
+    const plain = paintPatternTileRGBA(PATTERN, MASK, REFERENCE_ROLE_COLOURS, { tileSize: TS });
+    for (const ribbon of [
+      NO_RIBBON,
+      { ...NO_RIBBON, algo: 'bevel' as const, amount: 0 },
+      { ...NO_RIBBON, algo: 'none' as const, amount: 1 },
+    ]) {
+      expect([...paintPatternTileRGBA(PATTERN, MASK, REFERENCE_ROLE_COLOURS, {
+        tileSize: TS, ribbon,
+      })]).toEqual([...plain]);
+    }
+  });
+
+  it('lets the band ramp and the ribbon combine without either shadowing the other', () => {
+    // The ribbon's ramp is built FROM the band ramp's outline entry, so an
+    // override of that entry has to reach the ribbon's shade 0 base as well as
+    // the pixels the motif leaves bare.
+    const custom = derived().map((c, i) => (i === 2 ? YELLOW : c));
+    const px = paintPatternTileRGBA(PATTERN, MASK, REFERENCE_ROLE_COLOURS, {
+      tileSize: TS,
+      ramp: custom,
+      ribbon: { ...NO_RIBBON, algo: 'dashes', amount: 0.5, period: 6, shades: 1, ramp: [undefined, CYAN] },
+    });
+    expect(pixelsOf(px, YELLOW).length).toBeGreaterThan(0); // bare outline survives
+    expect(pixelsOf(px, CYAN).length).toBeGreaterThan(0);   // the dashes survive
+  });
+
+  it('widens with the outline instead of staying a fixed strip', () => {
+    const lit = (w: number) => {
+      // Mask 15 rather than the island: mask 0 is small enough that its
+      // innermost distances never reach the far face of a wide outline, so the
+      // strip would be truncated by the art rather than by the control.
+      const px = paintPatternTileRGBA(PATTERN, 15, REFERENCE_ROLE_COLOURS, {
+        tileSize: TS, outlineWidth: w,
+        ribbon: { ...NO_RIBBON, algo: 'bevel', amount: 1, shades: 1, ramp: [undefined, CYAN] },
+      });
+      return pixelsOf(px, CYAN).length;
+    };
+    expect(lit(4)).toBeGreaterThan(lit(2));
+  });
+
+  it('reports the outline width the ribbon is scaled by', () => {
+    for (const w of [1, 2, 3.5, 6]) {
+      expect(outlineWidthPx(PATTERN, 3, false, w, PATTERN_TILE_SIZE)).toBeCloseTo(w, 9);
+    }
+    // At twice the resolution the same outline is twice as many pixels, which is
+    // what keeps a motif the same size relative to the art rather than the grid.
+    expect(outlineWidthPx(PATTERN, 3, false, 2, PATTERN_TILE_SIZE * 2)).toBeCloseTo(4, 9);
   });
 });
 
