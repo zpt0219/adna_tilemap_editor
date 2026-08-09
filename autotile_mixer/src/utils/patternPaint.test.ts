@@ -521,7 +521,7 @@ describe('painting', () => {
   // the move untouched.
   const LOCKS = [
     ['square', 3907203429],
-    ['rounded', 2359414661],
+    ['rounded', 3180312917],
     ['sharp', 196643349],
     ['jagged', 3145449431],
     ['gravel', 3096308343],

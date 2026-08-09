@@ -187,14 +187,14 @@ export const PATTERN_BANDS: Record<PatternId, readonly [number, number, number, 
 export const PATTERN_OFFSET_RANGE: Record<PatternId, readonly [number, number]> = {
   square: [-8.5, 6.25],
   sharp: [-8.5, 6.25],
-  rounded: [-3.5, 5.75],
-  jagged: [-9.75, 2.5],
-  gravel: [-9.5, 3.25],
-  boulder: [-4.25, 2.75],
-  thorn: [-8.5, 2.75],
-  coast: [-5, 4.75],
-  moss: [-9, 2.25],
-  billow: [-2.75, 2.5],
+  rounded: [-3.75, 2.75],
+  jagged: [-5.5, 1.0],
+  gravel: [-5.25, 1.5],
+  boulder: [-4.0, 1.25],
+  thorn: [-4.5, 1.25],
+  coast: [-3.75, 2.25],
+  moss: [-5.75, 1.0],
+  billow: [-2.75, 1.0],
 };
 
 const FIELDS: Record<PatternId, Record<number, string>> = {
@@ -418,11 +418,14 @@ function edgeNoise(u: number, v: number, seed: number): number {
  * half-pixel never lands anywhere the transition band can reach.
  */
 function sampleField(field: string, u: number, v: number): number {
-  const N = PATTERN_TILE_SIZE;
-  const x0 = Math.floor(u);
-  const y0 = Math.floor(v);
-  const tx = u - x0;
-  const ty = v - y0;
+  const N = Math.sqrt(field.length) | 0;
+  const scale = N / PATTERN_TILE_SIZE;
+  const fu = u * scale;
+  const fv = v * scale;
+  const x0 = Math.floor(fu);
+  const y0 = Math.floor(fv);
+  const tx = fu - x0;
+  const ty = fv - y0;
   const cl = (n: number) => (n < 0 ? 0 : n > N - 1 ? N - 1 : n);
   const gx0 = cl(x0), gx1 = cl(x0 + 1), gy0 = cl(y0), gy1 = cl(y0 + 1);
   const g = (x: number, y: number) => CHAR_VALUE[field.charCodeAt(y * N + x)];

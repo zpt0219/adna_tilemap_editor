@@ -120,12 +120,6 @@ function boxDist(px: number, py: number, x0: number, y0: number, x1: number, y1:
   return Math.hypot(dx, dy);
 }
 
-/** Polynomial smooth minimum. k <= 0 degenerates to Math.min. */
-function smin(a: number, b: number, k: number): number {
-  if (k <= 0 || !isFinite(a) || !isFinite(b)) return Math.min(a, b);
-  const h = Math.max(k - Math.abs(a - b), 0) / k;
-  return Math.min(a, b) - h * h * k * 0.25;
-}
 
 /** Neighbour cell offsets, in the same order as the edge bits. */
 const ORTHO: [number, number, number][] = [
@@ -189,11 +183,13 @@ export function blobWeightAt(
   }
 
   if (cornerRounding > 0) {
+    const r = cornerRounding;
     for (const [a, b] of CONVEX_PAIRS) {
       const da = orthoDist[a];
       const db = orthoDist[b];
-      if (isFinite(da) && isFinite(db)) {
-        d = Math.min(d, smin(da, db, cornerRounding));
+      if (da < r && db < r) {
+        const dCorner = r - Math.hypot(r - da, r - db);
+        d = Math.min(d, dCorner);
       }
     }
   }
