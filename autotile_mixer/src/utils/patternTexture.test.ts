@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   TEXTURE_PRESETS, DEFAULT_TEXTURE, DEFAULT_TEXTURE_SHADES, MAX_TEXTURE_SHADES,
-  textureShadeAt, textureColour, textureRamp, texturePeriod,
+  textureShadeAt, textureColour, textureRamp, texturePeriod, usedTextureShades,
   type TextureId,
 } from './patternTexture';
 import {
@@ -15,7 +15,12 @@ const DEEP_BLUE = { r: 0x00, g: 0x18, b: 0xa0 };
 const NEAR_WHITE = { r: 0xf8, g: 0xf8, b: 0xf8 };
 
 /** Baked art keeps its lightest tone as bare terrain, so it never inks everything. */
-const BAKED = ['weave', 'paving', 'paving3', 'paving5'] as const;
+const BAKED = [
+  'weave', 'paving', 'paving3', 'paving5',
+  // Not baked art, but the same kind of texture: these name a shade per cell
+  // rather than thresholding a field, so the cells dealt shade 0 stay bare.
+  'cells', 'medium_cells', 'small_cells',
+] as const;
 
 /**
  * Fraction of textured pixels, counted over one full period of the texture. A
@@ -102,19 +107,58 @@ describe('texture presets', () => {
     ['paving', 960 / 1024],
     ['paving3', 692 / 1024],
     ['paving5', 817 / 1024],
+    ['cells', 789 / 1024],
+    ['medium_cells', 772 / 1024],
+    ['small_cells', 814 / 1024],
   ] as const)('%s leaves its lightest tone as bare terrain at full amount', (algo, want) => {
     expect(coverage(algo, 1)).toBeCloseTo(want, 6);
   });
 
-  it.each(ALGOS)('%s keeps the strongest shade sparse', (algo) => {
-    // Biased low on purpose: the top shade is a highlight, not half the surface.
+  it.each(ALGOS)('%s keeps the strongest shade a minority', (algo) => {
+    // The top shade is an accent — a highlight, a joint, a grout line — never
+    // the surface itself. This used to be checked as `counts[1] > counts[max]`,
+    // which is a fair proxy for a scatter but not for a texture whose top shade
+    // is its grout: at 4x4 cells the grout is legitimately the single commonest
+    // tone at 28%, and that is the texture working, not failing.
     const p = texturePeriod(algo);
     const counts = new Array(MAX_TEXTURE_SHADES + 1).fill(0);
     for (let y = 0; y < p; y++) {
       for (let x = 0; x < p; x++) counts[textureShadeAt(algo, x, y, 0, 1)]++;
     }
-    expect(counts[1]).toBeGreaterThan(counts[MAX_TEXTURE_SHADES]);
+    expect(counts[MAX_TEXTURE_SHADES]).toBeLessThan((p * p) / 3);
   });
+
+  it.each(['cells', 'medium_cells', 'small_cells'] as const)(
+    '%s deals every shade below the grout to some cell', (algo) => {
+      // The regression this whole model exists for. Cells used to go through the
+      // scatter path, which squares its input before scaling: an interior value
+      // of at most 0.24 gave `1 + floor(4 * 0.24^2)` = 1 for every cell however
+      // the hash fell, so all cells were one colour and only the boundary ever
+      // climbed — a wireframe, not a paving. Every interior step must be spoken
+      // for, or the ramp is being wasted again.
+      const p = texturePeriod(algo);
+      const seen = new Set<number>();
+      for (let y = 0; y < p; y++) {
+        for (let x = 0; x < p; x++) seen.add(textureShadeAt(algo, x, y, 0, 1, MAX_TEXTURE_SHADES));
+      }
+      for (let k = 0; k <= MAX_TEXTURE_SHADES; k++) expect(seen).toContain(k);
+    });
+
+  it.each(['cells', 'medium_cells', 'small_cells'] as const)(
+    '%s paints each cell flat, not as a gradient', (algo) => {
+      // A cell is one block of colour. Counting how many pixels sit on a shade
+      // boundary catches a field that has started ramping inside a cell: a flat
+      // deal only changes shade at the grout, which is a small fraction of the
+      // tile.
+      const p = texturePeriod(algo);
+      const at = (x: number, y: number) =>
+        textureShadeAt(algo, ((x % p) + p) % p, ((y % p) + p) % p, 0, 1, MAX_TEXTURE_SHADES);
+      let edges = 0;
+      for (let y = 0; y < p; y++) {
+        for (let x = 0; x < p; x++) if (at(x, y) !== at(x + 1, y)) edges++;
+      }
+      expect(edges).toBeLessThan(p * p * 0.25);
+    });
 
   it('changes with the seed', () => {
     const print = (seed: number) => {
@@ -159,8 +203,8 @@ describe('geometric textures', () => {
   // Both lattices are half-drop: every other course is shifted by half a brick.
   // Shifting by (half a brick, one course) therefore maps the pattern exactly
   // onto itself — which is the definition, not a consequence. The vector differs
-  // because the bricks are 16x8 and the carpet cells 16x16.
-  it.each([['brick', 8, 8], ['carpet', 8, 16]] as const)(
+  // because the bricks are 16x8.
+  it.each([['brick', 8, 8]] as const)(
     '%s is a half-drop lattice',
     (algo, dx, dy) => {
       for (let y = 0; y < 32; y++) {
@@ -210,17 +254,6 @@ describe('geometric textures', () => {
     expect(new Set(sets).size).toBe(2); // two distinct joint alignments
   });
 
-  it('carpet reaches full strength on both rings of a cell', () => {
-    // One 16x16 cell of the 32px lattice. Manhattan rings at m=2 and m=8 hold 8
-    // and 32 lattice points; anything weaker means the motif washed out.
-    let top = 0;
-    for (let y = 0; y < 16; y++) {
-      for (let x = 0; x < 16; x++) {
-        if (textureShadeAt('carpet', x, y, 0, 1, MAX_TEXTURE_SHADES) === MAX_TEXTURE_SHADES) top++;
-      }
-    }
-    expect(top).toBe(8 + 32);
-  });
 
   it('weave keeps the tone census of the art it was traced from', () => {
     // The lock on the baked table. assets/test3.png has five tones; these are
@@ -313,12 +346,6 @@ describe('geometric textures', () => {
       expect(spread(0.1)).toBeLessThan(spread(0.5));
     });
 
-  it('carpet leaves the ground between motifs untextured', () => {
-    // The field has to come back to zero, or the "pattern" is just a wash.
-    const on = lit('carpet', 0.5);
-    expect(on.length).toBeLessThan(32 * 32);
-    expect(on.length).toBeGreaterThan(0);
-  });
 
   it('cells has sparse boundaries at low amount and varied interiors at full amount', () => {
     const sparse = lit('cells', 0.35);
@@ -397,6 +424,34 @@ describe('texture colour', () => {
   });
 });
 
+describe('reachable shades', () => {
+  it('reports nothing for no texture', () => {
+    expect(usedTextureShades('none', 1, 4).size).toBe(0);
+  });
+
+  it.each(ALGOS)('%s reports exactly the shades it paints', (algo) => {
+    // The set has to agree with the pixels, or a swatch is crossed out while
+    // still colouring something (or worse, left live while inert).
+    for (const amount of [0.2, 0.4, 1]) {
+      const used = usedTextureShades(algo, amount, 4);
+      const p = texturePeriod(algo);
+      const seen = new Set<number>();
+      for (let y = 0; y < p; y++) {
+        for (let x = 0; x < p; x++) seen.add(textureShadeAt(algo, x, y, 0, amount, 4));
+      }
+      expect([...used].sort()).toEqual([...seen].sort());
+    }
+  });
+
+  it('shows a ramp-scaling texture losing its top shades as density drops', () => {
+    // The reason this exists. `cells` scales its ramp, so at low density the top
+    // of the ramp is simply never painted and its swatches must say so.
+    expect(usedTextureShades('cells', 1, 4)).toContain(4);
+    expect(usedTextureShades('cells', 0.4, 4)).not.toContain(4);
+    expect(usedTextureShades('cells', 0.4, 4)).toContain(1);
+  });
+});
+
 describe('texture ramp', () => {
   const GRASS = { r: 93, g: 168, b: 50 };
   const YELLOW = { r: 240, g: 220, b: 90 };
@@ -424,6 +479,17 @@ describe('texture ramp', () => {
     }
   });
 
+  it('substitutes a hand-picked step and leaves the rest derived', () => {
+    // The point of per-step overrides: one swatch changed must not detach the
+    // others from the terrain colour they follow.
+    const plain = textureRamp(GRASS, YELLOW, 4);
+    const picked = textureRamp(GRASS, YELLOW, 4, [undefined, undefined, DEEP_BLUE]);
+    expect(toHexColour(picked[2])).toBe(toHexColour(DEEP_BLUE));
+    for (const k of [0, 1, 3, 4]) {
+      expect(toHexColour(picked[k])).toBe(toHexColour(plain[k]));
+    }
+  });
+
   it('falls back to the derived shift when nothing is picked', () => {
     const ramp = textureRamp(GRASS, undefined, 4);
     for (let k = 0; k <= 4; k++) {
@@ -443,6 +509,27 @@ describe('texture applied to a tile', () => {
   const paint = (tex: Partial<typeof NO_TEXTURE>) =>
     paintPatternTileRGBA(DEFAULT_PATTERN, 110, REFERENCE_ROLE_COLOURS, 16, [], 0, 0, 1, 3,
       { ...NO_TEXTURE, ...tex });
+
+  it('ignores an override array left over from a different step count', () => {
+    // A stale array would recolour the wrong steps, so the painter drops any
+    // whose length does not match the current count.
+    const stale = [undefined, DEEP_BLUE, DEEP_BLUE, DEEP_BLUE, DEEP_BLUE];
+    const withStale = paint({ algoA: 'cells', amountA: 1, shades: 2, rampA: stale });
+    const withNone = paint({ algoA: 'cells', amountA: 1, shades: 2 });
+    expect(Array.from(withStale)).toEqual(Array.from(withNone));
+  });
+
+  it('recolours only the step it was given', () => {
+    const base = paint({ algoA: 'cells', amountA: 1, shades: 2 });
+    const one = paint({
+      algoA: 'cells', amountA: 1, shades: 2,
+      rampA: [undefined, DEEP_BLUE, undefined],
+    });
+    let changed = 0;
+    for (let i = 0; i < base.length; i += 4) if (base[i] !== one[i]) changed++;
+    expect(changed).toBeGreaterThan(0);
+    expect(changed).toBeLessThan(base.length / 4);
+  });
 
   it('is inert when off', () => {
     const bare = paintPatternTileRGBA(DEFAULT_PATTERN, 110, REFERENCE_ROLE_COLOURS, 16);

@@ -15,13 +15,14 @@ import { sample, type NoiseId } from './patternNoise';
 import type { RGB } from './patternPaint';
 
 /**
- * `ripple`, `brick` and `carpet` are texture-only; the rest are shared
- * with the band grain. The last two are geometric rather than noisy — for those
- * `amount` reads as line weight instead of scatter density.
+ * `ripple`, the three cell fields and `brick` are texture-only; the remaining
+ * noise ids are shared with the band grain. `clumped` is deliberately absent
+ * here while staying a band-grain option — it reads as a blotch, which is what
+ * an edge wants and a material does not.
  */
 export type TextureId =
   | 'none' | NoiseId | 'ripple' | 'cells' | 'medium_cells' | 'small_cells'
-  | 'brick' | 'carpet' | 'weave' | 'paving' | 'paving3' | 'paving5';
+  | 'brick' | 'weave' | 'paving' | 'paving3' | 'paving5';
 
 export const TEXTURE_PRESETS: readonly { id: TextureId; zh: string; en: string }[] = [
   { id: 'none', zh: '无纹理', en: 'None' },
@@ -30,14 +31,12 @@ export const TEXTURE_PRESETS: readonly { id: TextureId; zh: string; en: string }
   { id: 'medium_cells', zh: '中细胞 · 3x3 多边形', en: 'Medium Cells — 3x3 polygonal cells' },
   { id: 'small_cells', zh: '小细胞 · 4x4 细小多边形', en: 'Small Cells — 4x4 fine polygonal cells' },
   { id: 'brick', zh: '方砖路面 · 错缝铺装', en: 'Paving — square flags, running bond' },
-  { id: 'carpet', zh: '地毯花纹 · 菱格团花', en: 'Carpet — diamond lattice medallions' },
   { id: 'weave', zh: '斜铺砖 · 菱格编织', en: 'Weave — diagonal interlocking bricks' },
   { id: 'paving', zh: '乱砌石板 · 大小板错拼（32）', en: 'Paving — random ashlar flags (32)' },
   { id: 'paving3', zh: '立方体 · 等距方块（32）', en: 'Paving3 — isometric cubes (32)' },
   { id: 'paving5', zh: '互锁铺砖 · 曲边咬合（32）', en: 'Paving5 — interlocking curved pavers (32)' },
   { id: 'white', zh: '白噪散点 · 细碎', en: 'White speckle — fine' },
   { id: 'blue', zh: '蓝噪散点 · 均匀', en: 'Blue speckle — even' },
-  { id: 'clumped', zh: '云斑 · 成片', en: 'Clumped — patchy' },
   { id: 'ordered', zh: '有序网点 · 规则', en: 'Ordered — regular' },
 ];
 
@@ -55,7 +54,7 @@ const PERIOD_32: readonly TextureId[] = [
   // motif and widening the period are not the same thing, though — `brick` is
   // absent because a 16x8 running bond still maps onto itself every 16px in both
   // axes, measured, even though its flags are now twice the size.
-  'ripple', 'cells', 'medium_cells', 'small_cells', 'carpet',
+  'ripple', 'cells', 'medium_cells', 'small_cells',
 ];
 
 /**
@@ -105,14 +104,14 @@ function rippleField(x: number, y: number, seed: number): number {
   return h(x0) * (1 - u) + h(x0 + 1) * u;
 }
 
+/** Grout width between cells, in output pixels. */
+const LINE_WIDTH_PX = 1;
+
 /**
- * A tileable Voronoi cell field. Unlike `webField`, this keeps a little of the
- * nearest cell's identity in the interior, so full strength reads as softly
- * varied polygon tiles with darker shared boundaries rather than as a vein
- * network.
- * `per` defines the number of cells across the 32px tile (2 for 2x2, 3 for 3x3, 4 for 4x4).
+ * Nearest and second-nearest Voronoi feature point, plus which cell won.
+ * `per` is the number of cells across the 32px tile (2, 3 or 4).
  */
-function cellsField(x: number, y: number, seed: number, per = 2): number {
+function cellsAt(x: number, y: number, seed: number, per: number) {
   const fx = (x / 32) * per;
   const fy = (y / 32) * per;
   const cx = Math.floor(fx);
@@ -147,13 +146,57 @@ function cellsField(x: number, y: number, seed: number, per = 2): number {
       }
     }
   }
+  return { f1, f2, nearestX, nearestY };
+}
 
-  // F2-F1 is small on a Voronoi boundary. Tune boundary multiplier for raster thickness
-  // to ensure continuous boundary lines across integer pixel samples.
-  const boundaryMult = per === 4 ? 1.6 : per === 3 ? 2.0 : 2.4;
-  const boundary = 1 - Math.min(1, (f2 - f1) * boundaryMult);
-  const interior = 0.10 + 0.14 * hash01(nearestX, nearestY, seed ^ 0x510e52);
-  return Math.max(interior, boundary);
+/**
+ * Cells name their shade outright, the way the baked tables do, instead of being
+ * thresholded into one — which is the whole difference between a paving and a
+ * net of coloured lines.
+ *
+ * Going through `textureShadeAt`'s scatter path collapsed them: the interior
+ * carried a value in [0.10, 0.24], and that path squares it before scaling, so
+ * `1 + floor(4 * 0.24^2)` is 1 for *every* cell however the hash fell. Every
+ * interior landed on the same shade and only the boundary ever climbed, so the
+ * texture read as a wireframe. Here the cell's own hash picks a flat block from
+ * the ramp and the shared boundary takes the strongest shade, so a filled region
+ * reads as tiles of differing tone with grout between them.
+ *
+ * `amount` scales the ramp rather than thinning a scatter, matching weave and
+ * the pavings: the blocks converge on the bare terrain colour as it drops.
+ */
+function cellsShade(
+  x: number, y: number, seed: number, per: number, amount: number, shades: number
+): number {
+  const { f1, f2, nearestX, nearestY } = cellsAt(x, y, seed, per);
+  // F2-F1 is small on a Voronoi boundary, and grows at roughly twice the rate of
+  // the distance to it, so a grout line one output pixel wide is `f2 - f1` under
+  // one pixel expressed in cell units. Testing the old soft field's `* mult < 1`
+  // instead marked everything within 0.42 of a cell as boundary — 71% of the
+  // tile at 2x2 and 92% at 4x4, which is a net with tiles between it rather than
+  // tiles with a net between them.
+  const cellPx = per / 32;
+  const onBoundary = (f2 - f1) < cellPx * LINE_WIDTH_PX;
+  // Interiors span every shade below the boundary's, so the flattest-looking
+  // cell is bare terrain and the rest step up toward the texture colour.
+  //
+  // Dealt out evenly rather than hashed. A plain hash has to be *lucky* to cover
+  // the ramp when there are only per^2 cells to draw from, and at 2x2 it draws
+  // four times — measured, it produced nothing but shades 1 and 2, so half the
+  // ramp went unused and the texture read as two-tone.
+  //
+  // The cell count is known, so the even split can just be constructed: step
+  // through the cells by a stride coprime to their number (5 is coprime to 4, 9
+  // and 16 alike) and cut that permutation into equal parts. Four cells then
+  // take four distinct shades, nine split 3/2/2/2, sixteen split 4/4/4/4 — exact
+  // at every size rather than near-uniform. The seed rotates where the deal
+  // starts, so the dice still reshuffles which cell is which tone.
+  const n = per * per;
+  const idx = nearestY * per + nearestX;
+  const off = Math.floor(hash01(0, 0, seed) * n);
+  const dealt = (idx * 5 + off) % n;
+  const rank = onBoundary ? shades : Math.floor((dealt * shades) / n);
+  return Math.max(0, Math.min(shades, Math.round(rank * Math.min(1, amount))));
 }
 
 /**
@@ -190,29 +233,6 @@ function brickField(x: number, y: number, seed: number): number {
   const fy = py % SY;
   const d = Math.min(Math.min(fx, SX - fx), Math.min(fy, SY - fy));
   return 1 - Math.min(1, d / 1.5);
-}
-
-/**
- * A half-drop diamond lattice: each 16x16 cell carries a lozenge outline with a
- * medallion at its centre, the classic kilim/carpet motif. Manhattan distance
- * from the cell centre gives the diamond for free — the outline is one ring of
- * that distance, the medallion another.
- *
- * The two rings sit at distances the pixel grid can actually hit (cell centres
- * fall between pixels, so the distance is always a whole number), which is what
- * lets the motif reach full strength instead of washing out.
- */
-function carpetField(x: number, y: number, seed: number): number {
-  const S = 16;
-  const px = wrap32(x + (seed & 31));
-  const py = wrap32(y + ((seed >>> 4) & 31));
-  const ox = (Math.floor(py / S) % 2) * (S / 2);
-  const u = ((((px - ox) % S) + S) % S) - (S - 1) / 2;
-  const v = (py % S) - (S - 1) / 2;
-  const m = Math.abs(u) + Math.abs(v);
-  const medallion = 1 - Math.min(1, Math.abs(m - 2) / 1.5);
-  const lozenge = 1 - Math.min(1, Math.abs(m - 8) / 1.5);
-  return Math.max(0, Math.max(medallion, lozenge));
 }
 
 /**
@@ -418,17 +438,44 @@ export function textureShadeAt(
   if (texture === 'paving') return bakedShade(PAVING, 32, x, y, s, amount, shades);
   if (texture === 'paving3') return bakedShade(PAVING3, 32, x, y, s, amount, shades);
   if (texture === 'paving5') return bakedShade(PAVING5, 32, x, y, s, amount, shades);
+  // Cells name their shade too — see cellsShade for why the scatter path below
+  // flattened them into a wireframe.
+  if (texture === 'cells') return cellsShade(x, y, s, 2, amount, shades);
+  if (texture === 'medium_cells') return cellsShade(x, y, s, 3, amount, shades);
+  if (texture === 'small_cells') return cellsShade(x, y, s, 4, amount, shades);
   const n = texture === 'ripple' ? rippleField(x, y, s)
-    : texture === 'cells' ? cellsField(x, y, s, 2)
-      : texture === 'medium_cells' ? cellsField(x, y, s, 3)
-        : texture === 'small_cells' ? cellsField(x, y, s, 4)
-          : texture === 'brick' ? brickField(x, y, s)
-            : texture === 'carpet' ? carpetField(x, y, s)
-              : sample(texture, x, y, s);
+    : texture === 'brick' ? brickField(x, y, s)
+      : sample(texture, x, y, s);
   const cut = 1 - Math.min(1, amount);
   if (n < cut) return 0;
   const u = cut >= 1 ? 1 : (n - cut) / (1 - cut);
   return Math.min(shades, 1 + Math.floor(shades * u * u));
+}
+
+/**
+ * Which shades a texture actually paints at the given settings.
+ *
+ * Asked rather than derived because `amount` means different things to
+ * different textures: it thins a scatter but scales the ramp of the baked and
+ * cell textures, and a scaled ramp simply cannot reach its top steps at low
+ * density — at 40% a cell texture paints only shades 0 and 1, leaving three of
+ * the four colour swatches inert with nothing on screen to say so. Scanning one
+ * period is exact for every texture and costs at most 1024 evaluations, which
+ * is cheaper than keeping a second copy of each texture's amount semantics in
+ * the UI and getting one of them wrong.
+ */
+export function usedTextureShades(
+  texture: TextureId,
+  amount: number,
+  shades: number = DEFAULT_TEXTURE_SHADES
+): Set<number> {
+  const used = new Set<number>();
+  if (texture === 'none') return used;
+  const p = texturePeriod(texture);
+  for (let y = 0; y < p; y++) {
+    for (let x = 0; x < p; x++) used.add(textureShadeAt(texture, x, y, 0, amount, shades));
+  }
+  return used;
 }
 
 const clamp01 = (v: number) => (v < 0 ? 0 : v > 1 ? 1 : v);
@@ -466,14 +513,22 @@ const mix = (a: number, b: number, t: number) => Math.round(a + (b - a) * t);
  * brightness shift of the terrain — a grass field can carry yellow flecks, water
  * white foam. Without one it falls back to deriving the shift, which is what
  * makes a freshly picked terrain colour look textured before anything is set.
+ *
+ * `overrides` replaces individual steps, sparsely: an entry that is present wins
+ * outright, and anything absent is still derived, so a ramp with one step picked
+ * by hand keeps following the terrain colour everywhere else. Index 0 is the
+ * bare terrain and overriding it is allowed but pointless — nothing paints it.
  */
 export function textureRamp(
   base: RGB,
   target: RGB | undefined,
-  shades: number = DEFAULT_TEXTURE_SHADES
+  shades: number = DEFAULT_TEXTURE_SHADES,
+  overrides?: readonly (RGB | undefined)[]
 ): RGB[] {
   const n = Math.max(1, shades);
   return Array.from({ length: n + 1 }, (_, k) => {
+    const picked = overrides?.[k];
+    if (picked) return picked;
     const t = k / n;
     if (!target) return textureColour(base, t);
     return {

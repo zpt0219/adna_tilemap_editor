@@ -21,7 +21,7 @@ import {
   MAX_NOISE_STRENGTH, type NoiseId, type NoiseTargetId,
 } from './utils/patternNoise';
 import {
-  TEXTURE_PRESETS, DEFAULT_TEXTURE, DEFAULT_TEXTURE_SHADES,
+  TEXTURE_PRESETS, DEFAULT_TEXTURE, DEFAULT_TEXTURE_SHADES, textureRamp, usedTextureShades,
   MIN_TEXTURE_SHADES, MAX_TEXTURE_SHADES, type TextureId,
 } from './utils/patternTexture';
 
@@ -180,10 +180,15 @@ export default function App() {
   // Picked independently of the terrain colours: the speckle in hand-drawn
   // pixel art is usually a different material, not a lighter version of the
   // ground it sits on.
-  const [texHex, setTexHex] = useState({
-    terrainA: toHexColour(DEFAULT_TEXTURE_COLOURS.terrainA),
-    terrainB: toHexColour(DEFAULT_TEXTURE_COLOURS.terrainB),
-  });
+  // Per-step overrides of each terrain's texture ramp, sparse and indexed from
+  // the bare terrain at 0; null means every step is still derived. The single
+  // target picker this replaces could only ever move the ramp's far end, so the
+  // steps between it and the terrain were not reachable at all.
+  const [customTexHex, setCustomTexHex] =
+    useState<Record<'terrainA' | 'terrainB', (string | undefined)[] | null>>({
+      terrainA: null,
+      terrainB: null,
+    });
   // Memoised, not built inline: the render effects key off object identity, so
   // a fresh object every render would repaint all 48 tiles on every keystroke.
   const textureOpts = useMemo(() => ({
@@ -193,10 +198,12 @@ export default function App() {
     amountB: textureAmountB,
     shades: textureShades,
     seed: patternNoiseSeed,
-    colourA: parseHexColour(texHex.terrainA),
-    colourB: parseHexColour(texHex.terrainB),
+    colourA: DEFAULT_TEXTURE_COLOURS.terrainA,
+    colourB: DEFAULT_TEXTURE_COLOURS.terrainB,
+    rampA: customTexHex.terrainA?.map((h) => (h ? parseHexColour(h) : undefined)),
+    rampB: customTexHex.terrainB?.map((h) => (h ? parseHexColour(h) : undefined)),
   }), [textureAlgoA, textureAlgoB, textureAmountA, textureAmountB,
-       textureShades, patternNoiseSeed, texHex]);
+       textureShades, patternNoiseSeed, customTexHex]);
 
   const TEXTURE_SHADE_CHOICES = Array.from(
     { length: MAX_TEXTURE_SHADES - MIN_TEXTURE_SHADES + 1 },
@@ -274,6 +281,30 @@ export default function App() {
     }
     return derivedRamp;
   }, [customShadesHex, derivedRamp]);
+
+  /**
+   * Each terrain's texture ramp as the swatches show it and the painter uses it:
+   * derived from the terrain colour toward the default texture colour, with any
+   * hand-picked step substituted in. Memoised because the paint effect keys off
+   * object identity.
+   */
+  const textureRamps = useMemo(() => {
+    const build = (role: 'terrainA' | 'terrainB') => textureRamp(
+      roleColours[role],
+      DEFAULT_TEXTURE_COLOURS[role],
+      textureShades,
+      customTexHex[role]?.length === textureShades + 1
+        ? customTexHex[role]?.map((h) => (h ? parseHexColour(h) : undefined))
+        : undefined
+    );
+    return { terrainA: build('terrainA'), terrainB: build('terrainB') };
+  }, [roleColours, textureShades, customTexHex]);
+
+  /** Which texture shades each terrain is actually painting right now. */
+  const reachable = useMemo(() => ({
+    terrainA: usedTextureShades(textureAlgoA, textureAmountA, textureShades),
+    terrainB: usedTextureShades(textureAlgoB, textureAmountB, textureShades),
+  }), [textureAlgoA, textureAmountA, textureAlgoB, textureAmountB, textureShades]);
 
   // Custom noise colors state (null = derived from band ramp)
   const [customNoiseHex, setCustomNoiseHex] = useState<{ b?: string; edge?: string; a?: string } | null>(null);
@@ -919,23 +950,58 @@ export default function App() {
                       {val === 0 ? t.noiseOff : `${Math.round(val * 100)}%`}
                     </span>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <input
-                      type="range"
-                      className="slider-input"
-                      style={{ flex: 1, minWidth: 0 }}
-                      min={0} max={1} step={0.05}
-                      value={val}
-                      onChange={(e) => set(parseFloat(e.target.value))}
-                    />
-                    <input
-                      type="color"
-                      value={texHex[role]}
-                      onChange={(e) => setTexHex((p) => ({ ...p, [role]: e.target.value }))}
-                      style={{ width: '30px', height: '24px', padding: 0, border: 'none', background: 'none', cursor: 'pointer', flex: '0 0 auto' }}
-                      aria-label={colourLabel}
-                      title={colourLabel}
-                    />
+                  <input
+                    type="range"
+                    className="slider-input"
+                    style={{ width: '100%' }}
+                    min={0} max={1} step={0.05}
+                    value={val}
+                    onChange={(e) => set(parseFloat(e.target.value))}
+                  />
+
+                  <div className="slider-header" style={{ margin: '8px 0 4px' }}>
+                    <span className="slider-name" style={{ fontSize: '11px' }}>{colourLabel}</span>
+                    {customTexHex[role]?.some(Boolean) && (
+                      <ResetLink
+                        label={t.reset}
+                        title={t.resetTextureColoursHint}
+                        onClick={() => setCustomTexHex((p) => ({ ...p, [role]: null }))}
+                      />
+                    )}
+                  </div>
+                  <div className="swatch-row">
+                    {Array.from({ length: MAX_TEXTURE_SHADES }, (_, i) => i + 1).map((k) => {
+                      // Every slot is drawn whatever the settings, so the row
+                      // never reflows; the ones the texture cannot currently
+                      // reach are crossed out rather than hidden. That covers
+                      // both a step count below the slot and a density too low
+                      // for the ramp to climb this far, which otherwise leaves a
+                      // swatch that silently does nothing when clicked.
+                      const isDisabled = !reachable[role].has(k);
+                      const ramp = textureRamps[role];
+                      const hex = toHexColour(ramp[isDisabled ? textureShades : k]);
+                      return (
+                        <ColourSwatch
+                          key={k}
+                          hex={hex}
+                          disabled={isDisabled}
+                          isCustom={Boolean(customTexHex[role]?.[k])}
+                          title={isDisabled
+                            ? `${colourLabel} ${k} — ${t.textureShadeDisabled}`
+                            : `${colourLabel} ${k} (${hex}) — ${t.clickToCustomize}`}
+                          onChange={(next) => setCustomTexHex((p) => {
+                            // Start from an override of the RIGHT LENGTH; a stale
+                            // one from a different step count would mis-index.
+                            const prev = p[role];
+                            const base = prev && prev.length === textureShades + 1
+                              ? [...prev]
+                              : new Array<string | undefined>(textureShades + 1).fill(undefined);
+                            base[k] = next;
+                            return { ...p, [role]: base };
+                          })}
+                        />
+                      );
+                    })}
                   </div>
                 </>)}
               </div>

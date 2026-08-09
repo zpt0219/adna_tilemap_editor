@@ -50,6 +50,14 @@ export interface TextureOptions {
    */
   colourA?: RGB;
   colourB?: RGB;
+  /**
+   * Per-step overrides of the ramps above, sparse and indexed from the bare
+   * terrain at 0. Length must match `shades + 1` or it is ignored — a stale
+   * array from a different step count would recolour the wrong steps, which is
+   * the same guard the band ramp carries.
+   */
+  rampA?: readonly (RGB | undefined)[];
+  rampB?: readonly (RGB | undefined)[];
 }
 
 export const NO_TEXTURE: TextureOptions = {
@@ -217,12 +225,14 @@ export function paintPatternTileRGBA(
   const solid = ramp.length - 1;
 
   // Texture shades are a handful of colours, not a per-pixel computation.
+  const fitRamp = (r: readonly (RGB | undefined)[] | undefined, n: number) =>
+    r && r.length === n + 1 ? r : undefined;
   const shades = Math.max(1, texture.shades);
   const texA = texture.algoA !== 'none' && texture.amountA > 0
-    ? textureRamp(colours.terrainA, texture.colourA, shades)
+    ? textureRamp(colours.terrainA, texture.colourA, shades, fitRamp(texture.rampA, shades))
     : null;
   const texB = texture.algoB !== 'none' && texture.amountB > 0
-    ? textureRamp(colours.terrainB, texture.colourB, shades)
+    ? textureRamp(colours.terrainB, texture.colourB, shades, fitRamp(texture.rampB, shades))
     : null;
   // Grain displacement scales with the band so it keeps reading as the band
   // widens; at the default step count this is 1 and nothing changes.
