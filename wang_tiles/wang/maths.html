@@ -1,0 +1,345 @@
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><!-- #BeginTemplate "/Templates/wang.dwt" --><!-- DW6 --><head>
+<!-- #BeginEditable "doctitle" -->
+<title>Maths</title>
+<!-- #EndEditable -->
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<!-- #BeginEditable "Meta" -->
+<link rel="stylesheet" href="../wang/text.css" type="text/css">
+<script src="../js/wang.js" type="text/JavaScript"></script>
+<meta name="description" content="Stagecast puzzles, games, animation and sims">
+<meta name="keywords" content="Wang, maze, tile, tile set, tileset, labyrinth, Stagecast, seamless, icon, terrain, path, 32x32, game">
+<!-- #EndEditable -->
+</head>
+
+<body>
+<table class="tabs">
+	<tbody><tr>
+		<td><p style="margin:0">
+          Originally published on <a href="http://www.cr31.co.uk/stagecast/wang/intro.html">cr31.co.uk</a>
+          by Guy Walker. Mirrored from
+          <a href="https://www.boristhebrave.com/permanent/24/06/cr31/stagecast/wang/intro.html">boristhebrave.com</a>.
+        </p>
+        <p style="margin:4px 0 0; font-style:italic; opacity:0.85">
+          In memory of Professor Hao Wang (王浩, 1921 – 1995), whose elegant tiling theory continues to inspire generations of mathematicians and game designers.
+        </p></td>
+	</tr>
+</tbody></table>
+
+<table cellspacing="0" cellpadding="0" class="head">
+	<tbody><tr>
+		<td class="main"><h1>Wang Tiles</h1></td>
+		<td class="side">&nbsp;</td>
+	</tr>
+</tbody></table>
+<table cellspacing="0" cellpadding="0" class="strap">
+	<tbody><tr>
+		<td class="main"><p>edge and corner matched tilesets</p></td>
+		<td class="side"><p>menu</p></td>
+	</tr>
+</tbody></table>
+<table cellspacing="0" cellpadding="0" class="cont">
+	<tbody><tr>
+		<td class="main"><div class="content"><!-- #BeginEditable "contents" -->
+			<h2>Maths</h2>
+			<p>Just a bit of maths to show how readily Wang tiles can be programmed.</p>
+			<h3>Corner to Edge Wang tile conversion</h3>
+			<p>Any corner tileset can be converted into an equivalent edge tileset. This is done by replacing all combinations of two corner colors with a single edge color. For instance, to convert the following 2-color corner tileset, we will need to create a 4-color edge tileset, as there are 4 possible edge combinations.</p>
+			<table class="sq" cellspacing="0" cellpadding="0">
+				<caption>
+					A complete 2-corner tileset
+					</caption>
+				<tbody><tr>
+					<td><img src="../art/corn/wang-2c/0.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/corn/wang-2c/1.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/corn/wang-2c/2.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/corn/wang-2c/3.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/corn/wang-2c/4.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/corn/wang-2c/5.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/corn/wang-2c/6.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/corn/wang-2c/7.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/corn/wang-2c/8.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/corn/wang-2c/9.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/corn/wang-2c/10.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/corn/wang-2c/11.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/corn/wang-2c/12.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/corn/wang-2c/13.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/corn/wang-2c/14.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/corn/wang-2c/15.gif" width="32" height="32" alt="tile"></td>
+				</tr>
+				<tr>
+					<td>0</td>
+					<td>1</td>
+					<td>2</td>
+					<td>3</td>
+					<td>4</td>
+					<td>5</td>
+					<td>6</td>
+					<td>7</td>
+					<td>8</td>
+					<td>9</td>
+					<td>10</td>
+					<td>11</td>
+					<td>12</td>
+					<td>13</td>
+					<td>14</td>
+					<td>15</td>
+				</tr>
+			</tbody></table>
+			<p>If we denote an edge with </p>
+			<ol>
+				<li>two blue corners as blue</li>
+				<li>two yellow corners as yellow</li>
+				<li>a blue and yellow corner as green<br>
+				</li>
+				<li>and a  yellow and blue corner as purple</li>
+			</ol>
+			<p>then we create the following equivalent 4-edge tileset. It  is not complete, only 16 from a possible 256 edge combinations are used, as shown below. </p>
+			<table class="sq" cellspacing="0" cellpadding="0">
+				<caption>
+					An equivalent 4-edge tileset
+					</caption>
+				<tbody><tr>
+					<td><img src="../art/edge/wang-4e/0.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-4e/1.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-4e/2.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-4e/3.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-4e/4.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-4e/5.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-4e/6.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-4e/7.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-4e/8.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-4e/9.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-4e/10.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-4e/11.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-4e/12.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-4e/13.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-4e/14.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-4e/15.gif" width="32" height="32" alt="tile"></td>
+				</tr>
+				<tr>
+					<td>0</td>
+					<td>_</td>
+					<td>_</td>
+					<td>_</td>
+					<td>_</td>
+					<td>_</td>
+					<td>_</td>
+					<td>_</td>
+					<td>_</td>
+					<td>_</td>
+					<td>_</td>
+					<td>_</td>
+					<td>_</td>
+					<td>_</td>
+					<td>_</td>
+					<td>_</td>
+				</tr>
+			</tbody></table>
+			<p>Here is a patch of 2-corner tiles converted to an equivalent 4-edge tileset.</p>
+			<table cellpadding="0" cellspacing="0" class="lout">
+				<tbody><tr>
+					<td><table class="sq3" cellspacing="0" cellpadding="0">
+						<caption>
+							2-corner Tiles
+							</caption>
+						<tbody><tr>
+							<td><img src="../art/corn/wang-2c/4.gif" alt="6" width="32" height="32"></td>
+							<td><img src="../art/corn/wang-2c/3.gif" alt="14" width="32" height="32"></td>
+							<td><img src="../art/corn/wang-2c/14.gif" alt="8" width="32" height="32"></td>
+							<td><img src="../art/corn/wang-2c/6.gif" alt="4" width="32" height="32"></td>
+						</tr>
+						<tr>
+							<td><img src="../art/corn/wang-2c/10.gif" width="32" height="32" alt="1"></td>
+							<td><img src="../art/corn/wang-2c/7.gif" width="32" height="32" alt="7"></td>
+							<td><img src="../art/corn/wang-2c/15.gif" width="32" height="32" alt="12"></td>
+							<td><img src="../art/corn/wang-2c/13.gif" width="32" height="32" alt="5"></td>
+						</tr>
+						<tr>
+							<td><img src="../art/corn/wang-2c/1.gif" width="32" height="32" alt="2"></td>
+							<td><img src="../art/corn/wang-2c/9.gif" width="32" height="32" alt="15"></td>
+							<td><img src="../art/corn/wang-2c/11.gif" width="32" height="32" alt="11"></td>
+							<td><img src="../art/corn/wang-2c/12.gif" width="32" height="32" alt="13"></td>
+						</tr>
+						<tr>
+							<td><img src="../art/corn/wang-2c/0.gif" width="32" height="32" alt="3"></td>
+							<td><img src="../art/corn/wang-2c/2.gif" width="32" height="32" alt="3"></td>
+							<td><img src="../art/corn/wang-2c/5.gif" width="32" height="32" alt="8"></td>
+							<td><img src="../art/corn/wang-2c/8.gif" width="32" height="32" alt="1"></td>
+						</tr>
+					</tbody></table></td>
+					<td><table class="sq3" cellspacing="0" cellpadding="0">
+						<caption>
+							4-edge Tiles
+							</caption>
+						<tbody><tr>
+							<td><img src="../art/edge/wang-4e/4.gif" alt="6" width="32" height="32"></td>
+							<td><img src="../art/edge/wang-4e/3.gif" alt="14" width="32" height="32"></td>
+							<td><img src="../art/edge/wang-4e/14.gif" alt="8" width="32" height="32"></td>
+							<td><img src="../art/edge/wang-4e/6.gif" alt="4" width="32" height="32"></td>
+						</tr>
+						<tr>
+							<td><img src="../art/edge/wang-4e/10.gif" width="32" height="32" alt="1"></td>
+							<td><img src="../art/edge/wang-4e/7.gif" width="32" height="32" alt="7"></td>
+							<td><img src="../art/edge/wang-4e/15.gif" width="32" height="32" alt="12"></td>
+							<td><img src="../art/edge/wang-4e/13.gif" width="32" height="32" alt="5"></td>
+						</tr>
+						<tr>
+							<td><img src="../art/edge/wang-4e/1.gif" width="32" height="32" alt="2"></td>
+							<td><img src="../art/edge/wang-4e/9.gif" width="32" height="32" alt="15"></td>
+							<td><img src="../art/edge/wang-4e/11.gif" width="32" height="32" alt="11"></td>
+							<td><img src="../art/edge/wang-4e/12.gif" width="32" height="32" alt="13"></td>
+						</tr>
+						<tr>
+							<td><img src="../art/edge/wang-4e/0.gif" width="32" height="32" alt="3"></td>
+							<td><img src="../art/edge/wang-4e/2.gif" width="32" height="32" alt="3"></td>
+							<td><img src="../art/edge/wang-4e/5.gif" width="32" height="32" alt="8"></td>
+							<td><img src="../art/edge/wang-4e/8.gif" width="32" height="32" alt="1"></td>
+						</tr>
+					</tbody></table></td>
+				</tr>
+			</tbody></table>
+			<p>It is not possible to use a similar technique to convert an edge to a corner tileset. Therefore, as corner tilesets can be converted, Wang tile theory often refers to edge tilesets only.</p>
+			<h3>Weighting</h3>
+			<p>Weighting allows a unique 'index' number to be derived from each combination of edges and/or corners. It is a common maths/programming technique.</p>
+			<p>2-edge or 2-corner tiles are weighted as binary 1, 2, 4, and 8. The weighting values are added for each (say yellow) and ignored for blue. This produces a unique index number between 0 and 15.<br>
+				3-edge or 3-corner tiles are weighted as tertiary 1, 3, 9 and 27.
+				This produces a unique index number between 0 and 80. </p>
+			<table cellpadding="0" cellspacing="0" class="lout">
+				<tbody><tr>
+					<td><table class="sq4" cellspacing="0" cellpadding="0">
+						<caption>
+							2-edge weightings
+							</caption>
+						<tbody><tr>
+							<td width="48">&nbsp;</td>
+							<td width="48">North<br>
+								= 1</td>
+							<td width="48">&nbsp;</td>
+						</tr>
+						<tr>
+							<td>West<br>
+								= 8</td>
+							<td><img src="../art/edge/wang-2e/9.gif" alt="tile" width="32" height="32" class="pad"></td>
+							<td>East<br>
+								= 2</td>
+						</tr>
+						<tr>
+							<td>&nbsp;</td>
+							<td>South<br>
+								= 4</td>
+							<td>&nbsp;</td>
+						</tr>
+					</tbody></table></td>
+					<td><table class="sq4" cellspacing="0" cellpadding="0">
+						<caption>
+							2-corner weightings
+							</caption>
+						<tbody><tr>
+							<td>NorthWest<br>
+								= 8</td>
+							<td>&nbsp;</td>
+							<td>NorthEast<br>
+								= 1</td>
+						</tr>
+						<tr>
+							<td>&nbsp;</td>
+							<td><img src="../art/corn/wang-2c/9.gif" alt="tile" width="32" height="32" class="pad"></td>
+							<td>&nbsp;</td>
+						</tr>
+						<tr>
+							<td>SouthWest<br>
+								= 4</td>
+							<td>&nbsp;</td>
+							<td>SouthEast<br>
+								= 2</td>
+						</tr>
+					</tbody></table></td>
+				</tr>
+			</tbody></table>
+			<p><a href="blob.html">Blob tilesets</a> with two different colors are weighted 1, 2, 4, 8, 16, 32, 64 and 128. This produces a unique index number between 0 and 255. </p>
+			<p>I call the numbers 15, 80 and 255 the 'Highest Index Value', (HIV). Calculated by (2^n)-1, where n is the order of the tileset.</p>
+			<h3>Bitwise, Modulo or Clock Arithmatic</h3>
+			<p>As used in compass bearings and clocks. A system where numbers 'wrap around' upon reaching a certain value—the modulus. So turning 90° clockwise from a bearing of 315° gives 45°, as 315°+90° =405° =45° (mod 360). </p>
+			<p>To make full use of this powerful technique, it is important to label the tiles in a consecutive clockwise (or anti clockwise) manner.</p>
+			<p>A common  convention is to start at the top and label clockwise. As used by the points of the compass (NSEW) and Cascading Style Sheets (top, right, bottom, left). Corner tiles start in the NorthEastern corner.</p>
+			<h3>Complement of 2-order tiles</h3>
+			<p>The complement of the index number produces an inverted (or complementary) tile, where colors are reversed. To calculate the complement, subtract the index number from the HIV. So tile 9 will become tile 15-9 = tile 6.</p>
+			<p>For higher order tiles,  the weighting associated with each color can be cycled. So for an order 3 tileset, 0 is replaced by 1, 1 by 2 and 2 by 0. The new index is then calculated.</p>
+			<h3>Calculating Tile Exits from Index Number</h3>
+			<p>This is the reverse process of producing a unique index number from given edges or corners. Useful if a sprite is walking on a tile and needs to know if it can move forward off the tile. </p>
+			<p>Integer of (index / heading) and then mod 2. </p>
+			<p>So for instance, leaving to the west of tile-9 will give<br>
+				int (9/8) mod 2 which equals 1, so an exit path exists. </p>
+			<h3>Tile Rotation</h3>
+			<p>To rotate a 2-order tile, multiply the index by 2 (mod 15). For a 3 order tile, multiply by 3 (mod 80). This also works for Blob 2 edge 2 corner tiles. Multiply by 2 for 45 degree rotation and by 4 for 90 degrees.			</p>
+			<hr>
+			<h3>Dice </h3>
+			<table cellpadding="0" cellspacing="0" class="lout">
+				<tbody><tr>
+					<td>If you're creating random tile layouts then don't try to pick random numbers yourself. If you're human you'll end up with discernable patterns or clumping. Try a 16 sided die like this (sold in pairs on ebay).</td>
+					<td><img src="../art/die16.jpg" alt="Die" width="100" height="96" class="bord"></td>
+				</tr>
+			</tbody></table>
+		<!-- #EndEditable --><!-- end .content --></div></td>
+		<td class="side"><ul>
+				<li class="nolink">Intro</li>
+					<li><a href="intro.html">Wang tiles</a></li>
+					<li><a href="array.html">Maze arrays</a></li>
+					<li class="nolink">Wang Tiles</li>
+					<li><a href="2edge.html">2-edge tiles</a></li>
+					<li><a href="2corn.html">2-corner tiles</a></li>
+					<li><a href="3edge.html">3-edge tiles</a></li>
+					<li><a href="3corn.html">3-corner tiles</a></li>
+                    <li><a href="4ord.html">4-order tiles</a></li>
+					<li class="nolink">Tilesets</li>
+					<li><a href="blob.html">Blob tileset</a></li>
+					<li><a href="lout2e.html">Layout 2-edge</a></li>
+                    <li><a href="reduced.html">Reduced sets</a></li>
+					<li class="nolink">Single Side</li>
+					<li><a href="block.html">Block tiles</a></li>
+					<li><a href="1sideedge.html">1-side edge</a></li>
+					<li><a href="1sidecorn.html">1-side corner</a></li>
+					<li class="nolink">Paths</li>
+					<li><a href="angled.html">Angled paths</a></li>
+					<li><a href="border.html">Border paths</a></li>
+					<!--<li>Colour paths</li>-->
+					<li><a href="directed.html">Directed path</a></li>
+					<li><a href="isometric.html">Isometric path</a></li>
+					<li><a href="positioned.html">Position path</a></li>
+					<li><a href="shape.html">Shape tiles</a></li>
+					<li class="nolink">Mazes</li>
+					<li><a href="perfect.html">Perfect</a></li>
+					<li><a href="connect.html">Connected</a></li>
+                    <li><a href="imperfect.html">Imperfect</a></li>
+                    <li><a href="labyrinth.html">Labyrinth</a></li>
+                    <li><a href="twin.html">Twin maze</a></li>
+					<li class="nolink">Gallery</li>
+					<li><a href="tiles_e.html">Tiles 2-edge</a></li>
+					<li><a href="tiles_c.html">Tiles 2-corner</a></li>
+                    <li><a href="tiles_3ec.html">Tiles 3-order</a></li>
+                    <li><a href="blob_g.html">Blob tilesets</a></li>
+                    <li><a href="twin_g.html">Twin tilesets</a></li>
+					<li><a href="truch_g.html">Truchet tiles</a></li>
+					<li><a href="block_g.html">Block tiles</a></li>
+					<li><a href="patts.html">Patterns</a></li>
+					<li><a href="icons.html">Icons</a></li>
+					<li class="nolink">Info</li>
+					<li><a href="maths.html">Maths</a></li>
+					<li><a href="knots.html">Knots</a></li>
+                    <li><a href="pattern.html">Patterns</a></li>
+                    <li><a href="puzzle.html">Puzzles</a></li>
+					<li><a href="web.html">Web news</a></li>
+					<li><a href="glossary.html">Glossary</a></li>
+					<li>&nbsp;</li>
+			</ul></td>
+	</tr>
+</tbody></table>
+<table cellspacing="0" cellpadding="0" class="foot">
+	<tbody><tr>
+		<td class="main"><p>cr31.co.uk</p></td>
+		<td class="side">&nbsp;</td>
+	</tr>
+</tbody></table>
+
+
+</body><!-- #EndTemplate --></html>

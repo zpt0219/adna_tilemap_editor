@@ -1,0 +1,218 @@
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><!-- #BeginTemplate "/Templates/wang.dwt" --><!-- DW6 --><head>
+<!-- #BeginEditable "doctitle" -->
+<title>Connected Maze</title>
+<!-- #EndEditable -->
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<!-- #BeginEditable "Meta" -->
+<link rel="stylesheet" href="../wang/text.css" type="text/css">
+<script src="../js/wang.js" type="text/JavaScript"></script>
+<meta name="description" content="Stagecast puzzles, games, animation and sims">
+<meta name="keywords" content="Wang, maze, tile, tile set, tileset, labyrinth, Stagecast, seamless, icon, terrain, path, 32x32, game">
+<!-- #EndEditable -->
+</head>
+
+<body>
+<table class="tabs">
+	<tbody><tr>
+		<td><p style="margin:0">
+          Originally published on <a href="http://www.cr31.co.uk/stagecast/wang/intro.html">cr31.co.uk</a>
+          by Guy Walker. Mirrored from
+          <a href="https://www.boristhebrave.com/permanent/24/06/cr31/stagecast/wang/intro.html">boristhebrave.com</a>.
+        </p>
+        <p style="margin:4px 0 0; font-style:italic; opacity:0.85">
+          In memory of Professor Hao Wang (王浩, 1921 – 1995), whose elegant tiling theory continues to inspire generations of mathematicians and game designers.
+        </p></td>
+	</tr>
+</tbody></table>
+
+<table cellspacing="0" cellpadding="0" class="head">
+	<tbody><tr>
+		<td class="main"><h1>Wang Tiles</h1></td>
+		<td class="side">&nbsp;</td>
+	</tr>
+</tbody></table>
+<table cellspacing="0" cellpadding="0" class="strap">
+	<tbody><tr>
+		<td class="main"><p>edge and corner matched tilesets</p></td>
+		<td class="side"><p>menu</p></td>
+	</tr>
+</tbody></table>
+<table cellspacing="0" cellpadding="0" class="cont">
+	<tbody><tr>
+		<td class="main"><div class="content"><!-- #BeginEditable "contents" -->
+			<h2>Connected Mazes</h2>
+			<p>Connected mazes are perfect mazes (so all paths are reachable) but with added fusing causing loops. There can have more than one solution. Connected mazes can also include weaving where paths pass under or over each other.</p>
+			<table cellspacing="0" cellpadding="0">
+				<tbody><tr>
+					<td><table class="sq" cellspacing="0" cellpadding="0">
+						<caption>
+							Reduced set of 2-edge road tiles
+							</caption>
+						<tbody><tr>
+							<td><img src="../art/edge/road/3.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/road/5.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/road/6.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/road/7.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/road/9.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/road/10.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/road/11.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/road/12.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/road/13.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/road/14.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/road/15x.gif" width="32" height="32" alt="tile"></td>
+						</tr>
+						<tr>
+							<td>3</td>
+							<td>5</td>
+							<td>6</td>
+							<td>7</td>
+							<td>9</td>
+							<td>10</td>
+							<td>11</td>
+							<td>12</td>
+							<td>13</td>
+							<td>14</td>
+							<td>15</td>
+						</tr>
+					</tbody></table></td>
+					<td><table cellpadding="0" cellspacing="0" class="sq">
+						<caption>
+							Pass tiles
+							</caption>
+						<tbody><tr class="sq">
+							<td><img src="../art/edge/road/15.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/road/flyover3.gif" width="32" height="32" alt="tile"></td>
+						</tr>
+						<tr class="sq">
+							<td>15</td>
+							<td>15</td>
+						</tr>
+					</tbody></table></td>
+				</tr>
+			</tbody></table>
+			<p>Blank tile-0 and dead ends are not used. Also, there are two additional variations of tile-15, the under and over pass tiles, (either one of which is selected at random). The blue and red vans are added sprites.</p>
+			<p>See more at <a href="../scast/roadrail.html">Roadways</a>.</p>
+			<div class="stage"><p>Stage: Roadway Layout</p>
+		<img src="../art/grabs/roadway.png" width="576" height="384" alt="Maze Tiles"></div>
+		<h2>Twin Path Mazes</h2>
+		<p>Two sets of  maze tiles can be used together. The best effect is achieved if weaving is allowed. Extra interchange (link) tiles can then allow the path between both tilesets if necessary. I keep both paths to their own grids. The regularity makes rules easier to write and gives a visually strong interlocked effect.<br>
+			Here, extra interchange path tiles at ground level have been added to link the upper 'bridge' walkway and lower 'trench' paths. The exits list will also need to be modified, so wandering sprites can swop paths correctly. </p>
+		<table cellpadding="0" cellspacing="0" class="sq">
+			<caption>
+				Link Tiles
+				</caption>
+			<tbody><tr class="sq">
+				<td><img src="../art/block/inter2.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/block/inter1.gif" width="32" height="32" alt="tile"></td>
+			</tr>
+			<tr class="sq">
+				<td>a</td>
+				<td>b</td>
+			</tr>
+		</tbody></table>
+		<p>See more at <a href="../scast/twin.html">Twin Maze</a> designs.</p>
+		<div class="stage"><p>Stage: Twin Path Tiles</p>
+		<img src="../art/grabs/twin/twin-path2.png" width="576" height="384" alt="Maze Tiles"></div>
+		<h3>Block Mazes</h3>
+		<p>The perfect maze algorithm can also be used to generate perfect block (or hedge) mazes. Here, confusingly, the blocks are actually gaps between the maze floor tiles. This allows the more detailed repeat background pattern of 3x3 cells to show through. Shadows have been added to the floor tiles from a 6 tileset. The plain no shadow tile is not needed.</p>
+		<table cellspacing="0" cellpadding="0">
+			<tbody><tr>
+				<td><table cellpadding="0" cellspacing="0" class="sq">
+					<caption>
+						Shadow floor tiles
+						</caption>
+					<tbody><tr class="sq">
+						<td><img src="../art/cobbles/2.gif" width="32" height="32" alt="tile"></td>
+						<td><img src="../art/cobbles/1.gif" width="32" height="32" alt="tile"></td>
+						<td><img src="../art/cobbles/3.gif" width="32" height="32" alt="tile"></td>
+						<td><img src="../art/cobbles/5.gif" width="32" height="32" alt="tile"></td>
+						<td><img src="../art/cobbles/4.gif" width="32" height="32" alt="tile"></td>
+						<td><img src="../art/cobbles/q.gif" width="32" height="32" alt="tile"></td>
+					</tr>
+					<tr class="sq">
+						<td>a</td>
+						<td>b</td>
+						<td>c</td>
+						<td>d</td>
+						<td>e</td>
+						<td>f</td>
+					</tr>
+				</tbody></table></td>
+				<td><table cellpadding="0" cellspacing="0" class="sq">
+					<caption>
+						X
+						</caption>
+					<tbody><tr>
+						<td><img src="../art/cobbles/cobbs.gif" width="32" height="32" alt="tile"></td>
+					</tr>
+					<tr>
+						<td>X</td>
+					</tr>
+				</tbody></table></td>
+			</tr>
+		</tbody></table>
+		<p>See more <a href="../scast/dungeon.html">dungeon maze</a> designs.</p>
+		<div class="stage"><p>Stage: 3d Dungeon Maze</p>
+		<img src="../art/grabs/split/dungeon2a.png" width="576" height="384" alt="Maze Tiles"></div><!-- #EndEditable --><!-- end .content --></div></td>
+		<td class="side"><ul>
+				<li class="nolink">Intro</li>
+					<li><a href="intro.html">Wang tiles</a></li>
+					<li><a href="array.html">Maze arrays</a></li>
+					<li class="nolink">Wang Tiles</li>
+					<li><a href="2edge.html">2-edge tiles</a></li>
+					<li><a href="2corn.html">2-corner tiles</a></li>
+					<li><a href="3edge.html">3-edge tiles</a></li>
+					<li><a href="3corn.html">3-corner tiles</a></li>
+                    <li><a href="4ord.html">4-order tiles</a></li>
+					<li class="nolink">Tilesets</li>
+					<li><a href="blob.html">Blob tileset</a></li>
+					<li><a href="lout2e.html">Layout 2-edge</a></li>
+                    <li><a href="reduced.html">Reduced sets</a></li>
+					<li class="nolink">Single Side</li>
+					<li><a href="block.html">Block tiles</a></li>
+					<li><a href="1sideedge.html">1-side edge</a></li>
+					<li><a href="1sidecorn.html">1-side corner</a></li>
+					<li class="nolink">Paths</li>
+					<li><a href="angled.html">Angled paths</a></li>
+					<li><a href="border.html">Border paths</a></li>
+					<!--<li>Colour paths</li>-->
+					<li><a href="directed.html">Directed path</a></li>
+					<li><a href="isometric.html">Isometric path</a></li>
+					<li><a href="positioned.html">Position path</a></li>
+					<li><a href="shape.html">Shape tiles</a></li>
+					<li class="nolink">Mazes</li>
+					<li><a href="perfect.html">Perfect</a></li>
+					<li><a href="connect.html">Connected</a></li>
+                    <li><a href="imperfect.html">Imperfect</a></li>
+                    <li><a href="labyrinth.html">Labyrinth</a></li>
+                    <li><a href="twin.html">Twin maze</a></li>
+					<li class="nolink">Gallery</li>
+					<li><a href="tiles_e.html">Tiles 2-edge</a></li>
+					<li><a href="tiles_c.html">Tiles 2-corner</a></li>
+                    <li><a href="tiles_3ec.html">Tiles 3-order</a></li>
+                    <li><a href="blob_g.html">Blob tilesets</a></li>
+                    <li><a href="twin_g.html">Twin tilesets</a></li>
+					<li><a href="truch_g.html">Truchet tiles</a></li>
+					<li><a href="block_g.html">Block tiles</a></li>
+					<li><a href="patts.html">Patterns</a></li>
+					<li><a href="icons.html">Icons</a></li>
+					<li class="nolink">Info</li>
+					<li><a href="maths.html">Maths</a></li>
+					<li><a href="knots.html">Knots</a></li>
+                    <li><a href="pattern.html">Patterns</a></li>
+                    <li><a href="puzzle.html">Puzzles</a></li>
+					<li><a href="web.html">Web news</a></li>
+					<li><a href="glossary.html">Glossary</a></li>
+					<li>&nbsp;</li>
+			</ul></td>
+	</tr>
+</tbody></table>
+<table cellspacing="0" cellpadding="0" class="foot">
+	<tbody><tr>
+		<td class="main"><p>cr31.co.uk</p></td>
+		<td class="side">&nbsp;</td>
+	</tr>
+</tbody></table>
+
+
+</body><!-- #EndTemplate --></html>

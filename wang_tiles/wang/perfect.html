@@ -1,0 +1,429 @@
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><!-- #BeginTemplate "/Templates/wang.dwt" --><!-- DW6 --><head>
+<!-- #BeginEditable "doctitle" -->
+<title>Perfect Maze</title>
+<!-- #EndEditable -->
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<!-- #BeginEditable "Meta" -->
+<link rel="stylesheet" href="../wang/text.css" type="text/css">
+<script src="../js/wang.js" type="text/JavaScript"></script>
+<meta name="description" content="Stagecast puzzles, games, animation and sims">
+<meta name="keywords" content="Wang, maze, tile, tile set, tileset, labyrinth, Stagecast, seamless, icon, terrain, path, 32x32, game">
+<!-- #EndEditable -->
+</head>
+
+<body>
+<table class="tabs">
+	<tbody><tr>
+		<td><p style="margin:0">
+          Originally published on <a href="http://www.cr31.co.uk/stagecast/wang/intro.html">cr31.co.uk</a>
+          by Guy Walker. Mirrored from
+          <a href="https://www.boristhebrave.com/permanent/24/06/cr31/stagecast/wang/intro.html">boristhebrave.com</a>.
+        </p>
+        <p style="margin:4px 0 0; font-style:italic; opacity:0.85">
+          In memory of Professor Hao Wang (王浩, 1921 – 1995), whose elegant tiling theory continues to inspire generations of mathematicians and game designers.
+        </p></td>
+	</tr>
+</tbody></table>
+
+<table cellspacing="0" cellpadding="0" class="head">
+	<tbody><tr>
+		<td class="main"><h1>Wang Tiles</h1></td>
+		<td class="side">&nbsp;</td>
+	</tr>
+</tbody></table>
+<table cellspacing="0" cellpadding="0" class="strap">
+	<tbody><tr>
+		<td class="main"><p>edge and corner matched tilesets</p></td>
+		<td class="side"><p>menu</p></td>
+	</tr>
+</tbody></table>
+<table cellspacing="0" cellpadding="0" class="cont">
+	<tbody><tr>
+		<td class="main"><div class="content"><!-- #BeginEditable "contents" -->
+			<h2>'Perfect' Maze Generator</h2>
+			<p>A random array of tiles can leave many paths unused. A so called 'perfect' maze has  every path  connected to every other path, so there are no unreachable areas. Also, there are no path loops or isolated walls. There is  always one unique path between any two points in the maze. Perfect mazes look more evenly distributed and are more fun to traverse than a random layout, as all paths are used.</p>
+			<p>To create a perfect maze, you need to follow a step-by-step process. A path is drawn from the current cell to an empty neighboring cell. A list needs to be kept of all cells that have been visited, which may have empty neighbors. If they have none, then the cell is removed from the list.<br>
+				This simple algorithm generates 'perfect', connected mazes... </p>
+			<p>First, select a random empty 'start' cell on the stage and add it to the empty 'visited' list. Then to animate the maze, repeat the following loop each step...</p>
+			<p><strong>1</strong>/ Select an already visited cell from the 'visited' list<br>
+				<strong>2</strong>/ Make	a	list	of	all adjacent	empty cells that you could possibly move to</p>
+			<p>if the list contains at least one cell
+				then</p>
+			<p><strong>3</strong>/ Select one of the adjacent cells at random<br>
+				<strong>4</strong>/ Move  to the  empty cell, making a path as you go<br>
+				<strong>5</strong>/ Add the cell to the end of the 'visited' list </p>
+			<p>else (there are no  empty adjacent cells)</p>
+			<p><strong>6</strong>/  Remove the current cell from the 'visited' list</p>
+			<p>When the 'visited' list is empty, the maze is done. The result will be a perfect, fully connected maze.<br>
+				The first time the loop is called, the visited list contains only one cell, - the randomly chosen starting cell.<br>
+				Empty adjacent cells must not lie outside the Stage area. They can either be edge (horizontally or vertically) adjacent or corner (diagonally) adjacent. The algorithm will then produce either edge or corner mazes. Using both edge and corner is also possible.</p>
+			<h3>Random / Last Selector</h3>
+			<p>All mazes  can be adjusted using the ran/last selector. This alters the way a cell is selected from the 'visited' list in step <strong>1</strong>. By always selecting a random cell from the 'visited' list, many short stubby paths are generated (Prim's algorithm). By always choosing the last cell, long winding paths are formed (recursive backtracker algorithm). </p>
+			<p>The  default is 10%. This means that for each step, there is a 10% chance  a random  cell is selected and a 90% chance that the last cell in the 'visited' list is selected. </p>
+			<h3>Perfect Trench Maze - 10% ran/last</h3>
+			<p>Tile-0 is unused, so every cell contains a trench. No paths are fused, so the maze is 'perfect'. North and west heading trenches (Tile-2 and Tile-4) have steps. A thoughtful addition for people to enter and leave the maze from ground level.</p>
+			<table class="sq" cellspacing="0" cellpadding="0">
+				<caption>
+					All 16  combinations of 2-edge Trench tiles
+					</caption>
+				<tbody><tr>
+					<td><img src="../art/edge/trench/0.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/trench/1.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/trench/2.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/trench/3.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/trench/4.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/trench/5.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/trench/6.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/trench/7.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/trench/8.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/trench/9.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/trench/10.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/trench/11.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/trench/12.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/trench/13.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/trench/14.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/trench/15.gif" width="32" height="32" alt="tile"></td>
+				</tr>
+				<tr>
+					<td>0</td>
+					<td>1</td>
+					<td>2</td>
+					<td>3</td>
+					<td>4</td>
+					<td>5</td>
+					<td>6</td>
+					<td>7</td>
+					<td>8</td>
+					<td>9</td>
+					<td>10</td>
+					<td>11</td>
+					<td>12</td>
+					<td>13</td>
+					<td>14</td>
+					<td>15</td>
+				</tr>
+			</tbody></table>
+			<p>See <a href="../scast/maze.html">Mazes</a> for more info and <a href="../stage/maze/maze.html">images</a>. </p>
+			<div class="stage"><p>Stage: Perfect  Maze - 'Trench'</p>
+		<img src="../art/grabs/maze/maze-trench.png" width="576" height="384" alt="Maze Tiles"></div>
+		<h3>Perfect  'Tree' Maze - 90% ran/last</h3>
+		<p>Tile-0 is unused, so every cell contains a path. No paths are fused, so the maze is 'perfect'.</p>
+		<table class="sq" cellspacing="0" cellpadding="0">
+			<caption>
+				Greek tileset with all 16 combinations of two edges
+				</caption>
+			<tbody><tr>
+				<td><img src="../art/edge/greek/0.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/edge/greek/1.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/edge/greek/2.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/edge/greek/3.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/edge/greek/4.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/edge/greek/5.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/edge/greek/6.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/edge/greek/7.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/edge/greek/8.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/edge/greek/9.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/edge/greek/10.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/edge/greek/11.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/edge/greek/12.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/edge/greek/13.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/edge/greek/14.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/edge/greek/15.gif" width="32" height="32" alt="tile"></td>
+			</tr>
+			<tr>
+				<td>0</td>
+				<td>1</td>
+				<td>2</td>
+				<td>3</td>
+				<td>4</td>
+				<td>5</td>
+				<td>6</td>
+				<td>7</td>
+				<td>8</td>
+				<td>9</td>
+				<td>10</td>
+				<td>11</td>
+				<td>12</td>
+				<td>13</td>
+				<td>14</td>
+				<td>15</td>
+			</tr>
+		</tbody></table>
+		<p>See <a href="../scast/maze.html">Mazes</a> for more info and <a href="../stage/randtree.html">images</a>. </p>
+		<div class="stage"><p>Stage: Perfect  Tree Maze - 'Greek'</p>
+		<img src="../art/grabs/tree-greek.png" width="576" height="384" alt="Tree Maze"></div>
+		<h3>Weaving</h3>
+		<p>Weaving allows paths to cross over or under each other. The maze remains perfect as no path loops form.<br>
+			When trapped and weaving  is allowed then pass over (or under) the perpendicular straight path to an empty cell beyond. </p>
+		<table cellspacing="0" cellpadding="0">
+			<tbody><tr>
+				<td><table cellpadding="0" cellspacing="0" class="sq">
+					<caption>
+						Trapped
+						</caption>
+					<tbody><tr>
+						<td><img src="../art/edge/path/6.gif" width="32" height="32" alt="tile"></td>
+						<td><img src="../art/edge/path/12.gif" width="32" height="32" alt="tile"></td>
+						<td><img src="../art/block/black.gif" width="32" height="32" alt="tile"></td>
+					</tr>
+					<tr>
+						<td><img src="../art/icons/bud-s.gif" width="32" height="32" alt="tile"></td>
+						<td><img src="../art/edge/path/5.gif" width="32" height="32" alt="tile"></td>
+						<td><img src="../art/block/black.gif" width="32" height="32" alt="tile"></td>
+					</tr>
+					<tr>
+						<td><img src="../art/edge/path/6.gif" width="32" height="32" alt="tile"></td>
+						<td><img src="../art/edge/path/9.gif" width="32" height="32" alt="tile"></td>
+						<td><img src="../art/block/black.gif" width="32" height="32" alt="tile"></td>
+					</tr>
+				</tbody></table></td>
+				<td><table cellpadding="0" cellspacing="0" class="sq">
+					<caption>
+						Pass-over
+						</caption>
+					<tbody><tr>
+						<td><img src="../art/edge/path/6.gif" width="32" height="32" alt="tile"></td>
+						<td><img src="../art/edge/path/12.gif" width="32" height="32" alt="tile"></td>
+						<td><img src="../art/block/black.gif" width="32" height="32" alt="tile"></td>
+					</tr>
+					<tr>
+						<td><img src="../art/edge/path/3.gif" width="32" height="32" alt="tile"></td>
+						<td><img src="../art/edge/path/15e.gif" width="32" height="32" alt="tile"></td>
+						<td><img src="../art/icons/bud-e.gif" width="32" height="32" alt="tile"></td>
+					</tr>
+					<tr>
+						<td><img src="../art/edge/path/6.gif" width="32" height="32" alt="tile"></td>
+						<td><img src="../art/edge/path/9.gif" width="32" height="32" alt="tile"></td>
+						<td><img src="../art/block/black.gif" width="32" height="32" alt="tile"></td>
+					</tr>
+				</tbody></table></td>
+				<td><table cellpadding="0" cellspacing="0" class="sq">
+					<caption>
+						Pass-under
+						</caption>
+					<tbody><tr>
+						<td><img src="../art/edge/path/6.gif" width="32" height="32" alt="tile"></td>
+						<td><img src="../art/edge/path/12.gif" width="32" height="32" alt="tile"></td>
+						<td><img src="../art/block/black.gif" width="32" height="32" alt="tile"></td>
+					</tr>
+					<tr>
+						<td><img src="../art/edge/path/3.gif" width="32" height="32" alt="tile"></td>
+						<td><img src="../art/edge/path/15d.gif" width="32" height="32" alt="tile"></td>
+						<td><img src="../art/icons/bud-e.gif" width="32" height="32" alt="tile"></td>
+					</tr>
+					<tr>
+						<td><img src="../art/edge/path/6.gif" width="32" height="32" alt="tile"></td>
+						<td><img src="../art/edge/path/9.gif" width="32" height="32" alt="tile"></td>
+						<td><img src="../art/block/black.gif" width="32" height="32" alt="tile"></td>
+					</tr>
+				</tbody></table></td>
+			</tr>
+		</tbody></table>
+		<h3>Fork Tile Removal</h3>
+		<p>If a cell is selected 2 (or 3) times from the 'visited' list then a 4-way intersection is formed. However, in a weave maze,  Tile-15 is a pass-over tile and not a cross-roads tile. The resulting maze will visually appear to be no longer  perfect, as a section of path can no longer be reached.<br>
+			To prevent this from happening, cells are also removed from the 'visited' list if they have only 1 neighbor. This means removing fork tiles before they have chance to possibly become crossroads tiles.</p>
+		<table cellspacing="0" cellpadding="0">
+			<tbody><tr>
+				<td><table cellpadding="0" cellspacing="0" class="sq">
+					<caption>
+						Perfect
+						</caption>
+					<tbody><tr>
+						<td><img src="../art/icons/bud-w.gif" width="32" height="32" alt="tile"></td>
+						<td><img src="../art/edge/path/12.gif" width="32" height="32" alt="tile"></td>
+						<td><img src="../art/block/black.gif" width="32" height="32" alt="tile"></td>
+					</tr>
+					<tr>
+						<td><img src="../art/edge/path/10.gif" width="32" height="32" alt="tile"></td>
+						<td><img src="../art/edge/path/11.gif" width="32" height="32" alt="tile"></td>
+						<td><img src="../art/edge/path/10.gif" width="32" height="32" alt="tile"></td>
+					</tr>
+					<tr>
+						<td><img src="../art/block/black.gif" width="32" height="32" alt="tile"></td>
+						<td><img src="../art/block/black.gif" width="32" height="32" alt="tile"></td>
+						<td><img src="../art/block/black.gif" width="32" height="32" alt="tile"></td>
+					</tr>
+				</tbody></table></td>
+				<td><table cellpadding="0" cellspacing="0" class="sq">
+					<caption>
+						Imperfect
+						</caption>
+					<tbody><tr>
+						<td><img src="../art/edge/path/2s.gif" width="32" height="32" alt="tile"></td>
+						<td><img src="../art/edge/path/12.gif" width="32" height="32" alt="tile"></td>
+						<td><img src="../art/block/black.gif" width="32" height="32" alt="tile"></td>
+					</tr>
+					<tr>
+						<td><img src="../art/edge/path/10.gif" width="32" height="32" alt="tile"></td>
+						<td><img src="../art/edge/path/15e.gif" width="32" height="32" alt="tile"></td>
+						<td><img src="../art/edge/path/10.gif" width="32" height="32" alt="tile"></td>
+					</tr>
+					<tr>
+						<td><img src="../art/block/black.gif" width="32" height="32" alt="tile"></td>
+						<td><img src="../art/icons/bud-s.gif" width="32" height="32" alt="tile"></td>
+						<td><img src="../art/block/black.gif" width="32" height="32" alt="tile"></td>
+					</tr>
+				</tbody></table></td>
+				<td><table cellpadding="0" cellspacing="0" class="sq">
+					<caption>
+						Abort
+						</caption>
+					<tbody><tr>
+						<td><img src="../art/block/black.gif" width="32" height="32" alt="tile"></td>
+						<td><img src="../art/edge/path/6.gif" width="32" height="32" alt="tile"></td>
+						<td><img src="../art/edge/path/11.gif" width="32" height="32" alt="tile"></td>
+						<td><img src="../art/edge/path/12.gif" width="32" height="32" alt="tile"></td>
+					</tr>
+					<tr>
+						<td><img src="../art/block/black.gif" width="32" height="32" alt="tile"></td>
+						<td><img src="../art/edge/path/3.gif" width="32" height="32" alt="tile"></td>
+						<td><img src="../art/icons/bud-e.gif" width="32" height="32" alt="tile"></td>
+						<td><img src="../art/edge/path/7.gif" width="32" height="32" alt="tile"></td>
+					</tr>
+					<tr>
+						<td><img src="../art/edge/path/10.gif" width="32" height="32" alt="tile"></td>
+						<td><img src="../art/edge/path/10.gif" width="32" height="32" alt="tile"></td>
+						<td><img src="../art/edge/path/14.gif" width="32" height="32" alt="tile"></td>
+						<td><img src="../art/edge/path/9.gif" width="32" height="32" alt="tile"></td>
+					</tr>
+				</tbody></table></td>
+			</tr>
+		</tbody></table>
+		<p>If cross roads (4 way tiles) and dead ends are not allowed, then there can be a situation where the algorithm cannot continue. If a path forms as shown, the central tile cannot be laid. I've never seen this happen,  it is quite rare. </p>
+		<h3>Pass By</h3>
+		<p>When trapped and pass-by is allowed then pass by a path of opposite bend to the empty cell beyond. For this to work visually, paths cannot be too wide.</p>
+		<table cellspacing="0" cellpadding="0">
+			<tbody><tr>
+				<td><table cellpadding="0" cellspacing="0" class="sq">
+					<caption>
+						Trapped
+						</caption>
+					<tbody><tr>
+						<td><img src="../art/block/black.gif" width="32" height="32" alt="tile"></td>
+						<td><img src="../art/edge/path/6.gif" width="32" height="32" alt="tile"></td>
+						<td><img src="../art/edge/path/10.gif" width="32" height="32" alt="tile"></td>
+						<td><img src="../art/edge/path/12.gif" width="32" height="32" alt="tile"></td>
+					</tr>
+					<tr>
+						<td><img src="../art/edge/path/6.gif" width="32" height="32" alt="tile"></td>
+						<td><img src="../art/edge/path/9.gif" width="32" height="32" alt="tile"></td>
+						<td><img src="../art/icons/bud-n.gif" width="32" height="32" alt="tile"></td>
+						<td><img src="../art/edge/path/5.gif" width="32" height="32" alt="tile"></td>
+					</tr>
+					<tr>
+						<td><img src="../art/edge/path/5.gif" width="32" height="32" alt="tile"></td>
+						<td><img src="../art/block/black.gif" width="32" height="32" alt="tile"></td>
+						<td><img src="../art/edge/path/3.gif" width="32" height="32" alt="tile"></td>
+						<td><img src="../art/edge/path/9.gif" width="32" height="32" alt="tile"></td>
+					</tr>
+				</tbody></table></td>
+				<td><table cellpadding="0" cellspacing="0" class="sq">
+					<caption>
+						Pass-by
+						</caption>
+					<tbody><tr>
+						<td><img src="../art/block/black.gif" width="32" height="32" alt="tile"></td>
+						<td><img src="../art/edge/path/6.gif" width="32" height="32" alt="tile"></td>
+						<td><img src="../art/edge/path/10.gif" width="32" height="32" alt="tile"></td>
+						<td><img src="../art/edge/path/12.gif" width="32" height="32" alt="tile"></td>
+					</tr>
+					<tr>
+						<td><img src="../art/edge/path/6.gif" width="32" height="32" alt="tile"></td>
+						<td><img src="../art/edge/path/15b.gif" width="32" height="32" alt="tile"></td>
+						<td><img src="../art/edge/path/12.gif" width="32" height="32" alt="tile"></td>
+						<td><img src="../art/edge/path/5.gif" width="32" height="32" alt="tile"></td>
+					</tr>
+					<tr>
+						<td><img src="../art/edge/path/5.gif" width="32" height="32" alt="tile"></td>
+						<td><img src="../art/icons/bud-s.gif" width="32" height="32" alt="tile"></td>
+						<td><img src="../art/edge/path/3.gif" width="32" height="32" alt="tile"></td>
+						<td><img src="../art/edge/path/9.gif" width="32" height="32" alt="tile"></td>
+					</tr>
+				</tbody></table></td>
+			</tr>
+		</tbody></table>
+		<h3>Blob Mazes</h3>
+		<p>Blob tileset mazes are generated in the same way as a 2-edge tileset maze. All corner cells are left at '0'. The result is identical to a 2-edge maze.<br>
+			As a maze 'edge' is drawn, the corner cell to the left and to the right of the edge is checked. If it has 3 (or more?!) adjacent edge cells with a value of '1', then all adjacent edges and the corner cell are given a value of '1'. This tends to 'fill in'  path bends. </p>
+		<table cellpadding="0" cellspacing="0" class="sq5">
+			<tbody><tr>
+				<td><table cellpadding="0" cellspacing="0" class="sq">
+					<caption>
+						Blob tileset room creation
+						</caption>
+					<tbody><tr>
+						<td><img src="../art/grab-array/blob/blobfill.png" width="230" height="132" alt="blobfill"></td>
+					</tr>
+				</tbody></table></td>
+				<td><p>Here, the corner to the left of the new edge is surrounded by 3 edges. The corner and all 4 of its surrounding edges are made a '1'. </p>
+					<p>The corner to the right of the new edge has only 2 adjacent edges and so is not altered.</p>
+					<p>The result is a small 'land fill' or room creation to the right of the new path.</p></td>
+			</tr>
+		</tbody></table>
+		<p>Use the ran/last selector to adjust the maze between long paths with small islands and short paths with large island areas.</p>
+		<p>A perfect maze using the 'Commune' Blob tileset is shown below. There is  one unique path between any two points in the maze. Traversing  the ground level is forbidden.</p>
+		<p>See <a href="../scast/maze.html">Mazes</a> for more info and <a href="../stage/randtree.html">images</a>. </p>
+		<div class="stage"><p>Stage: Perfect  Blob Maze (10%) - 'Commune'</p>
+		<img src="../art/grabs/maze/blob_maze.png" width="576" height="384" alt="Blob Maze"></div><!-- #EndEditable --><!-- end .content --></div></td>
+		<td class="side"><ul>
+				<li class="nolink">Intro</li>
+					<li><a href="intro.html">Wang tiles</a></li>
+					<li><a href="array.html">Maze arrays</a></li>
+					<li class="nolink">Wang Tiles</li>
+					<li><a href="2edge.html">2-edge tiles</a></li>
+					<li><a href="2corn.html">2-corner tiles</a></li>
+					<li><a href="3edge.html">3-edge tiles</a></li>
+					<li><a href="3corn.html">3-corner tiles</a></li>
+                    <li><a href="4ord.html">4-order tiles</a></li>
+					<li class="nolink">Tilesets</li>
+					<li><a href="blob.html">Blob tileset</a></li>
+					<li><a href="lout2e.html">Layout 2-edge</a></li>
+                    <li><a href="reduced.html">Reduced sets</a></li>
+					<li class="nolink">Single Side</li>
+					<li><a href="block.html">Block tiles</a></li>
+					<li><a href="1sideedge.html">1-side edge</a></li>
+					<li><a href="1sidecorn.html">1-side corner</a></li>
+					<li class="nolink">Paths</li>
+					<li><a href="angled.html">Angled paths</a></li>
+					<li><a href="border.html">Border paths</a></li>
+					<!--<li>Colour paths</li>-->
+					<li><a href="directed.html">Directed path</a></li>
+					<li><a href="isometric.html">Isometric path</a></li>
+					<li><a href="positioned.html">Position path</a></li>
+					<li><a href="shape.html">Shape tiles</a></li>
+					<li class="nolink">Mazes</li>
+					<li><a href="perfect.html">Perfect</a></li>
+					<li><a href="connect.html">Connected</a></li>
+                    <li><a href="imperfect.html">Imperfect</a></li>
+                    <li><a href="labyrinth.html">Labyrinth</a></li>
+                    <li><a href="twin.html">Twin maze</a></li>
+					<li class="nolink">Gallery</li>
+					<li><a href="tiles_e.html">Tiles 2-edge</a></li>
+					<li><a href="tiles_c.html">Tiles 2-corner</a></li>
+                    <li><a href="tiles_3ec.html">Tiles 3-order</a></li>
+                    <li><a href="blob_g.html">Blob tilesets</a></li>
+                    <li><a href="twin_g.html">Twin tilesets</a></li>
+					<li><a href="truch_g.html">Truchet tiles</a></li>
+					<li><a href="block_g.html">Block tiles</a></li>
+					<li><a href="patts.html">Patterns</a></li>
+					<li><a href="icons.html">Icons</a></li>
+					<li class="nolink">Info</li>
+					<li><a href="maths.html">Maths</a></li>
+					<li><a href="knots.html">Knots</a></li>
+                    <li><a href="pattern.html">Patterns</a></li>
+                    <li><a href="puzzle.html">Puzzles</a></li>
+					<li><a href="web.html">Web news</a></li>
+					<li><a href="glossary.html">Glossary</a></li>
+					<li>&nbsp;</li>
+			</ul></td>
+	</tr>
+</tbody></table>
+<table cellspacing="0" cellpadding="0" class="foot">
+	<tbody><tr>
+		<td class="main"><p>cr31.co.uk</p></td>
+		<td class="side">&nbsp;</td>
+	</tr>
+</tbody></table>
+
+
+</body><!-- #EndTemplate --></html>

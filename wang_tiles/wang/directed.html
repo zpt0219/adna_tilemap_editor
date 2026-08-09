@@ -1,0 +1,185 @@
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><!-- #BeginTemplate "/Templates/wang.dwt" --><!-- DW6 --><head>
+<!-- #BeginEditable "doctitle" -->
+<title>Directed Mazes</title>
+<!-- #EndEditable -->
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<!-- #BeginEditable "Meta" -->
+<link rel="stylesheet" href="../wang/text.css" type="text/css">
+<script src="../js/wang.js" type="text/JavaScript"></script>
+<meta name="description" content="Stagecast puzzles, games, animation and sims">
+<meta name="keywords" content="Wang, maze, tile, tile set, tileset, labyrinth, Stagecast, seamless, icon, terrain, path, 32x32, game">
+<!-- #EndEditable -->
+</head>
+
+<body>
+<table class="tabs">
+	<tbody><tr>
+		<td><p style="margin:0">
+          Originally published on <a href="http://www.cr31.co.uk/stagecast/wang/intro.html">cr31.co.uk</a>
+          by Guy Walker. Mirrored from
+          <a href="https://www.boristhebrave.com/permanent/24/06/cr31/stagecast/wang/intro.html">boristhebrave.com</a>.
+        </p>
+        <p style="margin:4px 0 0; font-style:italic; opacity:0.85">
+          In memory of Professor Hao Wang (王浩, 1921 – 1995), whose elegant tiling theory continues to inspire generations of mathematicians and game designers.
+        </p></td>
+	</tr>
+</tbody></table>
+
+<table cellspacing="0" cellpadding="0" class="head">
+	<tbody><tr>
+		<td class="main"><h1>Wang Tiles</h1></td>
+		<td class="side">&nbsp;</td>
+	</tr>
+</tbody></table>
+<table cellspacing="0" cellpadding="0" class="strap">
+	<tbody><tr>
+		<td class="main"><p>edge and corner matched tilesets</p></td>
+		<td class="side"><p>menu</p></td>
+	</tr>
+</tbody></table>
+<table cellspacing="0" cellpadding="0" class="cont">
+	<tbody><tr>
+		<td class="main"><div class="content"><!-- #BeginEditable "contents" -->
+			<h2>Directed Maze</h2>
+			<p>In a directed maze, paths can only be traversed in one direction. This is usually indicated by an arrow. Some tile designs can show a step where path following sprites can  step down but not back up.<br>
+			</p>
+			<h3><a name="arrow"></a>Arrow edge tiles</h3>
+			<p> Here, an arrow straddles the tile edges to indicate the allowable direction of travel between tiles. A similar method to <a href="shape.html">Shape tiles</a> is needed to ensure all edges match. So yellow edges are interpreted as allowing travel up or to the right (away from the origin) and blue edges as down or left (towards the origin). <br>
+				We again have 16 different tiles. </p>
+			<table class="sq" cellspacing="0" cellpadding="0">
+				<caption>
+					All 16  combinations of two edges
+					</caption>
+				<tbody><tr>
+					<td><img src="../art/edge/wang-2e/0.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-2e/1.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-2e/2.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-2e/3.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-2e/4.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-2e/5.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-2e/6.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-2e/7.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-2e/8.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-2e/9.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-2e/10.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-2e/11.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-2e/12.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-2e/13.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-2e/14.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-2e/15.gif" width="32" height="32" alt="tile"></td>
+				</tr>
+				<tr>
+					<td><img src="../art/edge/arrow/0.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/arrow/1.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/arrow/2.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/arrow/3.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/arrow/4.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/arrow/5.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/arrow/6.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/arrow/7.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/arrow/8.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/arrow/9.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/arrow/10.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/arrow/11.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/arrow/12.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/arrow/13.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/arrow/14.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/arrow/15.gif" width="32" height="32" alt="tile"></td>
+				</tr>
+				<tr>
+					<td>0</td>
+					<td>1</td>
+					<td>2</td>
+					<td>3</td>
+					<td>4</td>
+					<td>5</td>
+					<td>6</td>
+					<td>7</td>
+					<td>8</td>
+					<td>9</td>
+					<td>10</td>
+					<td>11</td>
+					<td>12</td>
+					<td>13</td>
+					<td>14</td>
+					<td>15</td>
+				</tr>
+			</tbody></table>
+			<h3>Sources and sinks</h3>
+			<p> A source tile (red dots) has all arrows flowing out. A sprite can start at the tile, but can never return to it. A sink tile (magenta dots) has all arrows flowing in. Sprites will be trapped at the tile, and can never leave. <br>
+				It is also possible for sprites in a directed maze to become trapped in a loop.</p>
+			<p>Here is a directed maze. Paths are not shown, only the arrows between tiles. It is quite difficult to find a path between two points. A future maze solving sim may automate the process. It will find the longest path in the maze below.</p>
+			<div class="stage"><p>Stage: Random  2-edge Directed Arrow Tiles</p>
+		<img src="../art/grabs/edge/arrow.png" width="576" height="384" alt="Arrow Flow Tiles"></div>
+		<p>If paths can be one-way or absent then we naturally have a 3-edge tileset. If they can also be both-ways, then a 4-edge tileset is needed. See <a href="3edge.html">3-edge Tiles</a> for more path flow mazes. </p>
+		<h3>Tilt Mazes</h3>
+		<p>A tilt maze is typically a wooden maze containing a marble. The maze is rotated by 90 degrees and the marble drops under gravity. It is equivalent to walking a maze where you can only turn right or left when you 'hit' a wall. So...</p>
+		<p>1/ You can only turn through 180 degrees and retrace your path at dead-ends and bends.<br>
+			2/ You can never turn at cross-road junctions. Straight across only. <br>
+			3/ You can never turn into the middle exit of a 'T' junction, which acts as a directed path, flowing into the junction only. </p>
+		<p>You can create a 'Tilt' maze by replacing all 'T' junctions with directed 'T' junctions. They are shown with an arrow point. Generating interesting Tilt mazes is difficult.</p>
+		<div class="stage"><p>Stage: Random  2-edge Tilt Tiles</p>
+		<img src="../art/grabs/edge/tilt.png" width="576" height="384" alt="Random Tilt Maze"></div>
+		<p><em>[[ Add: Directed corner tilesets ]]</em></p><!-- #EndEditable --><!-- end .content --></div></td>
+		<td class="side"><ul>
+				<li class="nolink">Intro</li>
+					<li><a href="intro.html">Wang tiles</a></li>
+					<li><a href="array.html">Maze arrays</a></li>
+					<li class="nolink">Wang Tiles</li>
+					<li><a href="2edge.html">2-edge tiles</a></li>
+					<li><a href="2corn.html">2-corner tiles</a></li>
+					<li><a href="3edge.html">3-edge tiles</a></li>
+					<li><a href="3corn.html">3-corner tiles</a></li>
+                    <li><a href="4ord.html">4-order tiles</a></li>
+					<li class="nolink">Tilesets</li>
+					<li><a href="blob.html">Blob tileset</a></li>
+					<li><a href="lout2e.html">Layout 2-edge</a></li>
+                    <li><a href="reduced.html">Reduced sets</a></li>
+					<li class="nolink">Single Side</li>
+					<li><a href="block.html">Block tiles</a></li>
+					<li><a href="1sideedge.html">1-side edge</a></li>
+					<li><a href="1sidecorn.html">1-side corner</a></li>
+					<li class="nolink">Paths</li>
+					<li><a href="angled.html">Angled paths</a></li>
+					<li><a href="border.html">Border paths</a></li>
+					<!--<li>Colour paths</li>-->
+					<li><a href="directed.html">Directed path</a></li>
+					<li><a href="isometric.html">Isometric path</a></li>
+					<li><a href="positioned.html">Position path</a></li>
+					<li><a href="shape.html">Shape tiles</a></li>
+					<li class="nolink">Mazes</li>
+					<li><a href="perfect.html">Perfect</a></li>
+					<li><a href="connect.html">Connected</a></li>
+                    <li><a href="imperfect.html">Imperfect</a></li>
+                    <li><a href="labyrinth.html">Labyrinth</a></li>
+                    <li><a href="twin.html">Twin maze</a></li>
+					<li class="nolink">Gallery</li>
+					<li><a href="tiles_e.html">Tiles 2-edge</a></li>
+					<li><a href="tiles_c.html">Tiles 2-corner</a></li>
+                    <li><a href="tiles_3ec.html">Tiles 3-order</a></li>
+                    <li><a href="blob_g.html">Blob tilesets</a></li>
+                    <li><a href="twin_g.html">Twin tilesets</a></li>
+					<li><a href="truch_g.html">Truchet tiles</a></li>
+					<li><a href="block_g.html">Block tiles</a></li>
+					<li><a href="patts.html">Patterns</a></li>
+					<li><a href="icons.html">Icons</a></li>
+					<li class="nolink">Info</li>
+					<li><a href="maths.html">Maths</a></li>
+					<li><a href="knots.html">Knots</a></li>
+                    <li><a href="pattern.html">Patterns</a></li>
+                    <li><a href="puzzle.html">Puzzles</a></li>
+					<li><a href="web.html">Web news</a></li>
+					<li><a href="glossary.html">Glossary</a></li>
+					<li>&nbsp;</li>
+			</ul></td>
+	</tr>
+</tbody></table>
+<table cellspacing="0" cellpadding="0" class="foot">
+	<tbody><tr>
+		<td class="main"><p>cr31.co.uk</p></td>
+		<td class="side">&nbsp;</td>
+	</tr>
+</tbody></table>
+
+
+</body><!-- #EndTemplate --></html>

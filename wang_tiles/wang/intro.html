@@ -1,0 +1,216 @@
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><!-- #BeginTemplate "/Templates/wang.dwt" --><!-- DW6 --><head>
+<!-- #BeginEditable "doctitle" -->
+<title>Wang Tiles</title>
+<!-- #EndEditable -->
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<!-- #BeginEditable "Meta" -->
+<link rel="stylesheet" href="../wang/text.css" type="text/css">
+<script src="../js/wang.js" type="text/JavaScript"></script>
+<meta name="description" content="Stagecast puzzles, games, animation and sims">
+<meta name="keywords" content="Wang, maze, tile, tile set, tileset, labyrinth, Stagecast, seamless, icon, terrain, path, 32x32, game">
+<!-- #EndEditable -->
+</head>
+
+<body>
+<table class="tabs">
+	<tbody><tr>
+		<td><p style="margin:0">
+          Originally published on <a href="http://www.cr31.co.uk/stagecast/wang/intro.html">cr31.co.uk</a>
+          by Guy Walker. Mirrored from
+          <a href="https://www.boristhebrave.com/permanent/24/06/cr31/stagecast/wang/intro.html">boristhebrave.com</a>.
+        </p>
+        <p style="margin:4px 0 0; font-style:italic; opacity:0.85">
+          In memory of Professor Hao Wang (王浩, 1921 – 1995), whose elegant tiling theory continues to inspire generations of mathematicians and game designers.
+        </p></td>
+	</tr>
+</tbody></table>
+
+<table cellspacing="0" cellpadding="0" class="head">
+	<tbody><tr>
+		<td class="main"><h1>Wang Tiles</h1></td>
+		<td class="side">&nbsp;</td>
+	</tr>
+</tbody></table>
+<table cellspacing="0" cellpadding="0" class="strap">
+	<tbody><tr>
+		<td class="main"><p>edge and corner matched tilesets</p></td>
+		<td class="side"><p>menu</p></td>
+	</tr>
+</tbody></table>
+<table cellspacing="0" cellpadding="0" class="cont">
+	<tbody><tr>
+		<td class="main"><div class="content"><!-- #BeginEditable "contents" -->
+			<h2>Introduction</h2>
+			<p>Wang tiles were first proposed by mathematician, Hao Wang in 1961. A set of square tiles, with each tile edge of a fixed color, are arranged side by side in a rectangular  grid. All  four edges of each tile must 'match' (have the same color as) their adjoining neighbor.</p>
+			<p>The tiles never overlap and usually all spaces (cells) in the grid are filled.  Tiles have a 'fixed orientation', they are never rotated or reflected (turned over). </p>
+			<p>With careful tile design, a complete array can produce a large image without  visual 'breaks' between  tiles. This helps computer game designers  create large tiled backgrounds from a small set of tile images.</p>
+			<p><a href="2edge.html">Edge matching</a> Wang tiles tend to produce path or maze designs. A second type of tile set are <a href="2corn.html">corner tiles</a>. These are matched by their corners and tend to produce patch or terrain designs. </p>
+			<p>Read more about Wang Tiles  at <a href="http://en.wikipedia.org/wiki/Wang_tile">Wikipedia</a>.</p>
+			<h3>Wang Tileset</h3>
+			<p>Here is a  set of Wang tiles. You can see that every tile has two different types of edge; blue or yellow. This gives 2x2x2x2 (written as 2^4),  or 16 possible combinations. Hence the complete set contains 16 different tiles.</p>
+			<table class="sq" cellspacing="0" cellpadding="0">
+				<caption>
+					All 16  combinations of two edges
+					</caption>
+				<tbody><tr>
+					<td><img src="../art/edge/wang-2e/0.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-2e/1.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-2e/2.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-2e/3.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-2e/4.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-2e/5.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-2e/6.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-2e/7.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-2e/8.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-2e/9.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-2e/10.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-2e/11.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-2e/12.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-2e/13.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-2e/14.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-2e/15.gif" width="32" height="32" alt="tile"></td>
+				</tr>
+				<tr>
+					<td>0</td>
+					<td>1</td>
+					<td>2</td>
+					<td>3</td>
+					<td>4</td>
+					<td>5</td>
+					<td>6</td>
+					<td>7</td>
+					<td>8</td>
+					<td>9</td>
+					<td>10</td>
+					<td>11</td>
+					<td>12</td>
+					<td>13</td>
+					<td>14</td>
+					<td>15</td>
+				</tr>
+			</tbody></table>
+			<p>The  set is said to be 'complete' as it includes a tile for every possible combination of two edges. We can use these tiles to fill a grid where all tile edges match.</p>
+			<table cellpadding="0" cellspacing="0" class="lout">
+				<tbody><tr>
+					<td width="60%"><h3>Bitwise Tile Index</h3>
+						<p>With some  bitwise maths, we can compute a unique 'index' number for each tile.<br>
+							Ignore blue edges. Add  up yellow edges using the following binary weighting:</p>
+						<p>Yellow North  = 1<br>
+							Yellow East  = 2<br>
+							Yellow South  = 4<br>
+							Yellow West  = 8 </p>
+						<p>Blue edges are ignored. </p></td>
+					<td><br>
+						<table class="sq4" cellspacing="0" cellpadding="0">
+							<caption>
+								2-edge weighting
+							</caption>
+							<tbody><tr>
+								<td width="48">&nbsp;</td>
+								<td width="48">North<br>
+									= 1</td>
+								<td width="48">&nbsp;</td>
+							</tr>
+							<tr>
+								<td>West<br>
+									= 8</td>
+								<td><img src="../art/edge/wang-2e/9.gif" alt="tile" width="32" height="32" class="pad"></td>
+								<td>East<br>
+									= 2</td>
+							</tr>
+							<tr>
+								<td>&nbsp;</td>
+								<td>South<br>
+									= 4</td>
+								<td>&nbsp;</td>
+							</tr>
+						</tbody></table>
+						<p>This tile has yellow edges North(1) and West(8). Adding up gives a tile index of '9'.</p></td>
+				</tr>
+			</tbody></table>
+			Hence each tile can be given a unique index number, 0-15.
+			<table cellpadding="0" cellspacing="0" class="lout">
+				<tbody><tr>
+					<td width="60%"><h3>4x4 Layout</h3>
+						<p>The complete tileset of 16 tiles can be arranged in a convienient 4x4 layout. All tile edges match and all border edges are '0' blue. </p>
+						<p>More 2-edge tilesets can be seen <a href="tiles_e.html">here</a>.</p></td>
+					<td><table class="sq3" cellspacing="0" cellpadding="0">
+						<caption>
+							Wang 2edge
+							</caption>
+						<tbody><tr>
+							<td><img src="../art/atlas/edge/wang2e.png" alt="atlas" width="128" height="128"></td>
+						</tr>
+				</tbody></table></td>
+				</tr>
+	</tbody></table>
+			<h3>Random Wang Tile Array</h3>
+			<p>We  arrange Wang tiles in a grid array. For each position, a tile is selected at random from the tileset, always ensuring that  all edges match   adjacent tiles.</p>
+			<p>See <a href="../scast/edge.html">Path Tiles</a> for more info, images and interactive Stagecast sim.<br>
+				See <a href="../wang/stage.html">Stage</a> for random tile arrays. </p>
+			<div class="stage"><p>Stage: Random 2-edge Wang Tiles</p>
+		<img src="../art/grabs/edge/wang-2e.png" width="576" height="384" alt="Maze Tiles">
+		</div>
+		<!-- #EndEditable --><!-- end .content --></div></td>
+		<td class="side"><ul>
+				<li class="nolink">Intro</li>
+					<li><a href="intro.html">Wang tiles</a></li>
+					<li><a href="array.html">Maze arrays</a></li>
+					<li class="nolink">Wang Tiles</li>
+					<li><a href="2edge.html">2-edge tiles</a></li>
+					<li><a href="2corn.html">2-corner tiles</a></li>
+					<li><a href="3edge.html">3-edge tiles</a></li>
+					<li><a href="3corn.html">3-corner tiles</a></li>
+                    <li><a href="4ord.html">4-order tiles</a></li>
+					<li class="nolink">Tilesets</li>
+					<li><a href="blob.html">Blob tileset</a></li>
+					<li><a href="lout2e.html">Layout 2-edge</a></li>
+                    <li><a href="reduced.html">Reduced sets</a></li>
+					<li class="nolink">Single Side</li>
+					<li><a href="block.html">Block tiles</a></li>
+					<li><a href="1sideedge.html">1-side edge</a></li>
+					<li><a href="1sidecorn.html">1-side corner</a></li>
+					<li class="nolink">Paths</li>
+					<li><a href="angled.html">Angled paths</a></li>
+					<li><a href="border.html">Border paths</a></li>
+					<!--<li>Colour paths</li>-->
+					<li><a href="directed.html">Directed path</a></li>
+					<li><a href="isometric.html">Isometric path</a></li>
+					<li><a href="positioned.html">Position path</a></li>
+					<li><a href="shape.html">Shape tiles</a></li>
+					<li class="nolink">Mazes</li>
+					<li><a href="perfect.html">Perfect</a></li>
+					<li><a href="connect.html">Connected</a></li>
+                    <li><a href="imperfect.html">Imperfect</a></li>
+                    <li><a href="labyrinth.html">Labyrinth</a></li>
+                    <li><a href="twin.html">Twin maze</a></li>
+					<li class="nolink">Gallery</li>
+					<li><a href="tiles_e.html">Tiles 2-edge</a></li>
+					<li><a href="tiles_c.html">Tiles 2-corner</a></li>
+                    <li><a href="tiles_3ec.html">Tiles 3-order</a></li>
+                    <li><a href="blob_g.html">Blob tilesets</a></li>
+                    <li><a href="twin_g.html">Twin tilesets</a></li>
+					<li><a href="truch_g.html">Truchet tiles</a></li>
+					<li><a href="block_g.html">Block tiles</a></li>
+					<li><a href="patts.html">Patterns</a></li>
+					<li><a href="icons.html">Icons</a></li>
+					<li class="nolink">Info</li>
+					<li><a href="maths.html">Maths</a></li>
+					<li><a href="knots.html">Knots</a></li>
+                    <li><a href="pattern.html">Patterns</a></li>
+                    <li><a href="puzzle.html">Puzzles</a></li>
+					<li><a href="web.html">Web news</a></li>
+					<li><a href="glossary.html">Glossary</a></li>
+					<li>&nbsp;</li>
+			</ul></td>
+	</tr>
+</tbody></table>
+<table cellspacing="0" cellpadding="0" class="foot">
+	<tbody><tr>
+		<td class="main"><p>cr31.co.uk</p></td>
+		<td class="side">&nbsp;</td>
+	</tr>
+</tbody></table>
+
+
+</body><!-- #EndTemplate --></html>

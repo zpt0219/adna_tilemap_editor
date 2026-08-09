@@ -1,0 +1,436 @@
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><!-- #BeginTemplate "/Templates/wang.dwt" --><!-- DW6 --><head>
+<!-- #BeginEditable "doctitle" -->
+<title>2-corner Wang Tiles</title>
+<!-- #EndEditable -->
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<!-- #BeginEditable "Meta" -->
+<link rel="stylesheet" href="../wang/text.css" type="text/css">
+<script src="../js/wang.js" type="text/JavaScript"></script>
+<meta name="description" content="Stagecast puzzles, games, animation and sims">
+<meta name="keywords" content="Wang, maze, tile, tile set, tileset, labyrinth, Stagecast, seamless, icon, terrain, path, 32x32, game">
+<!-- #EndEditable -->
+</head>
+
+<body>
+<table class="tabs">
+	<tbody><tr>
+		<td><p style="margin:0">
+          Originally published on <a href="http://www.cr31.co.uk/stagecast/wang/intro.html">cr31.co.uk</a>
+          by Guy Walker. Mirrored from
+          <a href="https://www.boristhebrave.com/permanent/24/06/cr31/stagecast/wang/intro.html">boristhebrave.com</a>.
+        </p>
+        <p style="margin:4px 0 0; font-style:italic; opacity:0.85">
+          In memory of Professor Hao Wang (王浩, 1921 – 1995), whose elegant tiling theory continues to inspire generations of mathematicians and game designers.
+        </p></td>
+	</tr>
+</tbody></table>
+
+<table cellspacing="0" cellpadding="0" class="head">
+	<tbody><tr>
+		<td class="main"><h1>Wang Tiles</h1></td>
+		<td class="side">&nbsp;</td>
+	</tr>
+</tbody></table>
+<table cellspacing="0" cellpadding="0" class="strap">
+	<tbody><tr>
+		<td class="main"><p>edge and corner matched tilesets</p></td>
+		<td class="side"><p>menu</p></td>
+	</tr>
+</tbody></table>
+<table cellspacing="0" cellpadding="0" class="cont">
+	<tbody><tr>
+		<td class="main"><div class="content"><!-- #BeginEditable "contents" -->
+			<h2>2-corner Wang Tiles</h2>
+			<p>Wang tilesets are usually edge tilesets. But we can also create a Wang tileset by considering the tile corners. Each tile has four corners so for 2 different types of corner we have 2^4 or 16 different tiles, the same number as 2 different edges. </p>
+			<p>It may seem that matching corners will produce similar results as matching edges, but this is not so. An edge only affects one adjacent tile, while matching a corner affects three adjacent tiles.</p>
+			<p>Corner Wang tiles create areas (or patches) of matching terrain. Although not a maze of paths or passages, a complex layout of terrain patches, separated by barriers (ditches, walls, fences etc) can provide a difficult course to navigate through. </p>
+			<h3>2-corner  Tileset</h3>
+			<p>Here is a typical set of corner Wang tiles. You can see that every tile has two different types of corner: blue or yellow. This gives 2x2x2x2 or 2 to the power 4, (written as 2^4),  giving 16 possible combinations. Hence 16 different tiles, with index numbers 0 to 15.</p>
+			<table class="sq" cellspacing="0" cellpadding="0">
+				<caption>
+					All 16  combinations of two corners
+					</caption>
+				<tbody><tr>
+					<td><img src="../art/corn/wang-2c/0.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/corn/wang-2c/1.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/corn/wang-2c/2.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/corn/wang-2c/3.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/corn/wang-2c/4.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/corn/wang-2c/5.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/corn/wang-2c/6.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/corn/wang-2c/7.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/corn/wang-2c/8.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/corn/wang-2c/9.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/corn/wang-2c/10.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/corn/wang-2c/11.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/corn/wang-2c/12.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/corn/wang-2c/13.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/corn/wang-2c/14.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/corn/wang-2c/15.gif" width="32" height="32" alt="tile"></td>
+				</tr>
+				<tr>
+					<td>0</td>
+					<td>1</td>
+					<td>2</td>
+					<td>3</td>
+					<td>4</td>
+					<td>5</td>
+					<td>6</td>
+					<td>7</td>
+					<td>8</td>
+					<td>9</td>
+					<td>10</td>
+					<td>11</td>
+					<td>12</td>
+					<td>13</td>
+					<td>14</td>
+					<td>15</td>
+				</tr>
+			</tbody></table>
+			<p>The tileset is said to be 'complete' as it includes every possible combination of two corners. We can use these to tile a grid where all tile corners match.</p>
+			<table cellpadding="0" cellspacing="0" class="lout">
+				<tbody><tr>
+					<td width="705"><h3>Bitwise Tile Index</h3>
+						<p>With some  bitwise maths, we can compute a unique 'index' number for each tile.<br>
+							Ignore blue corners and add  up yellow corners using the following binary weightings:</p>
+						<p>Yellow NorthEast corner  = 1<br>
+							Yellow SouthEast corner  = 2<br>
+							Yellow Sout-West corner  = 4<br>
+							Yellow NorthWest corner  = 8</p>
+						<p>Blue corners are ignored. </p></td>
+					<td><br>
+						<table class="sq4" cellspacing="0" cellpadding="0">
+							<caption>
+								2-corner weightings
+								</caption>
+							<tbody><tr>
+								<td>NorthWest<br>
+									= 8</td>
+								<td>&nbsp;</td>
+								<td>NorthEast<br>
+									= 1</td>
+							</tr>
+							<tr>
+								<td>&nbsp;</td>
+								<td><img src="../art/corn/wang-2c/9.gif" alt="tile" width="32" height="32" class="pad"></td>
+								<td>&nbsp;</td>
+							</tr>
+							<tr>
+								<td>SouthWest<br>
+									= 4</td>
+								<td>&nbsp;</td>
+								<td>SouthEast<br>
+									= 2</td>
+							</tr>
+						</tbody></table>
+						<p>This tile has yellow corners NorthEast(1) and NorthWest(8). Adding up gives a tile index of '9'.</p></td>
+				</tr>
+			</tbody></table>
+			<h3>Random Wang Tiles</h3>
+			<p>We can arrange Wang tiles in a grid array. For each position, a tile is selected at random from the tileset, always ensuring that  all corners match   adjacent tiles.</p>
+			<p>See <a href="../stage/corner/wang2c.html">Terrain Tiles</a>.<br>
+				See <a href="../wang/stage.html">Stage</a> for random terrain arrays. </p>
+			<div class="stage"><p>Stage: Random 2-corner Wang Tiles</p>
+		<img src="../art/grabs/corner/wang-2c.png" width="576" height="384" alt="Wang 2 Corner Tiles"></div>
+		<h3>Path Tileset</h3>
+		<p>Here is a path tileset which as you can see is very similar to the 2-edge path tileset, which is shown here for comparison. The corner tilset appears rotated by 45°. A few different tile variations are also shown.</p>
+		<table class="sq" cellspacing="0" cellpadding="0">
+			<caption>
+				Complete set of 2-edge Path tiles
+				</caption>
+			<tbody><tr>
+				<td><img src="../art/edge/path/0.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/edge/path/1.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/edge/path/2.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/edge/path/3.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/edge/path/4.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/edge/path/5.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/edge/path/6.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/edge/path/7.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/edge/path/8.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/edge/path/9.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/edge/path/10.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/edge/path/11.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/edge/path/12.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/edge/path/13.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/edge/path/14.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/edge/path/15.gif" width="32" height="32" alt="tile"></td>
+			</tr>
+		</tbody></table>
+		<table class="sq" cellspacing="0" cellpadding="0">
+			<caption>
+				Complete set of 2-corner Path tiles with variations
+				</caption>
+			<tbody><tr>
+				<td><img src="../art/corn/path/0.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/corn/path/_1.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/corn/path/_2.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/corn/path/_3.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/corn/path/_4.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/corn/path/_5.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/corn/path/_6.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/corn/path/_7.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/corn/path/_8.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/corn/path/_9.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/corn/path/_10.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/corn/path/_11.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/corn/path/_12.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/corn/path/_13.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/corn/path/_14.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/corn/path/_15.gif" width="32" height="32" alt="tile"></td>
+			</tr>
+			<tr>
+				<td>&nbsp;</td>
+				<td><img src="../art/corn/path/1.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/corn/path/2.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/corn/path/3.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/corn/path/4.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/corn/path/5.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/corn/path/6.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/corn/path/7.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/corn/path/8.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/corn/path/9.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/corn/path/10.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/corn/path/11.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/corn/path/12.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/corn/path/13.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/corn/path/14.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/corn/path/15x.gif" width="32" height="32" alt="tile"></td>
+			</tr>
+			<tr>
+				<td>&nbsp;</td>
+				<td>&nbsp;</td>
+				<td>&nbsp;</td>
+				<td>&nbsp;</td>
+				<td>&nbsp;</td>
+				<td>&nbsp;</td>
+				<td>&nbsp;</td>
+				<td><img src="../art/corn/path/7a.gif" width="32" height="32" alt="tile"></td>
+				<td>&nbsp;</td>
+				<td>&nbsp;</td>
+				<td>&nbsp;</td>
+				<td><img src="../art/corn/path/11a.gif" width="32" height="32" alt="tile"></td>
+				<td>&nbsp;</td>
+				<td><img src="../art/corn/path/13a.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/corn/path/14a.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/corn/path/15a.gif" width="32" height="32" alt="tile"></td>
+			</tr>
+			<tr>
+				<td>0</td>
+				<td>1</td>
+				<td>2</td>
+				<td>3</td>
+				<td>4</td>
+				<td>5</td>
+				<td>6</td>
+				<td>7</td>
+				<td>8</td>
+				<td>9</td>
+				<td>10</td>
+				<td>11</td>
+				<td>12</td>
+				<td>13</td>
+				<td>14</td>
+				<td>15</td>
+			</tr>
+		</tbody></table>
+Here are four pairs of tile-15 variations.
+<table cellspacing="0" cellpadding="0">
+	<caption>
+		Four pairs of Tile-15 variations
+	</caption>
+	<tbody><tr>
+		<td><table cellpadding="0" cellspacing="0" class="sq4">
+			<tbody><tr>
+				<td><img src="../art/corn/path/_15cc.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/corn/path/_15e.gif" width="32" height="32" alt="tile"></td>
+			</tr>
+		</tbody></table></td>
+		<td><table cellpadding="0" cellspacing="0" class="sq4">
+			<tbody><tr>
+				<td><img src="../art/corn/path/_15h.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/corn/path/_15f.gif" width="32" height="32" alt="tile"></td>
+			</tr>
+		</tbody></table></td>
+		<td><table cellpadding="0" cellspacing="0" class="sq4">
+			<tbody><tr>
+				<td><img src="../art/corn/path/_15b.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/corn/path/_15a.gif" width="32" height="32" alt="tile"></td>
+			</tr>
+		</tbody></table></td>
+		<td><table cellpadding="0" cellspacing="0" class="sq4">
+			<tbody><tr>
+				<td><img src="../art/corn/path/15b.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/corn/path/15c.gif" width="32" height="32" alt="tile"></td>
+			</tr>
+		</tbody></table></td>
+	</tr>
+</tbody></table>
+<p>We can use these 2-corner tiles to tile a grid where all tile corners match.</p>
+<div class="stage"><p>Stage: Random 2-corner Path Tiles</p>
+		<img src="../art/grabs/corner/flat2c-c.png" width="576" height="384" alt="Path Tiles"></div>
+		<h3>Terrain Tilesets</h3>
+		<p>Wang corner tiles make good terrain  tiles. You can see that every tile has two different types of corner. </p>
+		<table class="sq" cellspacing="0" cellpadding="0">
+			<caption>
+				All 16  combinations of two corners
+				</caption>
+			<tbody><tr>
+				<td><img src="../art/corn/patch/0.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/corn/patch/1.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/corn/patch/2.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/corn/patch/3.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/corn/patch/4.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/corn/patch/5.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/corn/patch/6.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/corn/patch/7.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/corn/patch/8.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/corn/patch/9.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/corn/patch/10.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/corn/patch/11.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/corn/patch/12.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/corn/patch/13.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/corn/patch/14.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/corn/patch/15.gif" width="32" height="32" alt="tile"></td>
+			</tr>
+			<tr>
+				<td><img src="../art/corn/terrain/0.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/corn/terrain/1.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/corn/terrain/2.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/corn/terrain/3.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/corn/terrain/4.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/corn/terrain/5.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/corn/terrain/6.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/corn/terrain/7.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/corn/terrain/8.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/corn/terrain/9.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/corn/terrain/10.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/corn/terrain/11.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/corn/terrain/12.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/corn/terrain/13.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/corn/terrain/14.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/corn/terrain/15.gif" width="32" height="32" alt="tile"></td>
+			</tr>
+			<tr>
+				<td><img src="../art/terrain2/0.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/terrain2/1.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/terrain2/2.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/terrain2/3.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/terrain2/4.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/terrain2/5.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/terrain2/6.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/terrain2/7.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/terrain2/8.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/terrain2/9.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/terrain2/10.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/terrain2/11.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/terrain2/12.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/terrain2/13.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/terrain2/14.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/terrain2/15.gif" width="32" height="32" alt="tile"></td>
+			</tr>
+			<tr>
+				<td><img src="../art/corn/ground/0a.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/corn/ground/1.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/corn/ground/2.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/corn/ground/3.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/corn/ground/4.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/corn/ground/5.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/corn/ground/6.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/corn/ground/7.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/corn/ground/8.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/corn/ground/9.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/corn/ground/10.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/corn/ground/11.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/corn/ground/12.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/corn/ground/13a.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/corn/ground/14a.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/corn/ground/15b.gif" width="32" height="32" alt="tile"></td>
+			</tr>
+			<tr>
+				<td>0</td>
+				<td>1</td>
+				<td>2</td>
+				<td>3</td>
+				<td>4</td>
+				<td>5</td>
+				<td>6</td>
+				<td>7</td>
+				<td>8</td>
+				<td>9</td>
+				<td>10</td>
+				<td>11</td>
+				<td>12</td>
+				<td>13</td>
+				<td>14</td>
+				<td>15</td>
+			</tr>
+		</tbody></table>
+		<p>We can use these terrain tiles to create a grid where all tile corners match.<br>
+			See <a href="../scast/corner.html">Terrain Tiles</a> for more info and <a href="../stage/corner/wang2c.html">images</a>. <br>
+			See <a href="../wang/stage.html">Stage</a> for random terrain arrays. </p>
+		<div class="stage"><p>Stage: Random 2-corner Terrain Tiles</p>
+			<img src="../art/grabs/corner/terrain-split.png" width="576" height="384" alt="Terrain Tiles"></div>
+		<!-- #EndEditable --><!-- end .content --></div></td>
+		<td class="side"><ul>
+				<li class="nolink">Intro</li>
+					<li><a href="intro.html">Wang tiles</a></li>
+					<li><a href="array.html">Maze arrays</a></li>
+					<li class="nolink">Wang Tiles</li>
+					<li><a href="2edge.html">2-edge tiles</a></li>
+					<li><a href="2corn.html">2-corner tiles</a></li>
+					<li><a href="3edge.html">3-edge tiles</a></li>
+					<li><a href="3corn.html">3-corner tiles</a></li>
+                    <li><a href="4ord.html">4-order tiles</a></li>
+					<li class="nolink">Tilesets</li>
+					<li><a href="blob.html">Blob tileset</a></li>
+					<li><a href="lout2e.html">Layout 2-edge</a></li>
+                    <li><a href="reduced.html">Reduced sets</a></li>
+					<li class="nolink">Single Side</li>
+					<li><a href="block.html">Block tiles</a></li>
+					<li><a href="1sideedge.html">1-side edge</a></li>
+					<li><a href="1sidecorn.html">1-side corner</a></li>
+					<li class="nolink">Paths</li>
+					<li><a href="angled.html">Angled paths</a></li>
+					<li><a href="border.html">Border paths</a></li>
+					<!--<li>Colour paths</li>-->
+					<li><a href="directed.html">Directed path</a></li>
+					<li><a href="isometric.html">Isometric path</a></li>
+					<li><a href="positioned.html">Position path</a></li>
+					<li><a href="shape.html">Shape tiles</a></li>
+					<li class="nolink">Mazes</li>
+					<li><a href="perfect.html">Perfect</a></li>
+					<li><a href="connect.html">Connected</a></li>
+                    <li><a href="imperfect.html">Imperfect</a></li>
+                    <li><a href="labyrinth.html">Labyrinth</a></li>
+                    <li><a href="twin.html">Twin maze</a></li>
+					<li class="nolink">Gallery</li>
+					<li><a href="tiles_e.html">Tiles 2-edge</a></li>
+					<li><a href="tiles_c.html">Tiles 2-corner</a></li>
+                    <li><a href="tiles_3ec.html">Tiles 3-order</a></li>
+                    <li><a href="blob_g.html">Blob tilesets</a></li>
+                    <li><a href="twin_g.html">Twin tilesets</a></li>
+					<li><a href="truch_g.html">Truchet tiles</a></li>
+					<li><a href="block_g.html">Block tiles</a></li>
+					<li><a href="patts.html">Patterns</a></li>
+					<li><a href="icons.html">Icons</a></li>
+					<li class="nolink">Info</li>
+					<li><a href="maths.html">Maths</a></li>
+					<li><a href="knots.html">Knots</a></li>
+                    <li><a href="pattern.html">Patterns</a></li>
+                    <li><a href="puzzle.html">Puzzles</a></li>
+					<li><a href="web.html">Web news</a></li>
+					<li><a href="glossary.html">Glossary</a></li>
+					<li>&nbsp;</li>
+			</ul></td>
+	</tr>
+</tbody></table>
+<table cellspacing="0" cellpadding="0" class="foot">
+	<tbody><tr>
+		<td class="main"><p>cr31.co.uk</p></td>
+		<td class="side">&nbsp;</td>
+	</tr>
+</tbody></table>
+
+
+</body><!-- #EndTemplate --></html>

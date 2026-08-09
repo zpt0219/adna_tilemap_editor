@@ -1,0 +1,393 @@
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><!-- InstanceBegin template="/Templates/maze.dwt" codeOutsideHTMLIsLocked="false" --><head>
+<!-- InstanceBeginEditable name="doctitle" -->
+<title>Wang Tiles</title>
+<!-- InstanceEndEditable -->
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<!-- #BeginEditable "Meta" -->
+<link rel="stylesheet" href="text.css" type="text/css">
+<link rel="stylesheet" href="stage.css" type="text/css">
+
+<!--<script src="../../js/wang.js" type="text/JavaScript"></script>
+<script src="../../js/jsx.js" type="text/JavaScript"></script>-->
+
+<script src="../js/jsdom1.js" type="text/JavaScript"></script>
+<script src="../js/jsdom2.js" type="text/JavaScript"></script>
+<script src="../js/jsdom3.js" type="text/JavaScript"></script>
+<script src="../js/jsdom4.js" type="text/JavaScript"></script>
+<script src="../js/jsdom5.js" type="text/JavaScript"></script>
+<meta name="description" content="Wang tiles, edge and corner matched tilesets">
+<meta name="keywords" content="Wang, maze, tile, tile set, tileset, labyrinth, Stagecast, seamless, icon, terrain, path, 32x32, game">
+<!-- #EndEditable -->
+</head>
+
+<body onload="init()">
+
+<table cellspacing="0" cellpadding="0" class="head">
+	<tbody><tr>
+		<td class="main"><h1>Maze Arrays</h1></td>
+		<td class="side">&nbsp;</td>
+	</tr>
+</tbody></table>
+<table cellspacing="0" cellpadding="0" class="strap">
+	<tbody><tr>
+		<td class="main"><p>random Wang tile layouts</p></td>
+		<td class="side"><p>menu</p></td>
+	</tr>
+</tbody></table>
+<table cellspacing="0" cellpadding="0" class="cont">
+	<tbody><tr>
+		<td class="main"><div class="content"><!-- InstanceBeginEditable name="contents" -->
+				<table cellpadding="0" cellspacing="0" class="stagebox">
+					<tbody><tr>
+						<td id="title">Stage</td>
+					</tr>
+					<tr>
+						<td><div id="stagearea" onmouseleave="hidecurs()">
+							<div id="cursor">
+								<img src="../art/js/cr31.png" width="32" height="32" id="cr31">
+								<img src="../art/js/down.gif" width="32" height="32" id="down">
+								<img src="../art/js/over.gif" width="32" height="32" id="over" onmousedown="operate(this)">
+							</div>
+						</div></td>
+					</tr>
+					<tr>
+						<td><table class="tank" cellpadding="0" cellspacing="0">
+							<tbody><tr>
+								<td class="bg1"><select name="ssize" id="ssize" onchange="stageSize(this.value);">
+									<option value="18x12">18x12</option>
+									<option value="18x18">18x18</option>
+									<!--<option value="24x18">24x18</option>-->
+								</select>
+									size</td>
+								<td><select name="bloc" id="bloc2" onchange="tiles('bloc2',this.value)">
+									<option value="none"></option>
+									<option value="bloc">Block</option>
+									<option value="bowtie">Bowtie</option>
+									<option value="box">Box</option>
+									<option value="diag">Diag</option>
+									<option value="pool">Pool</option>
+									<option value="spiral">Spiral</option>
+									<option value="square">Square</option>
+									<option value="1edge2a">1edgeA</option>
+									<option value="1corn2a">1cornA</option>
+									<!--<option value="1edge2b">1edgeB</option>-->
+									<option value="1corn2b">1cornB</option>
+								</select>
+									<input type="checkbox" id="tq">
+									Block 2</td>
+								<!--*tidy-->
+								<td class="bg3"><select name="paths2" id="paths2" onchange="tiles('paths2',this.value)">
+									<option value="none"></option>
+									<option value="wang2e">Wang-2e</option>
+									<option value="angular">Angular</option>
+									<!--<option value="arrows">Arrows</option>-->
+									<option value="border">Border</option>
+									<option value="brench">Brench</option>
+									<option value="brickwall">BrickWall</option>
+									<option value="bridge">Bridge</option>
+									<option value="celtic">Celtic</option>
+									<option value="circuit">Circuit</option>
+									<!--<option value="drawn">Drawn</option>-->
+									<!--<option value="dropbox">Dropbox</option>-->
+									<option value="dual">Dual</option>
+									<!--<option value="dungeon">Dungeon</option>-->
+									<!--<option value="flat15">1 side</option>-->
+									<option value="flow">Flow</option>
+									<option value="glob">Glob</option>
+									<option value="greek">Greek</option>
+									<option value="groove">Groove</option>
+									<option value="laser">Laser</option>
+									<option value="lattice">Lattice</option>
+									<option value="ledge">Ledge</option>
+									<!--<option value="line">Line</option>-->
+									<option value="molecule">Molecule</option>
+									<option value="octal">Octal</option>
+									<option value="path">Path</option>
+									<option value="pipe1">Pipe1</option>
+									<option value="pipe2">Pipe2</option>
+									<!--<option value="pipe3">Pipe3</option>-->
+									<option value="pully">Pully</option>
+									<option value="quad">Quad</option>
+									<option value="rail">Rail</option>
+									<option value="ribbon">Ribbon</option>
+									<option value="rings">Rings</option>
+									<option value="road">Road</option>
+									<option value="square">Square</option>
+									<option value="tilt">Tilt</option>
+									<option value="trench">Trench</option>
+									<option value="tube">Tube</option>
+									<option value="urban">Urban</option>
+									<option value="walks">Walks</option>
+									<option value="walkway">Walkway</option>
+									<option value="none"></option>
+									<!--<option value="arrow">Arrow</option>-->
+									<option value="balls">Balls</option>
+									<option value="jigsaw">Jigsaw</option>
+									<option value="pebbles">Pebbles</option>
+									<option value="zigzag">Zigzag</option>
+								</select>
+									2-edge</td>
+								<td class="bg1"><select name="paths3" id="paths3" onchange="tiles('paths3',this.value)">
+									<option value="none"></option>
+									<option value="wang3e">Wang-3e</option>
+									<option value="flow3e">Flow</option>
+									<option value="celtic3e">Celtic</option>
+									<!--<option value="puzzle3e">Puzzle</option>-->
+									<option value="walkway3e">Walkway</option>
+								</select>
+									3-edge</td>
+								<td class="bg3"><select name="twin" id="twin" onchange="tiles('twin',this.value)">
+									<option value="none"></option>
+									<option value="brench">Brench</option>
+									<option value="pipes">Pipes</option>
+									<option value="routes">Route</option>
+									<option value="wangtw">Wang</option>
+								</select>
+									<input type="checkbox" id="ba" onchange="brench_alt()">
+									Twin</td>
+								<!--*orig-->
+								<td rowspan="3"><table cellspacing="0" cellpadding="0" class="bgfull">
+									<tbody><tr>
+										<td class="bg2"><input type="button" value="Random" onclick="rand()">
+											<br></td>
+									</tr>
+									<tr>
+										<td class="bg2" id="auto"><input type="button" value="Auto" onclick="auto()"></td>
+									</tr>
+									<tr>
+										<td><input type="button" id="inv" value="Invert" onclick="invertStage()"></td>
+									</tr>
+									<tr>
+										<td><input type="button" value="Clear" onclick="clearStage()"></td>
+									</tr>
+								</tbody></table></td>
+							</tr>
+							<tr>
+								<td><input type="checkbox" id="bevel" onchange="bevel(this)">
+									<br>
+									grout
+									<!--<select name="bord" id="bord" onchange="user_bord(this.value)">
+                    <option value="0">0</option>
+                    <option value="1">1</option>
+                    <option value="2">2</option>
+                    <option value="3">wrap</option>
+					border</select>--></td>
+								<td><select name="bloc" id="bloc4" onchange="tiles('bloc4',this.value)">
+									<option value="none"></option>
+									<!--<option value="arrow">Arrow</option>-->
+									<!--<option value="box">Box</option>-->
+									<!--<option value="brench">Brench</option>-->
+									<option value="braid">Braid</option>
+									<option value="bubble">Bubble</option>
+									<option value="dublin">Dublin</option>
+									<option value="fence">Fence</option>
+									<option value="floor1">Floor1</option>
+									<option value="floor2">Floor2</option>
+									<option value="floor3">Floor3</option>
+									<option value="fold">Fold</option>
+									<option value="geo">Geo</option>
+									<option value="madrid">Madrid</option>
+									<option value="oslo">Oslo</option>
+									<option value="panel">Panel</option>
+									<option value="rome">Rome</option>
+									<option value="steps">Steps</option>
+									<option value="wall">Wall</option>
+									<option value="wedge">Wedge</option>
+									<option value="1edge4a">1edgeA</option>
+									<!--<option value="1edge4c">1edgeC</option>-->
+									<!--<option value="1corn4c">1cornC</option>-->
+									<option value="1edge4b">1edgeB</option>
+									<!--<option value="1corn4e">1cornE</option>-->
+								</select>
+									Block 4</td>
+								<td class="bg3"><select name="patch2" id="patch2" onchange="tiles('patch2',this.value)">
+									<option value="none"></option>
+									<option value="wang2c">Wang-2c</option>
+									<!--<option value="flat-2c-block">1 side</option>-->
+									<option value="beam">Beam</option>
+									<option value="border">Border</option>
+									<option value="brench">Brench</option>
+									<option value="path">Path</option>
+									<option value="pcb">PCB</option>
+									<option value="square">Square</option>
+									<option value="steps">Steps</option>
+									
+									<option value="none"></option>
+									<!--<option value="cellar">Cellar</option>-->
+									<option value="cliff">Cliff</option>
+									<option value="glob">Glob</option>
+									<option value="ground">Ground</option>
+									<option value="island">Island</option>
+									<option value="lido">Lido</option>
+									<option value="patch">Patch</option>
+									<option value="roof">Roof</option>
+									<option value="sandgrass">SandGrass</option>
+									<option value="seasand">SeaSand</option>
+									<option value="terrain">Terrain</option>
+								</select>
+									2-corner</td>
+								<td><select name="patch" id="patch3" onchange="tiles('patch3',this.value)">
+									<option value="none"></option>
+									<option value="wang3c">Wang-3c</option>
+									<option value="campus">Campus</option>
+									<!--<option value="puzzle">Puzzle</option>-->
+								</select>
+									3-corner</td>
+								<td class="bg3"><select name="blob" id="blob" onchange="tiles('blob',this.value)">
+									<option value="none"></option>
+									<option value="bridge">Bridge</option>
+									<option value="commune">Commune</option>
+									<option value="deep">Deep</option>
+									<option value="dungeon">Dungeon</option>
+									<option value="islands">Islands</option>
+									<option value="trench">Trench</option>
+									<option value="wangbl">Wang-2e2c</option>
+								</select>
+									<input type="checkbox" id="sq">
+									Blob</td>
+							</tr>
+							<tr>
+								<td class="bg1"><!--<input type="button" value="ip" onclick="input()">-->
+									<input type="button" value="op" onclick="output()">
+									<br>
+									<!--load -->save</td>
+								<td><select name="truch" id="truch" onchange="tiles('truch',this.value)">
+									<option value="none"></option>
+									<option value="tru1">Tru-1</option>
+									<option value="tru2">Tru-2</option>
+									<option value="tru3">Tru-3</option>
+									<option value="tru4">Tru-4</option>
+									<option value="tru5">Tru-5</option>
+									<option value="tru7">Tru-7</option>
+									<option value="tru8">Tru-8</option>
+								</select>
+									Truchet</td>
+								<td>&nbsp;</td>
+								<td colspan="2" class="bg1"> -Draw-<br>
+									<label>
+										<input type="radio" name="RadioGroup" value="0" id="rg0" onchange="radio(0)">
+										0</label>
+									<label>
+										<input type="radio" name="RadioGroup" value="1" id="rg1" onchange="radio(1)">
+										1</label>
+									<label>
+										<input type="radio" name="RadioGroup" value="2" id="rg2" onchange="radio(2)">
+										2</label>
+									<label>
+										<input type="radio" name="RadioGroup" value="3" id="rg3" onchange="radio(3)">
+										inv</label></td>
+							</tr>
+							<tr>
+								<td>&nbsp;</td>
+								<td>&nbsp;</td>
+								<td class="bg3">&nbsp;</td>
+								<td class="bg3">&nbsp;</td>
+								<td class="bg3"><select name="rand" id="rand" onchange="maze_rand(this.value);">
+									<option value="0">0%</option>
+									<option value="10">10%</option>
+									<option value="50">50%</option>
+									<option value="100">100%</option>
+								</select>
+									ran/last</td>
+								<td class="bg3"><input type="button" value="Maze" onclick="maze()"></td>
+							</tr>
+						</tbody></table></td>
+					</tr>
+				</tbody></table>
+				<pre><div id="op"></div>
+				</pre>
+				<p><a href="#" onclick="showhide('shde');"><strong>Guide</strong></a></p>
+							<div id="shde">
+								<p>Use the pull-down menus to select a tileset, which will display as a random layout. Selecting a tileset from the same menu will update the tiles not re-randomise the array. The top blank menu entry removes all tiles. </p>
+								<p>Click 'Random' to create a new random layout. <br>
+									Tick the check box below pull-down menus for alternative random layout methods. </p>
+								<p>Click 'Auto' to automatically alter tiles. Tiles are continueously re-drawn depending on the Draw radio button values, which can be changed while running. Click 'Auto' again to stop (and remove the button hi-lite).</p>
+								<p>Click 'Invert' to invert all tiles. Edge and corner '0' and '1' values are exchanged.<br>
+									For order 3 tilesets, values '1' and '2' are exchanged leaving '0' unaffected. This swops high and low ground levels and reverses the flow of directed paths. </p>
+								<p>Click 'Clear' to clear the stage. Click again to cycle between 0 and 1 (2 order tilesets) or 0, 1 and 2 (3 order tilesets).</p>
+								<p>Click 'Maze' to automatically draw a 'perfect' maze, using the current 2-edge, 2-corner, Twin or Blob tileset. Tilesets in the upper part of the pull-down menu are best for mazes. Click 'Auto' to stop the maze. You can 'Invert' a 3 order maze while it is drawing (but not a 2-order).<br>
+									Maze generation can be adjusted using the ran/last selector. 'Random' creates many short stubby paths (Prim's algorithm). 'Last' creates long winding paths (recursive backtracker algorithm).<br>
+									Click 'Auto' to stop maze drawing. Mazes always begin with a cleared stage. </p>
+								<strong>Drawing</strong>
+								<p>It may be easier to start drawing on a cleared stage. <br>
+									To draw or delete paths, click to select a cell. The stage border will turn red to indicate 'edit' mode. A cursor will appear over the selected cell. Move the mouse to an adjacent perpendicular (edge tileset) or diagonal (corner tileset) cell and both tiles will update. If it does not, check you are not drawing using the same 'draw' value as the stage background. </p>
+								<p>To change the 'draw' value, select one of the radio buttons. Select 'inv' to invert paths. This swops '0' and '1' when using order 2 tilesets but swops '1' and '2' while leaving '0' unaffected with order 3 tilesets. This swops high and low ground levels and reverses the flow of directed paths. <br>
+									When drawing with 'inv', you can retrace your path to invert values back again.</p>
+								<p>To stop drawing, click a cell to leave 'edit' mode. The stage border will turn back to black and the edge or corner cursor will be removed.</p>
+								<p>Blob tilesets cannot be inverted. Use Clear to toggle 'all on' and 'all off'. When a cell is selected and deselected without moving, the cursor will toggle between edge and corner editing. </p>
+								<p>With Twin tilesets you need to move 2 cells horizontally or vertically to draw.</p>
+								<p>With Block and Truchet tiles, drawing will cycle the tiles. </p>
+								<p>You can select 'Wang' tilesets from different menus without re-randomising the array. Twin to 3e, 2e to 3e or Blob, or 2c to 3c. Also 3e or Blob to 2e (will change any edges of '2' to '0'). And 3c or Blob to 2c (will change any corners of '2' to '0').</p>
+								<p>Use the 'grout' checkbox to show/hide a visual gap between tiles. <br>
+								</p><p>Use the 'stage' pull-down menu to select a different stage size. </p>
+								<p>See [<a href="intro.html">Wang</a>] for tileset information, [<a href="tiles_e.html">Tiles</a>] for complete galleries and Block tilesets <a href="block_g.html">here</a>.</p>
+							</div>
+		<!-- InstanceEndEditable --><!-- end .content --></div></td>
+		<td class="side"><ul>
+			<li class="nolink">Intro</li>
+			<li><a href="intro.html">Wang tiles</a></li>
+			<li><a href="array.html">Maze arrays</a></li>
+			<li class="nolink">Wang Tiles</li>
+			<li><a href="2edge.html">2-edge tiles</a></li>
+			<li><a href="2corn.html">2-corner tiles</a></li>
+			<li><a href="3edge.html">3-edge tiles</a></li>
+			<li><a href="3corn.html">3-corner tiles</a></li>
+			<li><a href="4ord.html">4-order tiles</a></li>
+			<li class="nolink">Tilesets</li>
+			<li><a href="blob.html">Blob tileset</a></li>
+			<li><a href="lout2e.html">Layout 2-edge</a></li>
+			<li><a href="reduced.html">Reduced sets</a></li>
+			<li class="nolink">Single Side</li>
+			<li><a href="block.html">Block tiles</a></li>
+			<li><a href="1sideedge.html">1-side edge</a></li>
+			<li><a href="1sidecorn.html">1-side corner</a></li>
+			<li class="nolink">Paths</li>
+			<li><a href="angled.html">Angled paths</a></li>
+			<li><a href="border.html">Border paths</a></li>
+			<!--<li>Colour paths</li>-->
+			<li><a href="directed.html">Directed path</a></li>
+			<li><a href="isometric.html">Isometric path</a></li>
+			<li><a href="positioned.html">Position path</a></li>
+			<li><a href="shape.html">Shape tiles</a></li>
+			<li class="nolink">Mazes</li>
+			<li><a href="perfect.html">Perfect</a></li>
+			<li><a href="connect.html">Connected</a></li>
+			<li><a href="imperfect.html">Imperfect</a></li>
+			<li><a href="labyrinth.html">Labyrinth</a></li>
+			<li><a href="twin.html">Twin maze</a></li>
+			<li class="nolink">Gallery</li>
+			<li><a href="tiles_e.html">Tiles 2-edge</a></li>
+			<li><a href="tiles_c.html">Tiles 2-corner</a></li>
+			<li><a href="tiles_3ec.html">Tiles 3-order</a></li>
+			<li><a href="blob_g.html">Blob tilesets</a></li>
+			<li><a href="twin_g.html">Twin tilesets</a></li>
+			<li><a href="truch_g.html">Truchet tiles</a></li>
+			<li><a href="block_g.html">Block tiles</a></li>
+			<li><a href="patts.html">Patterns</a></li>
+			<li><a href="icons.html">Icons</a></li>
+			<li class="nolink">Info</li>
+			<li><a href="maths.html">Maths</a></li>
+			<li><a href="knots.html">Knots</a></li>
+			<li><a href="pattern.html">Patterns</a></li>
+			<li><a href="puzzle.html">Puzzles</a></li>
+			<li><a href="web.html">Web news</a></li>
+			<li><a href="glossary.html">Glossary</a></li>
+			<li>&nbsp;</li>
+		</ul></td>
+	</tr>
+</tbody></table>
+<table cellspacing="0" cellpadding="0" class="foot">
+	<tbody><tr>
+		<td class="main"><p>cr31.co.uk</p></td>
+		<td class="side">&nbsp;</td>
+	</tr>
+</tbody></table>
+<table cellspacing="0" cellpadding="0" class="base">
+	<tbody><tr>
+		<td class="main"><p>use your browsers zoom option to enlarge arrays</p></td>
+		<td class="side">&nbsp;</td>
+	</tr>
+</tbody></table>
+
+
+</body><!-- InstanceEnd --></html>

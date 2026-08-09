@@ -1,0 +1,486 @@
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><!-- #BeginTemplate "/Templates/wang.dwt" --><!-- DW6 --><head>
+<!-- #BeginEditable "doctitle" -->
+<title>Block Tiles</title>
+<!-- #EndEditable -->
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<!-- #BeginEditable "Meta" -->
+<link rel="stylesheet" href="../wang/text.css" type="text/css">
+<script src="../js/wang.js" type="text/JavaScript"></script>
+<meta name="description" content="Stagecast puzzles, games, animation and sims">
+<meta name="keywords" content="Wang, maze, tile, tile set, tileset, labyrinth, Stagecast, seamless, icon, terrain, path, 32x32, game">
+<!-- #EndEditable -->
+</head>
+
+<body>
+<table class="tabs">
+	<tbody><tr>
+		<td><p style="margin:0">
+          Originally published on <a href="http://www.cr31.co.uk/stagecast/wang/intro.html">cr31.co.uk</a>
+          by Guy Walker. Mirrored from
+          <a href="https://www.boristhebrave.com/permanent/24/06/cr31/stagecast/wang/intro.html">boristhebrave.com</a>.
+        </p>
+        <p style="margin:4px 0 0; font-style:italic; opacity:0.85">
+          In memory of Professor Hao Wang (王浩, 1921 – 1995), whose elegant tiling theory continues to inspire generations of mathematicians and game designers.
+        </p></td>
+	</tr>
+</tbody></table>
+
+<table cellspacing="0" cellpadding="0" class="head">
+	<tbody><tr>
+		<td class="main"><h1>Wang Tiles</h1></td>
+		<td class="side">&nbsp;</td>
+	</tr>
+</tbody></table>
+<table cellspacing="0" cellpadding="0" class="strap">
+	<tbody><tr>
+		<td class="main"><p>edge and corner matched tilesets</p></td>
+		<td class="side"><p>menu</p></td>
+	</tr>
+</tbody></table>
+<table cellspacing="0" cellpadding="0" class="cont">
+	<tbody><tr>
+		<td class="main"><div class="content"><!-- #BeginEditable "contents" -->
+			<h2>Block and Space</h2>
+			<p>The simplest way to create a tiled maze is to use a single block tile. We can   ignore edge matching altogether. However, with a random scattering, large areas of open space or solid blocks form. Also we get blocks touching at  their corners which doesn't look good.</p>
+			<table cellpadding="0" cellspacing="0" class="lout">
+				<tbody><tr>
+					<td><h3>Tileset</h3>
+						<table cellpadding="0" cellspacing="0" class="sq">
+							<tbody><tr>
+								<td><img src="../art/icons/floor2.gif" width="32" height="32" alt="floor2"></td>
+								<td><img src="../art/block/box/3.gif" width="32" height="32" alt="floor2"></td>
+							</tr>
+							<tr class="lab">
+								<td>0</td>
+								<td>1</td>
+							</tr>
+						</tbody></table>
+						<p>Only two are tiles needed, a block and a space.</p>
+						<h2>&nbsp;</h2></td>
+					<td width="50%"><table cellpadding="0" cellspacing="0" class="sq">
+						<caption>
+							6x4 block and space
+							</caption>
+						<tbody><tr>
+							<td><img src="../art/block/box/3.gif" width="32" height="32" alt="floor2"></td>
+							<td><img src="../art/block/box/3.gif" width="32" height="32" alt="floor2"></td>
+							<td><img src="../art/icons/floor2.gif" width="32" height="32" alt="floor2"></td>
+							<td><img src="../art/icons/floor2.gif" width="32" height="32" alt="floor2"></td>
+							<td><img src="../art/block/box/3.gif" width="32" height="32" alt="floor2"></td>
+							<td><img src="../art/block/box/3.gif" width="32" height="32" alt="floor2"></td>
+						</tr>
+						<tr>
+							<td><img src="../art/block/box/3.gif" width="32" height="32" alt="floor2"></td>
+							<td><img src="../art/icons/floor2.gif" width="32" height="32" alt="floor2"></td>
+							<td><img src="../art/block/box/3.gif" width="32" height="32" alt="floor2"></td>
+							<td><img src="../art/block/box/3.gif" width="32" height="32" alt="floor2"></td>
+							<td><img src="../art/icons/floor2.gif" width="32" height="32" alt="floor2"></td>
+							<td><img src="../art/icons/floor2.gif" width="32" height="32" alt="floor2"></td>
+						</tr>
+						<tr>
+							<td><img src="../art/block/box/3.gif" width="32" height="32" alt="floor2"></td>
+							<td><img src="../art/block/box/3.gif" width="32" height="32" alt="floor2"></td>
+							<td><img src="../art/block/box/3.gif" width="32" height="32" alt="floor2"></td>
+							<td><img src="../art/icons/floor2.gif" width="32" height="32" alt="floor2"></td>
+							<td><img src="../art/block/box/3.gif" width="32" height="32" alt="floor2"></td>
+							<td><img src="../art/icons/floor2.gif" width="32" height="32" alt="floor2"></td>
+						</tr>
+						<tr>
+							<td><img src="../art/icons/floor2.gif" width="32" height="32" alt="floor2"></td>
+							<td><img src="../art/block/box/3.gif" width="32" height="32" alt="floor2"></td>
+							<td><img src="../art/block/box/3.gif" width="32" height="32" alt="floor2"></td>
+							<td><img src="../art/icons/floor2.gif" width="32" height="32" alt="floor2"></td>
+							<td><img src="../art/block/box/3.gif" width="32" height="32" alt="floor2"></td>
+							<td><img src="../art/block/box/3.gif" width="32" height="32" alt="floor2"></td>
+						</tr>
+					</tbody></table></td>
+				</tr>
+			</tbody></table>
+			<h3><a name="tidy"></a>'Tidy Tiling' Method</h3>
+			<p class="sq2">In the above image, all tiles are selected at random. However, there is some clumping and corner touching of box and space tiles. By being a bit more selective, we can reject tilings that form clumping or corner touching.</p>
+			<p class="sq2">In the 'tidy tiling' method, four conditions are detected:</p>
+			<table cellpadding="0" cellspacing="0" class="sq4">
+				<tbody><tr>
+					<td><table cellpadding="0" cellspacing="0" class="sq">
+						<tbody><tr>
+							<td><img src="../art/icons/floor2.gif" width="32" height="32" alt="floor2"></td>
+							<td><img src="../art/icons/floor2.gif" width="32" height="32" alt="floor2"></td>
+						</tr>
+						<tr class="lab">
+							<td><img src="../art/icons/floor2.gif" width="32" height="32" alt="floor2"></td>
+							<td><img src="../art/icons/qmark.gif" width="32" height="32" alt="floor2"></td>
+						</tr>
+					</tbody></table>
+						? = box </td>
+					<td><table cellpadding="0" cellspacing="0" class="sq">
+						<tbody><tr>
+							<td><img src="../art/block/box/3.gif" width="32" height="32" alt="floor2"></td>
+							<td><img src="../art/icons/floor2.gif" width="32" height="32" alt="floor2"></td>
+						</tr>
+						<tr class="lab">
+							<td><img src="../art/icons/floor2.gif" width="32" height="32" alt="floor2"></td>
+							<td><img src="../art/icons/qmark.gif" width="32" height="32" alt="floor2"></td>
+						</tr>
+					</tbody></table>
+						? = space</td>
+					<td><table cellpadding="0" cellspacing="0" class="sq">
+						<tbody><tr>
+							<td><img src="../art/icons/floor2.gif" width="32" height="32" alt="floor2"></td>
+							<td><img src="../art/block/box/3.gif" width="32" height="32" alt="floor2"></td>
+						</tr>
+						<tr class="lab">
+							<td><img src="../art/block/box/3.gif" width="32" height="32" alt="floor2"></td>
+							<td><img src="../art/icons/qmark.gif" width="32" height="32" alt="floor2"></td>
+						</tr>
+					</tbody></table>
+						? = box</td>
+					<td><table cellpadding="0" cellspacing="0" class="sq">
+						<tbody><tr>
+							<td><img src="../art/block/box/3.gif" width="32" height="32" alt="floor2"></td>
+							<td><img src="../art/block/box/3.gif" width="32" height="32" alt="floor2"></td>
+						</tr>
+						<tr class="lab">
+							<td><img src="../art/block/box/3.gif" width="32" height="32" alt="floor2"></td>
+							<td><img src="../art/icons/qmark.gif" width="32" height="32" alt="floor2"></td>
+						</tr>
+					</tbody></table>
+						? = space</td>
+				</tr>
+			</tbody></table>
+			<p>In each case, the current block is not chosen at random but set as to prevent corner touching or a clump of four similar tiles. The result is more maze like. The other four conditions are left as random tile selection.</p>
+			<table cellpadding="0" cellspacing="0" class="sq4">
+				<tbody><tr>
+					<td><table cellpadding="0" cellspacing="0" class="sq">
+						<tbody><tr>
+							<td><img src="../art/icons/floor2.gif" width="32" height="32" alt="floor2"></td>
+							<td><img src="../art/block/box/3.gif" width="32" height="32" alt="floor2"></td>
+						</tr>
+						<tr class="lab">
+							<td><img src="../art/icons/floor2.gif" width="32" height="32" alt="floor2"></td>
+							<td><img src="../art/icons/qmark.gif" width="32" height="32" alt="floor2"></td>
+						</tr>
+					</tbody></table>
+						? = random </td>
+					<td><table cellpadding="0" cellspacing="0" class="sq">
+						<tbody><tr>
+							<td><img src="../art/icons/floor2.gif" width="32" height="32" alt="floor2"></td>
+							<td><img src="../art/icons/floor2.gif" width="32" height="32" alt="floor2"></td>
+						</tr>
+						<tr class="lab">
+							<td><img src="../art/block/box/3.gif" width="32" height="32" alt="floor2"></td>
+							<td><img src="../art/icons/qmark.gif" width="32" height="32" alt="floor2"></td>
+						</tr>
+					</tbody></table>
+						? = random</td>
+					<td><table cellpadding="0" cellspacing="0" class="sq">
+						<tbody><tr>
+							<td><img src="../art/block/box/3.gif" width="32" height="32" alt="floor2"></td>
+							<td><img src="../art/block/box/3.gif" width="32" height="32" alt="floor2"></td>
+						</tr>
+						<tr class="lab">
+							<td><img src="../art/icons/floor2.gif" width="32" height="32" alt="floor2"></td>
+							<td><img src="../art/icons/qmark.gif" width="32" height="32" alt="floor2"></td>
+						</tr>
+					</tbody></table>
+						? = random</td>
+					<td><table cellpadding="0" cellspacing="0" class="sq">
+						<tbody><tr>
+							<td><img src="../art/block/box/3.gif" width="32" height="32" alt="floor2"></td>
+							<td><img src="../art/icons/floor2.gif" width="32" height="32" alt="floor2"></td>
+						</tr>
+						<tr class="lab">
+							<td><img src="../art/block/box/3.gif" width="32" height="32" alt="floor2"></td>
+							<td><img src="../art/icons/qmark.gif" width="32" height="32" alt="floor2"></td>
+						</tr>
+					</tbody></table>
+						? = random</td>
+				</tr>
+			</tbody></table>
+			<p><span class="sq2">You can select 'tidy tiling' by ticking the Stage checkbox</span> by	'Block2'	menu. </p>
+			<h3>Diagonal Gates </h3>
+			<p>These allow use of  all the floor, whereas with block mazes  you can't walk over half the floor area. <br>
+				Diagonal gate tiles can create quite a good random maze. Any added wandering sprites need to also move diagonally. Small enclosed rooms easily form, but none with the less random method <span class="sq2">(Stage checkbox ticked)</span>.</p>
+			<table cellpadding="0" cellspacing="0" class="lout">
+				<tbody><tr>
+					<td><h3>Tileset</h3>
+						<table cellpadding="0" cellspacing="0" class="sq">
+							<tbody><tr>
+								<td><img src="../art/block/gate2.gif" width="32" height="32" alt="floor2"></td>
+								<td><img src="../art/block/gate1.gif" width="32" height="32" alt="floor2"></td>
+							</tr>
+							<tr>
+								<td><img src="../art/block/diag/0.gif" width="32" height="32" alt="floor2"></td>
+								<td><img src="../art/block/diag/1.gif" width="32" height="32" alt="floor2"></td>
+							</tr>
+							<tr class="lab">
+								<td>0</td>
+								<td>1</td>
+							</tr>
+						</tbody></table>
+						<p>And a variation with an added seamless background.</p></td>
+					<td width="50%"><table cellpadding="0" cellspacing="0" class="sq">
+						<caption>
+							6x4 diagonal gate tiles
+							</caption>
+						<tbody><tr>
+							<td><img src="../art/block/gate1.gif" width="32" height="32" alt="floor2"></td>
+							<td><img src="../art/block/gate2.gif" width="32" height="32" alt="floor2"></td>
+							<td><img src="../art/block/gate1.gif" width="32" height="32" alt="floor2"></td>
+							<td><img src="../art/block/gate2.gif" width="32" height="32" alt="floor2"></td>
+							<td><img src="../art/block/gate1.gif" width="32" height="32" alt="floor2"></td>
+							<td><img src="../art/block/gate1.gif" width="32" height="32" alt="floor2"></td>
+						</tr>
+						<tr>
+							<td><img src="../art/block/gate2.gif" width="32" height="32" alt="floor2"></td>
+							<td><img src="../art/block/gate1.gif" width="32" height="32" alt="floor2"></td>
+							<td><img src="../art/block/gate1.gif" width="32" height="32" alt="floor2"></td>
+							<td><img src="../art/block/gate1.gif" width="32" height="32" alt="floor2"></td>
+							<td><img src="../art/block/gate2.gif" width="32" height="32" alt="floor2"></td>
+							<td><img src="../art/block/gate1.gif" width="32" height="32" alt="floor2"></td>
+						</tr>
+						<tr>
+							<td><img src="../art/block/gate2.gif" width="32" height="32" alt="floor2"></td>
+							<td><img src="../art/block/gate2.gif" width="32" height="32" alt="floor2"></td>
+							<td><img src="../art/block/gate2.gif" width="32" height="32" alt="floor2"></td>
+							<td><img src="../art/block/gate1.gif" width="32" height="32" alt="floor2"></td>
+							<td><img src="../art/block/gate2.gif" width="32" height="32" alt="floor2"></td>
+							<td><img src="../art/block/gate2.gif" width="32" height="32" alt="floor2"></td>
+						</tr>
+						<tr>
+							<td><img src="../art/block/gate2.gif" width="32" height="32" alt="floor2"></td>
+							<td><img src="../art/block/gate1.gif" width="32" height="32" alt="floor2"></td>
+							<td><img src="../art/block/gate2.gif" width="32" height="32" alt="floor2"></td>
+							<td><img src="../art/block/gate1.gif" width="32" height="32" alt="floor2"></td>
+							<td><img src="../art/block/gate1.gif" width="32" height="32" alt="floor2"></td>
+							<td><img src="../art/block/gate1.gif" width="32" height="32" alt="floor2"></td>
+						</tr>
+					</tbody></table></td>
+				</tr>
+			</tbody></table>
+			<p>See <a href="stage.html">Stage</a> to create your own layouts. </p>
+			<div class="stage"><p>Stage: Diagonal Gate Tiles Maze</p>
+		<img src="../art/grabs/diaganol.png" width="576" height="384" alt="Maze Tiles"></div>
+		<h3>Thin Wall Tiles</h3>
+		<p>These also allow use of  all the floor area. There is no tile edge matching. So some walls can be double thickness where North and South or East and West meet. This adds to the random appearance. But, some unreachable enclosed rooms are also formed.<br>
+		</p>
+		<table cellpadding="0" cellspacing="0" class="lout">
+			<tbody><tr>
+				<td><h3>Tileset</h3>
+					<table cellpadding="0" cellspacing="0" class="sq">
+						<tbody><tr>
+							<td><img src="../art/block/gate3.gif" width="32" height="32" alt="floor2"></td>
+							<td><img src="../art/block/gate6.gif" width="32" height="32" alt="floor2"></td>
+							<td><img src="../art/block/gate7.gif" width="32" height="32" alt="floor2"></td>
+							<td><img src="../art/block/gate4.gif" width="32" height="32" alt="floor2"></td>
+						</tr>
+						<tr>
+							<td><img src="../art/block/fence/0.gif" width="32" height="32" alt="floor2"></td>
+							<td><img src="../art/block/fence/1.gif" width="32" height="32" alt="floor2"></td>
+							<td><img src="../art/block/fence/2.gif" width="32" height="32" alt="floor2"></td>
+							<td><img src="../art/block/fence/3.gif" width="32" height="32" alt="floor2"></td>
+						</tr>
+						<tr class="lab">
+							<td>0</td>
+							<td>1</td>
+							<td>2</td>
+							<td>3</td>
+						</tr>
+					</tbody></table>
+					<p>A four set of thin wall tiles. No shadow effect can be added because tiles 2 and 3 will extend beyond the tile edge.</p></td>
+				<td width="50%"><table cellpadding="0" cellspacing="0" class="sq">
+					<caption>
+						6x4 thin wall tiles
+						</caption>
+					<tbody><tr>
+						<td><img src="../art/block/gate4.gif" width="32" height="32" alt="floor2"></td>
+						<td><img src="../art/block/gate7.gif" width="32" height="32" alt="floor2"></td>
+						<td><img src="../art/block/gate6.gif" width="32" height="32" alt="floor2"></td>
+						<td><img src="../art/block/gate7.gif" width="32" height="32" alt="floor2"></td>
+						<td><img src="../art/block/gate3.gif" width="32" height="32" alt="floor2"></td>
+						<td><img src="../art/block/gate7.gif" width="32" height="32" alt="floor2"></td>
+					</tr>
+					<tr>
+						<td><img src="../art/block/gate6.gif" width="32" height="32" alt="floor2"></td>
+						<td><img src="../art/block/gate3.gif" width="32" height="32" alt="floor2"></td>
+						<td><img src="../art/block/gate4.gif" width="32" height="32" alt="floor2"></td>
+						<td><img src="../art/block/gate6.gif" width="32" height="32" alt="floor2"></td>
+						<td><img src="../art/block/gate3.gif" width="32" height="32" alt="floor2"></td>
+						<td><img src="../art/block/gate4.gif" width="32" height="32" alt="floor2"></td>
+					</tr>
+					<tr>
+						<td><img src="../art/block/gate3.gif" width="32" height="32" alt="floor2"></td>
+						<td><img src="../art/block/gate6.gif" width="32" height="32" alt="floor2"></td>
+						<td><img src="../art/block/gate7.gif" width="32" height="32" alt="floor2"></td>
+						<td><img src="../art/block/gate3.gif" width="32" height="32" alt="floor2"></td>
+						<td><img src="../art/block/gate4.gif" width="32" height="32" alt="floor2"></td>
+						<td><img src="../art/block/gate7.gif" width="32" height="32" alt="floor2"></td>
+					</tr>
+					<tr>
+						<td><img src="../art/block/gate7.gif" width="32" height="32" alt="floor2"></td>
+						<td><img src="../art/block/gate3.gif" width="32" height="32" alt="floor2"></td>
+						<td><img src="../art/block/gate6.gif" width="32" height="32" alt="floor2"></td>
+						<td><img src="../art/block/gate4.gif" width="32" height="32" alt="floor2"></td>
+						<td><img src="../art/block/gate4.gif" width="32" height="32" alt="floor2"></td>
+						<td><img src="../art/block/gate6.gif" width="32" height="32" alt="floor2"></td>
+					</tr>
+				</tbody></table></td>
+			</tr>
+		</tbody></table>
+		<div class="stage"><p>Stage: Thin Wall Tiles Maze</p>
+		<img src="../art/grabs/ttw.png" width="576" height="384" alt="Maze Tiles"></div>
+		<h3>North West Wall Tiles</h3>
+		<p>These also allow use of  all the floor area.<br>
+			Walls are only to the top (North) and left (West) of each tile. This produces consistent wall thickness and also allows a shadow effect to be added within the tile. There is no tile edge matching. The tileset is again four tiles but a different arrangement to 'Thin Walls' above.</p>
+		<table cellpadding="0" cellspacing="0" class="lout">
+			<tbody><tr>
+				<td><h3>Tileset</h3>
+					<table cellpadding="0" cellspacing="0" class="sq">
+						<tbody><tr>
+							<td><img src="../art/block/gate0.gif" width="32" height="32" alt="floor2"></td>
+							<td><img src="../art/block/gate4.gif" width="32" height="32" alt="floor2"></td>
+							<td><img src="../art/block/gate3.gif" width="32" height="32" alt="floor2"></td>
+							<td><img src="../art/block/gate5.gif" width="32" height="32" alt="floor2"></td>
+						</tr>
+						<tr>
+							<td><img src="../art/block/panel/0.gif" width="32" height="32" alt="floor2"></td>
+							<td><img src="../art/block/panel/1.gif" width="32" height="32" alt="floor2"></td>
+							<td><img src="../art/block/panel/3.gif" width="32" height="32" alt="floor2"></td>
+							<td><img src="../art/block/panel/2.gif" width="32" height="32" alt="floor2"></td>
+						</tr>
+						<tr class="lab">
+							<td>0</td>
+							<td>1</td>
+							<td>2</td>
+							<td>3</td>
+						</tr>
+					</tbody></table>
+					<p>A variation with a seamless background and added shadow for a more 3d effect.</p></td>
+				<td width="50%"><table cellpadding="0" cellspacing="0" class="sq">
+					<caption>
+						6x4 North West tiles
+						</caption>
+					<tbody><tr>
+						<td><img src="../art/block/gate4.gif" width="32" height="32" alt="floor2"></td>
+						<td><img src="../art/block/gate5.gif" width="32" height="32" alt="floor2"></td>
+						<td><img src="../art/block/gate0.gif" width="32" height="32" alt="floor2"></td>
+						<td><img src="../art/block/gate5.gif" width="32" height="32" alt="floor2"></td>
+						<td><img src="../art/block/gate3.gif" width="32" height="32" alt="floor2"></td>
+						<td><img src="../art/block/gate5.gif" width="32" height="32" alt="floor2"></td>
+					</tr>
+					<tr>
+						<td><img src="../art/block/gate0.gif" width="32" height="32" alt="floor2"></td>
+						<td><img src="../art/block/gate3.gif" width="32" height="32" alt="floor2"></td>
+						<td><img src="../art/block/gate4.gif" width="32" height="32" alt="floor2"></td>
+						<td><img src="../art/block/gate0.gif" width="32" height="32" alt="floor2"></td>
+						<td><img src="../art/block/gate3.gif" width="32" height="32" alt="floor2"></td>
+						<td><img src="../art/block/gate4.gif" width="32" height="32" alt="floor2"></td>
+					</tr>
+					<tr>
+						<td><img src="../art/block/gate3.gif" width="32" height="32" alt="floor2"></td>
+						<td><img src="../art/block/gate0.gif" width="32" height="32" alt="floor2"></td>
+						<td><img src="../art/block/gate5.gif" width="32" height="32" alt="floor2"></td>
+						<td><img src="../art/block/gate3.gif" width="32" height="32" alt="floor2"></td>
+						<td><img src="../art/block/gate4.gif" width="32" height="32" alt="floor2"></td>
+						<td><img src="../art/block/gate5.gif" width="32" height="32" alt="floor2"></td>
+					</tr>
+					<tr>
+						<td><img src="../art/block/gate5.gif" width="32" height="32" alt="floor2"></td>
+						<td><img src="../art/block/gate3.gif" width="32" height="32" alt="floor2"></td>
+						<td><img src="../art/block/gate0.gif" width="32" height="32" alt="floor2"></td>
+						<td><img src="../art/block/gate4.gif" width="32" height="32" alt="floor2"></td>
+						<td><img src="../art/block/gate4.gif" width="32" height="32" alt="floor2"></td>
+						<td><img src="../art/block/gate0.gif" width="32" height="32" alt="floor2"></td>
+					</tr>
+				</tbody></table></td>
+			</tr>
+		</tbody></table>
+		<div class="stage"><p>Stage: North West Wall Tiles Maze</p>
+		<img src="../art/grabs/wall.png" width="576" height="384" alt="Maze Tiles"></div>
+		<h3>3d Wall Tiles</h3>
+		<p>By expanding beyond the tile edges, we can draw the walls in a fixed 3d perspective.<br>
+		</p>
+		<table cellpadding="0" cellspacing="0" class="lout">
+			<tbody><tr>
+				<td><h3>Tileset</h3>
+					<table cellpadding="0" cellspacing="0" class="sq">
+						<tbody><tr>
+							<td><img src="../art/block/wall/0.gif" width="32" height="32" alt="floor2"></td>
+							<td><img src="../art/block/wall/3.gif" width="32" height="32" alt="floor2"></td>
+							<td><img src="../art/block/wall/2.gif" width="32" height="32" alt="floor2"></td>
+							<td><img src="../art/block/wall/1.gif" width="32" height="32" alt="floor2"></td>
+						</tr>
+						<tr class="lab">
+							<td>0</td>
+							<td>1</td>
+							<td>2</td>
+							<td>3</td>
+						</tr>
+					</tbody></table></td>
+				<td width="66%">At first glance, these might look like 2-edge Wang tiles. But they're not. The wall between the pillars, is fully contained within the tile. However, as the pillars straddle the tile edges, these are more single side tiles than block tiles.</td>
+			</tr>
+		</tbody></table>
+		<p>See <a href="stage.html">Stage</a> to create your own layouts. </p>
+		<div class="stage"><p>Stage: 3d Wall Tiles Maze</p>
+		<img src="../art/grabs/wall2.png" width="576" height="384" alt="Maze Tiles"></div><!-- #EndEditable --><!-- end .content --></div></td>
+		<td class="side"><ul>
+				<li class="nolink">Intro</li>
+					<li><a href="intro.html">Wang tiles</a></li>
+					<li><a href="array.html">Maze arrays</a></li>
+					<li class="nolink">Wang Tiles</li>
+					<li><a href="2edge.html">2-edge tiles</a></li>
+					<li><a href="2corn.html">2-corner tiles</a></li>
+					<li><a href="3edge.html">3-edge tiles</a></li>
+					<li><a href="3corn.html">3-corner tiles</a></li>
+                    <li><a href="4ord.html">4-order tiles</a></li>
+					<li class="nolink">Tilesets</li>
+					<li><a href="blob.html">Blob tileset</a></li>
+					<li><a href="lout2e.html">Layout 2-edge</a></li>
+                    <li><a href="reduced.html">Reduced sets</a></li>
+					<li class="nolink">Single Side</li>
+					<li><a href="block.html">Block tiles</a></li>
+					<li><a href="1sideedge.html">1-side edge</a></li>
+					<li><a href="1sidecorn.html">1-side corner</a></li>
+					<li class="nolink">Paths</li>
+					<li><a href="angled.html">Angled paths</a></li>
+					<li><a href="border.html">Border paths</a></li>
+					<!--<li>Colour paths</li>-->
+					<li><a href="directed.html">Directed path</a></li>
+					<li><a href="isometric.html">Isometric path</a></li>
+					<li><a href="positioned.html">Position path</a></li>
+					<li><a href="shape.html">Shape tiles</a></li>
+					<li class="nolink">Mazes</li>
+					<li><a href="perfect.html">Perfect</a></li>
+					<li><a href="connect.html">Connected</a></li>
+                    <li><a href="imperfect.html">Imperfect</a></li>
+                    <li><a href="labyrinth.html">Labyrinth</a></li>
+                    <li><a href="twin.html">Twin maze</a></li>
+					<li class="nolink">Gallery</li>
+					<li><a href="tiles_e.html">Tiles 2-edge</a></li>
+					<li><a href="tiles_c.html">Tiles 2-corner</a></li>
+                    <li><a href="tiles_3ec.html">Tiles 3-order</a></li>
+                    <li><a href="blob_g.html">Blob tilesets</a></li>
+                    <li><a href="twin_g.html">Twin tilesets</a></li>
+					<li><a href="truch_g.html">Truchet tiles</a></li>
+					<li><a href="block_g.html">Block tiles</a></li>
+					<li><a href="patts.html">Patterns</a></li>
+					<li><a href="icons.html">Icons</a></li>
+					<li class="nolink">Info</li>
+					<li><a href="maths.html">Maths</a></li>
+					<li><a href="knots.html">Knots</a></li>
+                    <li><a href="pattern.html">Patterns</a></li>
+                    <li><a href="puzzle.html">Puzzles</a></li>
+					<li><a href="web.html">Web news</a></li>
+					<li><a href="glossary.html">Glossary</a></li>
+					<li>&nbsp;</li>
+			</ul></td>
+	</tr>
+</tbody></table>
+<table cellspacing="0" cellpadding="0" class="foot">
+	<tbody><tr>
+		<td class="main"><p>cr31.co.uk</p></td>
+		<td class="side">&nbsp;</td>
+	</tr>
+</tbody></table>
+
+
+</body><!-- #EndTemplate --></html>

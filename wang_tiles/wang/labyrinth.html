@@ -1,0 +1,507 @@
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><!-- #BeginTemplate "/Templates/wang.dwt" --><!-- DW6 --><head>
+<!-- #BeginEditable "doctitle" -->
+<title>Labyrinth Maze</title>
+<!-- #EndEditable -->
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<!-- #BeginEditable "Meta" -->
+<link rel="stylesheet" href="../wang/text.css" type="text/css">
+<script src="../js/wang.js" type="text/JavaScript"></script>
+<meta name="description" content="Stagecast puzzles, games, animation and sims">
+<meta name="keywords" content="Wang, maze, tile, tile set, tileset, labyrinth, Stagecast, seamless, icon, terrain, path, 32x32, game">
+<!-- #EndEditable -->
+</head>
+
+<body>
+<table class="tabs">
+	<tbody><tr>
+		<td><p style="margin:0">
+          Originally published on <a href="http://www.cr31.co.uk/stagecast/wang/intro.html">cr31.co.uk</a>
+          by Guy Walker. Mirrored from
+          <a href="https://www.boristhebrave.com/permanent/24/06/cr31/stagecast/wang/intro.html">boristhebrave.com</a>.
+        </p>
+        <p style="margin:4px 0 0; font-style:italic; opacity:0.85">
+          In memory of Professor Hao Wang (王浩, 1921 – 1995), whose elegant tiling theory continues to inspire generations of mathematicians and game designers.
+        </p></td>
+	</tr>
+</tbody></table>
+
+<table cellspacing="0" cellpadding="0" class="head">
+	<tbody><tr>
+		<td class="main"><h1>Wang Tiles</h1></td>
+		<td class="side">&nbsp;</td>
+	</tr>
+</tbody></table>
+<table cellspacing="0" cellpadding="0" class="strap">
+	<tbody><tr>
+		<td class="main"><p>edge and corner matched tilesets</p></td>
+		<td class="side"><p>menu</p></td>
+	</tr>
+</tbody></table>
+<table cellspacing="0" cellpadding="0" class="cont">
+	<tbody><tr>
+		<td class="main"><div class="content"><!-- #BeginEditable "contents" -->
+			<h2>Labyrinth Mazes</h2>
+			<p>Labyrinth or finger mazes have no branches, only one long path from start to finish made up of straights and bends. They use a reduced tileset of just 6 tiles.</p>
+			<table class="sq" cellspacing="0" cellpadding="0">
+				<caption>
+					Labyrinth set of 6 tiles
+					</caption>
+				<tbody><tr>
+					<td><img src="../art/edge/path/3.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/path/5.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/path/6.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/path/9.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/path/10.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/path/12.gif" width="32" height="32" alt="tile"></td>
+				</tr>
+				<tr class="lab">
+					<td>3</td>
+					<td>5</td>
+					<td>6</td>
+					<td>9</td>
+					<td>10</td>
+					<td>12</td>
+				</tr>
+			</tbody></table>
+			<div class="stage"><p>Stage: Labyrinth</p>
+		<img src="../art/labyrinth.png" width="576" height="448" alt="Maze Tiles"></div>
+		<h3>Circuit Mazes</h3>
+		<p>A labyrinth maze which returns to its starting point so creating a single closed circuit (or loop). Pass-under and pass-over tiles are allowed, so the result is similar to an F1 Grand Prix racing circuit.</p>
+		<p>If a  perfect maze is created using a 2-corner 'border' tileset, the result is always  a circuit maze. These can be produced easily using [<a href="stage.html">Stage</a>]. Select the 2-corner 'Border' tileset and then select 'Maze'.</p>
+		<div class="stage"><p>Stage:  Maze 2-corner 'Border' circuit</p>
+		<img src="../art/grabs/corner/maze-border.png" width="576" height="384" alt="Circuit Maze"></div>
+		<h3>Knot Labyrinths</h3>
+		<table cellpadding="0" cellspacing="0" class="lout">
+			<tbody><tr>
+				<td colspan="2"><p>The simplist knot requires 3 cross overs. </p>
+					<p>See <a href="knots.html">Knot Arrays</a>.</p>
+					<table class="sq" cellspacing="0" cellpadding="0">
+						<caption>
+							Unknot
+							</caption>
+						<tbody><tr>
+							<td><img src="../art/corn/border/2.gif" alt="6" width="32" height="32"></td>
+							<td><img src="../art/corn/border/4.gif" alt="14" width="32" height="32"></td>
+						</tr>
+						<tr>
+							<td><img src="../art/corn/border/1.gif" width="32" height="32" alt="1"></td>
+							<td><img src="../art/corn/border/8.gif" width="32" height="32" alt="7"></td>
+						</tr>
+				</tbody></table></td>
+				<td><table class="sq" cellspacing="0" cellpadding="0">
+					<caption>
+						6a
+						</caption>
+					<tbody><tr>
+						<td><img src="../art/corn/border/0.gif" alt="4" width="32" height="32"></td>
+						<td><img src="../art/corn/border/0.gif" alt="4" width="32" height="32"></td>
+						<td><img src="../art/corn/border/2.gif" alt="8" width="32" height="32"></td>
+						<td><img src="../art/corn/border/4.gif" alt="4" width="32" height="32"></td>
+						<td><img src="../art/corn/border/0.gif" alt="4" width="32" height="32"></td>
+						<td><img src="../art/corn/border/0.gif" alt="4" width="32" height="32"></td>
+					</tr>
+					<tr>
+						<td><img src="../art/corn/border/2.gif" width="32" height="32" alt="1"></td>
+						<td><img src="../art/corn/border/6.gif" width="32" height="32" alt="7"></td>
+						<td><img src="../art/corn/border/5.gif" width="32" height="32" alt="12"></td>
+						<td><img src="../art/corn/border/10.gif" width="32" height="32" alt="11"></td>
+						<td><img src="../art/corn/border/4.gif" alt="4" width="32" height="32"></td>
+						<td><img src="../art/corn/border/0.gif" alt="4" width="32" height="32"></td>
+					</tr>
+					<tr>
+						<td><img src="../art/corn/border/3.gif" width="32" height="32" alt="2"></td>
+						<td><img src="../art/corn/border/15.gif" width="32" height="32" alt="1"></td>
+						<td><img src="../art/corn/border/12.gif" width="32" height="32" alt="1"></td>
+						<td><img src="../art/corn/border/1.gif" width="32" height="32" alt="11"></td>
+						<td><img src="../art/corn/border/10.gif" width="32" height="32" alt="11"></td>
+						<td><img src="../art/corn/border/4.gif" alt="4" width="32" height="32"></td>
+					</tr>
+					<tr>
+						<td><img src="../art/corn/border/3.gif" width="32" height="32" alt="2"></td>
+						<td><img src="../art/corn/border/13.gif" width="32" height="32" alt="15"></td>
+						<td><img src="../art/corn/border/10.gif" width="32" height="32" alt="11"></td>
+						<td><img src="../art/corn/border/6.gif" width="32" height="32" alt="7"></td>
+						<td><img src="../art/corn/border/5.gif" width="32" height="32" alt="13"></td>
+						<td><img src="../art/corn/border/8.gif" alt="4" width="32" height="32"></td>
+					</tr>
+					<tr>
+						<td><img src="../art/corn/border/1.gif" width="32" height="32" alt="3"></td>
+						<td><img src="../art/corn/border/10.gif" width="32" height="32" alt="3"></td>
+						<td><img src="../art/corn/border/7.gif" width="32" height="32" alt="8"></td>
+						<td><img src="../art/corn/border/15.gif" width="32" height="32" alt="1"></td>
+						<td><img src="../art/corn/border/12.gif" width="32" height="32" alt="1"></td>
+						<td><img src="../art/corn/border/0.gif" alt="4" width="32" height="32"></td>
+					</tr>
+					<tr>
+						<td><img src="../art/corn/border/0.gif" alt="6" width="32" height="32"></td>
+						<td><img src="../art/corn/border/1.gif" alt="14" width="32" height="32"></td>
+						<td><img src="../art/corn/border/9.gif" alt="8" width="32" height="32"></td>
+						<td><img src="../art/corn/border/9.gif" alt="8" width="32" height="32"></td>
+						<td><img src="../art/corn/border/8.gif" alt="4" width="32" height="32"></td>
+						<td><img src="../art/corn/border/0.gif" alt="4" width="32" height="32"></td>
+					</tr>
+				</tbody></table></td>
+			</tr>
+			<tr>
+				<td><table class="sq" cellspacing="0" cellpadding="0">
+					<caption>
+						3a
+						</caption>
+					<tbody><tr>
+						<td><img src="../art/corn/border/0.gif" alt="6" width="32" height="32"></td>
+						<td><img src="../art/corn/border/2.gif" alt="14" width="32" height="32"></td>
+						<td><img src="../art/corn/border/6.gif" alt="8" width="32" height="32"></td>
+						<td><img src="../art/corn/border/4.gif" alt="4" width="32" height="32"></td>
+					</tr>
+					<tr>
+						<td><img src="../art/corn/border/2.gif" width="32" height="32" alt="1"></td>
+						<td><img src="../art/corn/border/5.gif" width="32" height="32" alt="7"></td>
+						<td><img src="../art/corn/border/11.gif" width="32" height="32" alt="12"></td>
+						<td><img src="../art/corn/border/12.gif" width="32" height="32" alt="5"></td>
+					</tr>
+					<tr>
+						<td><img src="../art/corn/border/1.gif" width="32" height="32" alt="2"></td>
+						<td><img src="../art/corn/border/10.gif" width="32" height="32" alt="15"></td>
+						<td><img src="../art/corn/border/5.gif" width="32" height="32" alt="11"></td>
+						<td><img src="../art/corn/border/8.gif" width="32" height="32" alt="13"></td>
+					</tr>
+					<tr>
+						<td><img src="../art/corn/border/0.gif" width="32" height="32" alt="3"></td>
+						<td><img src="../art/corn/border/1.gif" width="32" height="32" alt="3"></td>
+						<td><img src="../art/corn/border/8.gif" width="32" height="32" alt="8"></td>
+						<td><img src="../art/corn/border/0.gif" width="32" height="32" alt="1"></td>
+					</tr>
+				</tbody></table></td>
+				<td><table class="sq" cellspacing="0" cellpadding="0">
+					<caption>
+						5a
+						</caption>
+					<tbody><tr>
+						<td><img src="../art/corn/border/0.gif" alt="6" width="32" height="32"></td>
+						<td><img src="../art/corn/border/2.gif" alt="14" width="32" height="32"></td>
+						<td><img src="../art/corn/border/4.gif" alt="8" width="32" height="32"></td>
+						<td><img src="../art/corn/border/0.gif" alt="4" width="32" height="32"></td>
+						<td><img src="../art/corn/border/0.gif" alt="4" width="32" height="32"></td>
+					</tr>
+					<tr>
+						<td><img src="../art/corn/border/2.gif" width="32" height="32" alt="1"></td>
+						<td><img src="../art/corn/border/5.gif" width="32" height="32" alt="7"></td>
+						<td><img src="../art/corn/border/10.gif" width="32" height="32" alt="12"></td>
+						<td><img src="../art/corn/border/4.gif" width="32" height="32" alt="5"></td>
+						<td><img src="../art/corn/border/0.gif" alt="4" width="32" height="32"></td>
+					</tr>
+					<tr>
+						<td><img src="../art/corn/border/3.gif" width="32" height="32" alt="2"></td>
+						<td><img src="../art/corn/border/12.gif" width="32" height="32" alt="15"></td>
+						<td><img src="../art/corn/border/1.gif" width="32" height="32" alt="11"></td>
+						<td><img src="../art/corn/border/10.gif" width="32" height="32" alt="13"></td>
+						<td><img src="../art/corn/border/4.gif" alt="4" width="32" height="32"></td>
+					</tr>
+					<tr>
+						<td><img src="../art/corn/border/1.gif" width="32" height="32" alt="3"></td>
+						<td><img src="../art/corn/border/10.gif" width="32" height="32" alt="3"></td>
+						<td><img src="../art/corn/border/6.gif" width="32" height="32" alt="8"></td>
+						<td><img src="../art/corn/border/5.gif" width="32" height="32" alt="1"></td>
+						<td><img src="../art/corn/border/8.gif" alt="4" width="32" height="32"></td>
+					</tr>
+					<tr>
+						<td><img src="../art/corn/border/0.gif" alt="6" width="32" height="32"></td>
+						<td><img src="../art/corn/border/1.gif" alt="14" width="32" height="32"></td>
+						<td><img src="../art/corn/border/9.gif" alt="8" width="32" height="32"></td>
+						<td><img src="../art/corn/border/8.gif" alt="4" width="32" height="32"></td>
+						<td><img src="../art/corn/border/0.gif" alt="4" width="32" height="32"></td>
+					</tr>
+				</tbody></table></td>
+				<td><table class="sq" cellspacing="0" cellpadding="0">
+					<caption>
+						6b
+						</caption>
+					<tbody><tr>
+						<td><img src="../art/corn/border/0.gif" alt="4" width="32" height="32"></td>
+						<td><img src="../art/corn/border/2.gif" alt="8" width="32" height="32"></td>
+						<td><img src="../art/corn/border/6.gif" width="32" height="32" alt="7"></td>
+						<td><img src="../art/corn/border/4.gif" alt="4" width="32" height="32"></td>
+						<td><img src="../art/corn/border/0.gif" alt="4" width="32" height="32"></td>
+						<td><img src="../art/corn/border/0.gif" alt="4" width="32" height="32"></td>
+					</tr>
+					<tr>
+						<td><img src="../art/corn/border/0.gif" alt="6" width="32" height="32"></td>
+						<td><img src="../art/corn/border/3.gif" width="32" height="32" alt="2"></td>
+						<td><img src="../art/corn/border/13.gif" width="32" height="32" alt="15"></td>
+						<td><img src="../art/corn/border/10.gif" width="32" height="32" alt="11"></td>
+						<td><img src="../art/corn/border/4.gif" alt="4" width="32" height="32"></td>
+						<td><img src="../art/corn/border/0.gif" alt="4" width="32" height="32"></td>
+					</tr>
+					<tr>
+						<td><img src="../art/corn/border/0.gif" alt="6" width="32" height="32"></td>
+						<td><img src="../art/corn/border/3.gif" width="32" height="32" alt="2"></td>
+						<td><img src="../art/corn/border/12.gif" width="32" height="32" alt="1"></td>
+						<td><img src="../art/corn/border/1.gif" width="32" height="32" alt="11"></td>
+						<td><img src="../art/corn/border/10.gif" width="32" height="32" alt="11"></td>
+						<td><img src="../art/corn/border/4.gif" alt="4" width="32" height="32"></td>
+					</tr>
+					<tr>
+						<td><img src="../art/corn/border/2.gif" width="32" height="32" alt="1"></td>
+						<td><img src="../art/corn/border/5.gif" width="32" height="32" alt="7"></td>
+						<td><img src="../art/corn/border/10.gif" width="32" height="32" alt="15"></td>
+						<td><img src="../art/corn/border/6.gif" width="32" height="32" alt="7"></td>
+						<td><img src="../art/corn/border/7.gif" width="32" height="32" alt="8"></td>
+						<td><img src="../art/corn/border/12.gif" width="32" height="32" alt="1"></td>
+					</tr>
+					<tr>
+						<td><img src="../art/corn/border/1.gif" width="32" height="32" alt="2"></td>
+						<td><img src="../art/corn/border/10.gif" width="32" height="32" alt="15"></td>
+						<td><img src="../art/corn/border/5.gif" width="32" height="32" alt="11"></td>
+						<td><img src="../art/corn/border/9.gif" alt="8" width="32" height="32"></td>
+						<td><img src="../art/corn/border/9.gif" alt="8" width="32" height="32"></td>
+						<td><img src="../art/corn/border/8.gif" alt="4" width="32" height="32"></td>
+					</tr>
+					<tr>
+						<td><img src="../art/corn/border/0.gif" width="32" height="32" alt="3"></td>
+						<td><img src="../art/corn/border/1.gif" width="32" height="32" alt="3"></td>
+						<td><img src="../art/corn/border/8.gif" width="32" height="32" alt="8"></td>
+						<td><img src="../art/corn/border/0.gif" width="32" height="32" alt="1"></td>
+						<td><img src="../art/corn/border/0.gif" alt="6" width="32" height="32"></td>
+						<td><img src="../art/corn/border/0.gif" alt="4" width="32" height="32"></td>
+					</tr>
+				</tbody></table></td>
+			</tr>
+			<tr>
+				<td><table class="sq" cellspacing="0" cellpadding="0">
+					<caption>
+						4a
+						</caption>
+					<tbody><tr>
+						<td><img src="../art/corn/border/0.gif" alt="6" width="32" height="32"></td>
+						<td><img src="../art/corn/border/0.gif" alt="14" width="32" height="32"></td>
+						<td><img src="../art/corn/border/2.gif" alt="8" width="32" height="32"></td>
+						<td><img src="../art/corn/border/6.gif" alt="4" width="32" height="32"></td>
+						<td><img src="../art/corn/border/4.gif" alt="4" width="32" height="32"></td>
+					</tr>
+					<tr>
+						<td><img src="../art/corn/border/2.gif" width="32" height="32" alt="1"></td>
+						<td><img src="../art/corn/border/6.gif" width="32" height="32" alt="7"></td>
+						<td><img src="../art/corn/border/5.gif" width="32" height="32" alt="12"></td>
+						<td><img src="../art/corn/border/11.gif" width="32" height="32" alt="5"></td>
+						<td><img src="../art/corn/border/12.gif" alt="4" width="32" height="32"></td>
+					</tr>
+					<tr>
+						<td><img src="../art/corn/border/3.gif" width="32" height="32" alt="2"></td>
+						<td><img src="../art/corn/border/13.gif" width="32" height="32" alt="15"></td>
+						<td><img src="../art/corn/border/10.gif" width="32" height="32" alt="11"></td>
+						<td><img src="../art/corn/border/5.gif" width="32" height="32" alt="13"></td>
+						<td><img src="../art/corn/border/8.gif" alt="4" width="32" height="32"></td>
+					</tr>
+					<tr>
+						<td><img src="../art/corn/border/1.gif" width="32" height="32" alt="3"></td>
+						<td><img src="../art/corn/border/10.gif" width="32" height="32" alt="3"></td>
+						<td><img src="../art/corn/border/7.gif" width="32" height="32" alt="8"></td>
+						<td><img src="../art/corn/border/12.gif" width="32" height="32" alt="1"></td>
+						<td><img src="../art/corn/border/0.gif" alt="4" width="32" height="32"></td>
+					</tr>
+					<tr>
+						<td><img src="../art/corn/border/0.gif" alt="6" width="32" height="32"></td>
+						<td><img src="../art/corn/border/1.gif" alt="14" width="32" height="32"></td>
+						<td><img src="../art/corn/border/9.gif" alt="8" width="32" height="32"></td>
+						<td><img src="../art/corn/border/8.gif" alt="4" width="32" height="32"></td>
+						<td><img src="../art/corn/border/0.gif" alt="4" width="32" height="32"></td>
+					</tr>
+				</tbody></table></td>
+				<td><table class="sq" cellspacing="0" cellpadding="0">
+					<caption>
+						5b
+						</caption>
+					<tbody><tr>
+						<td><img src="../art/corn/border/0.gif" alt="6" width="32" height="32"></td>
+						<td><img src="../art/corn/border/0.gif" alt="14" width="32" height="32"></td>
+						<td><img src="../art/corn/border/2.gif" alt="8" width="32" height="32"></td>
+						<td><img src="../art/corn/border/4.gif" alt="4" width="32" height="32"></td>
+						<td><img src="../art/corn/border/0.gif" alt="4" width="32" height="32"></td>
+					</tr>
+					<tr>
+						<td><img src="../art/corn/border/2.gif" width="32" height="32" alt="1"></td>
+						<td><img src="../art/corn/border/6.gif" width="32" height="32" alt="7"></td>
+						<td><img src="../art/corn/border/5.gif" width="32" height="32" alt="12"></td>
+						<td><img src="../art/corn/border/10.gif" width="32" height="32" alt="5"></td>
+						<td><img src="../art/corn/border/4.gif" alt="4" width="32" height="32"></td>
+					</tr>
+					<tr>
+						<td><img src="../art/corn/border/3.gif" width="32" height="32" alt="2"></td>
+						<td><img src="../art/corn/border/13.gif" width="32" height="32" alt="15"></td>
+						<td><img src="../art/corn/border/10.gif" width="32" height="32" alt="11"></td>
+						<td><img src="../art/corn/border/5.gif" width="32" height="32" alt="13"></td>
+						<td><img src="../art/corn/border/8.gif" alt="4" width="32" height="32"></td>
+					</tr>
+					<tr>
+						<td><img src="../art/corn/border/1.gif" width="32" height="32" alt="3"></td>
+						<td><img src="../art/corn/border/10.gif" width="32" height="32" alt="3"></td>
+						<td><img src="../art/corn/border/7.gif" width="32" height="32" alt="8"></td>
+						<td><img src="../art/corn/border/12.gif" width="32" height="32" alt="1"></td>
+						<td><img src="../art/corn/border/0.gif" alt="4" width="32" height="32"></td>
+					</tr>
+					<tr>
+						<td><img src="../art/corn/border/0.gif" alt="6" width="32" height="32"></td>
+						<td><img src="../art/corn/border/1.gif" alt="14" width="32" height="32"></td>
+						<td><img src="../art/corn/border/9.gif" alt="8" width="32" height="32"></td>
+						<td><img src="../art/corn/border/8.gif" alt="4" width="32" height="32"></td>
+						<td><img src="../art/corn/border/0.gif" alt="4" width="32" height="32"></td>
+					</tr>
+				</tbody></table></td>
+				<td><table class="sq" cellspacing="0" cellpadding="0">
+					<caption>
+						6c
+						</caption>
+					<tbody><tr>
+						<td><img src="../art/corn/border/2.gif" width="32" height="32" alt="1"></td>
+						<td><img src="../art/corn/border/6.gif" width="32" height="32" alt="7"></td>
+						<td><img src="../art/corn/border/4.gif" alt="4" width="32" height="32"></td>
+						<td><img src="../art/corn/border/0.gif" alt="4" width="32" height="32"></td>
+						<td><img src="../art/corn/border/0.gif" alt="4" width="32" height="32"></td>
+						<td><img src="../art/corn/border/0.gif" alt="4" width="32" height="32"></td>
+					</tr>
+					<tr>
+						<td><img src="../art/corn/border/3.gif" width="32" height="32" alt="2"></td>
+						<td><img src="../art/corn/border/13.gif" width="32" height="32" alt="15"></td>
+						<td><img src="../art/corn/border/10.gif" width="32" height="32" alt="3"></td>
+						<td><img src="../art/corn/border/6.gif" width="32" height="32" alt="7"></td>
+						<td><img src="../art/corn/border/4.gif" alt="4" width="32" height="32"></td>
+						<td><img src="../art/corn/border/0.gif" alt="4" width="32" height="32"></td>
+					</tr>
+					<tr>
+						<td><img src="../art/corn/border/3.gif" width="32" height="32" alt="2"></td>
+						<td><img src="../art/corn/border/12.gif" width="32" height="32" alt="1"></td>
+						<td><img src="../art/corn/border/3.gif" width="32" height="32" alt="2"></td>
+						<td><img src="../art/corn/border/13.gif" width="32" height="32" alt="15"></td>
+						<td><img src="../art/corn/border/10.gif" width="32" height="32" alt="11"></td>
+						<td><img src="../art/corn/border/4.gif" alt="4" width="32" height="32"></td>
+					</tr>
+					<tr>
+						<td><img src="../art/corn/border/1.gif" width="32" height="32" alt="3"></td>
+						<td><img src="../art/corn/border/10.gif" width="32" height="32" alt="3"></td>
+						<td><img src="../art/corn/border/5.gif" width="32" height="32" alt="7"></td>
+						<td><img src="../art/corn/border/10.gif" width="32" height="32" alt="3"></td>
+						<td><img src="../art/corn/border/7.gif" width="32" height="32" alt="8"></td>
+						<td><img src="../art/corn/border/12.gif" width="32" height="32" alt="1"></td>
+					</tr>
+					<tr>
+						<td><img src="../art/corn/border/0.gif" alt="6" width="32" height="32"></td>
+						<td><img src="../art/corn/border/1.gif" alt="14" width="32" height="32"></td>
+						<td><img src="../art/corn/border/10.gif" width="32" height="32" alt="3"></td>
+						<td><img src="../art/corn/border/7.gif" width="32" height="32" alt="8"></td>
+						<td><img src="../art/corn/border/15.gif" width="32" height="32" alt="1"></td>
+						<td><img src="../art/corn/border/12.gif" width="32" height="32" alt="1"></td>
+					</tr>
+					<tr>
+						<td><img src="../art/corn/border/0.gif" alt="6" width="32" height="32"></td>
+						<td><img src="../art/corn/border/0.gif" alt="6" width="32" height="32"></td>
+						<td><img src="../art/corn/border/1.gif" alt="14" width="32" height="32"></td>
+						<td><img src="../art/corn/border/9.gif" alt="8" width="32" height="32"></td>
+						<td><img src="../art/corn/border/9.gif" alt="8" width="32" height="32"></td>
+						<td><img src="../art/corn/border/8.gif" alt="4" width="32" height="32"></td>
+					</tr>
+				</tbody></table></td>
+			</tr>
+		</tbody></table>
+		<table class="sq" cellspacing="0" cellpadding="0">
+			<caption>
+				6b
+				</caption>
+			<tbody><tr>
+				<td><img src="../art/corn/border/0.gif" alt="6" width="32" height="32"></td>
+				<td><img src="../art/corn/border/0.gif" alt="6" width="32" height="32"></td>
+				<td><img src="../art/corn/border/2.gif" alt="14" width="32" height="32"></td>
+				<td><img src="../art/corn/border/6.gif" width="32" height="32" alt="7"></td>
+				<td><img src="../art/corn/border/4.gif" alt="4" width="32" height="32"></td>
+			</tr>
+			<tr>
+				<td><img src="../art/corn/border/0.gif" alt="6" width="32" height="32"></td>
+				<td><img src="../art/corn/border/2.gif" alt="8" width="32" height="32"></td>
+				<td><img src="../art/corn/border/5.gif" width="32" height="32" alt="1"></td>
+				<td><img src="../art/corn/border/11.gif" width="32" height="32" alt="12"></td>
+				<td><img src="../art/corn/border/12.gif" width="32" height="32" alt="1"></td>
+			</tr>
+			<tr>
+				<td><img src="../art/corn/border/2.gif" width="32" height="32" alt="1"></td>
+				<td><img src="../art/corn/border/5.gif" width="32" height="32" alt="7"></td>
+				<td><img src="../art/corn/border/10.gif" width="32" height="32" alt="15"></td>
+				<td><img src="../art/corn/border/5.gif" width="32" height="32" alt="1"></td>
+				<td><img src="../art/corn/border/8.gif" alt="4" width="32" height="32"></td>
+			</tr>
+			<tr>
+				<td><img src="../art/corn/border/1.gif" width="32" height="32" alt="2"></td>
+				<td><img src="../art/corn/border/10.gif" width="32" height="32" alt="15"></td>
+				<td><img src="../art/corn/border/5.gif" width="32" height="32" alt="11"></td>
+				<td><img src="../art/corn/border/8.gif" alt="4" width="32" height="32"></td>
+				<td><img src="../art/corn/border/0.gif" alt="6" width="32" height="32"></td>
+			</tr>
+			<tr>
+				<td><img src="../art/corn/border/0.gif" width="32" height="32" alt="3"></td>
+				<td><img src="../art/corn/border/1.gif" width="32" height="32" alt="3"></td>
+				<td><img src="../art/corn/border/8.gif" width="32" height="32" alt="8"></td>
+				<td><img src="../art/corn/border/0.gif" width="32" height="32" alt="1"></td>
+				<td><img src="../art/corn/border/0.gif" alt="6" width="32" height="32"></td>
+			</tr>
+		</tbody></table>
+		<!-- #EndEditable --><!-- end .content --></div></td>
+		<td class="side"><ul>
+				<li class="nolink">Intro</li>
+					<li><a href="intro.html">Wang tiles</a></li>
+					<li><a href="array.html">Maze arrays</a></li>
+					<li class="nolink">Wang Tiles</li>
+					<li><a href="2edge.html">2-edge tiles</a></li>
+					<li><a href="2corn.html">2-corner tiles</a></li>
+					<li><a href="3edge.html">3-edge tiles</a></li>
+					<li><a href="3corn.html">3-corner tiles</a></li>
+                    <li><a href="4ord.html">4-order tiles</a></li>
+					<li class="nolink">Tilesets</li>
+					<li><a href="blob.html">Blob tileset</a></li>
+					<li><a href="lout2e.html">Layout 2-edge</a></li>
+                    <li><a href="reduced.html">Reduced sets</a></li>
+					<li class="nolink">Single Side</li>
+					<li><a href="block.html">Block tiles</a></li>
+					<li><a href="1sideedge.html">1-side edge</a></li>
+					<li><a href="1sidecorn.html">1-side corner</a></li>
+					<li class="nolink">Paths</li>
+					<li><a href="angled.html">Angled paths</a></li>
+					<li><a href="border.html">Border paths</a></li>
+					<!--<li>Colour paths</li>-->
+					<li><a href="directed.html">Directed path</a></li>
+					<li><a href="isometric.html">Isometric path</a></li>
+					<li><a href="positioned.html">Position path</a></li>
+					<li><a href="shape.html">Shape tiles</a></li>
+					<li class="nolink">Mazes</li>
+					<li><a href="perfect.html">Perfect</a></li>
+					<li><a href="connect.html">Connected</a></li>
+                    <li><a href="imperfect.html">Imperfect</a></li>
+                    <li><a href="labyrinth.html">Labyrinth</a></li>
+                    <li><a href="twin.html">Twin maze</a></li>
+					<li class="nolink">Gallery</li>
+					<li><a href="tiles_e.html">Tiles 2-edge</a></li>
+					<li><a href="tiles_c.html">Tiles 2-corner</a></li>
+                    <li><a href="tiles_3ec.html">Tiles 3-order</a></li>
+                    <li><a href="blob_g.html">Blob tilesets</a></li>
+                    <li><a href="twin_g.html">Twin tilesets</a></li>
+					<li><a href="truch_g.html">Truchet tiles</a></li>
+					<li><a href="block_g.html">Block tiles</a></li>
+					<li><a href="patts.html">Patterns</a></li>
+					<li><a href="icons.html">Icons</a></li>
+					<li class="nolink">Info</li>
+					<li><a href="maths.html">Maths</a></li>
+					<li><a href="knots.html">Knots</a></li>
+                    <li><a href="pattern.html">Patterns</a></li>
+                    <li><a href="puzzle.html">Puzzles</a></li>
+					<li><a href="web.html">Web news</a></li>
+					<li><a href="glossary.html">Glossary</a></li>
+					<li>&nbsp;</li>
+			</ul></td>
+	</tr>
+</tbody></table>
+<table cellspacing="0" cellpadding="0" class="foot">
+	<tbody><tr>
+		<td class="main"><p>cr31.co.uk</p></td>
+		<td class="side">&nbsp;</td>
+	</tr>
+</tbody></table>
+
+
+</body><!-- #EndTemplate --></html>

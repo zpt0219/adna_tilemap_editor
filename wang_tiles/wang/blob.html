@@ -1,0 +1,521 @@
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><!-- #BeginTemplate "/Templates/wang.dwt" --><!-- DW6 --><head>
+<!-- #BeginEditable "doctitle" -->
+<title>Blob Tileset</title>
+<!-- #EndEditable -->
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<!-- #BeginEditable "Meta" -->
+<link rel="stylesheet" href="../wang/text.css" type="text/css">
+<script src="../js/wang.js" type="text/JavaScript"></script>
+<meta name="description" content="Stagecast puzzles, games, animation and sims">
+<meta name="keywords" content="Wang, maze, tile, tile set, tileset, labyrinth, Stagecast, seamless, icon, terrain, path, 32x32, game">
+<!-- #EndEditable -->
+</head>
+
+<body>
+<table class="tabs">
+	<tbody><tr>
+		<td><p style="margin:0">
+          Originally published on <a href="http://www.cr31.co.uk/stagecast/wang/intro.html">cr31.co.uk</a>
+          by Guy Walker. Mirrored from
+          <a href="https://www.boristhebrave.com/permanent/24/06/cr31/stagecast/wang/intro.html">boristhebrave.com</a>.
+        </p>
+        <p style="margin:4px 0 0; font-style:italic; opacity:0.85">
+          In memory of Professor Hao Wang (王浩, 1921 – 1995), whose elegant tiling theory continues to inspire generations of mathematicians and game designers.
+        </p></td>
+	</tr>
+</tbody></table>
+
+<table cellspacing="0" cellpadding="0" class="head">
+	<tbody><tr>
+		<td class="main"><h1>Wang Tiles</h1></td>
+		<td class="side">&nbsp;</td>
+	</tr>
+</tbody></table>
+<table cellspacing="0" cellpadding="0" class="strap">
+	<tbody><tr>
+		<td class="main"><p>edge and corner matched tilesets</p></td>
+		<td class="side"><p>menu</p></td>
+	</tr>
+</tbody></table>
+<table cellspacing="0" cellpadding="0" class="cont">
+	<tbody><tr>
+		<td class="main"><div class="content"><!-- #BeginEditable "contents" -->
+			<h2>Blob Tileset</h2>
+			<p>A Blob tileset is a 47 tile subset of a 2-edge 2-corner Wang tileset.</p>
+			<h3 class="content">2-edge + 2-corner Wang Tiles</h3>
+			<table cellpadding="0" cellspacing="0" class="lout">
+				<tbody><tr>
+					<td><p>With two different types of edge and two different types of corner, we have 2^8 or 256 different tiles in a complete tileset.</p>
+						<p>The  tileset forms the basis of some tile matching <a href="puzzle.html">puzzles</a>.</p></td>
+					<td><table class="sq2" cellspacing="0" cellpadding="0">
+						<caption>
+							Wang 2e2c tiles
+							</caption>
+						<tbody><tr>
+							<td><img src="../art/bw-2e2c/tile1.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/bw-2e2c/tile2.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/bw-2e2c/tile3.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/bw-2e2c/tile4.gif" width="32" height="32" alt="tile"></td>
+						</tr>
+						<tr>
+							<td>100</td>
+							<td>107</td>
+							<td>168</td>
+							<td>203</td>
+						</tr>
+					</tbody></table></td>
+				</tr>
+			</tbody></table>
+			<p>Generally though 256 tiles is too many to produce and use. However, there is an interesting subset of 47 tiles, known as 'Blob' tiles. So called, because each tile has a central 'blob' of land or carpet, aulthough tile_0 is often depicted without for artistic reasons. These can be used to tile room, terrain or carpet areas. They have  a border (wall or fence) with internal as well as the usual external corners.</p>
+			<p>Here is the Blob tileset. Below each tile, all possible 90 degree rotations (clockwise) are shown. Each is 4x the previous index, (mod 255).</p>
+			<table class="sq" cellspacing="0" cellpadding="0">
+				<caption>
+					Blob tileset
+					</caption>
+				<tbody><tr>
+					<td><img src="../art/blob/wang-2e2c/0.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/blob/wang-2e2c/1.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/blob/wang-2e2c/5.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/blob/wang-2e2c/7.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/blob/wang-2e2c/17.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/blob/wang-2e2c/21.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/blob/wang-2e2c/23.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/blob/wang-2e2c/29.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/blob/wang-2e2c/31.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/blob/wang-2e2c/85.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/blob/wang-2e2c/87.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/blob/wang-2e2c/95.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/blob/wang-2e2c/119.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/blob/wang-2e2c/127.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/blob/wang-2e2c/255.gif" width="32" height="32" alt="tile"></td>
+				</tr>
+				<tr>
+					<td>0</td>
+					<td>1</td>
+					<td>5</td>
+					<td>7</td>
+					<td>17</td>
+					<td>21</td>
+					<td>23</td>
+					<td>29</td>
+					<td>31</td>
+					<td>85</td>
+					<td>87</td>
+					<td>95</td>
+					<td>119</td>
+					<td>127</td>
+					<td>255</td>
+				</tr>
+				<tr>
+					<td>&nbsp;</td>
+					<td>4<br>
+						16<br>
+						64</td>
+					<td>20<br>
+						80<br>
+						65 </td>
+					<td>28<br>
+						112<br>
+						193</td>
+					<td>68</td>
+					<td>84<br>
+						81<br>
+						69</td>
+					<td>92<br>
+						113<br>
+						197</td>
+					<td>116<br>
+						209<br>
+						71</td>
+					<td>124<br>
+						241<br>
+						199</td>
+					<td>&nbsp;</td>
+					<td>93<br>
+						117<br>
+						213</td>
+					<td>125<br>
+						245<br>
+						215</td>
+					<td>221</td>
+					<td>253<br>
+						247<br>
+						223</td>
+					<td>&nbsp;</td>
+				</tr>
+			</tbody></table>
+			<p>You can  see we  have   two different types of edge or corner (yellow or blue). But there is always a large central blob of yellow. So we can create yellow carpets on blue floors but not blue carpets on yellow floors. Note that no tile has a blue edge between two yellow corners. If either corner is yellow then the edge centre is yellow.</p>
+			<table cellpadding="0" cellspacing="0" class="lout">
+				<tbody><tr>
+					<td width="70%"><h3>Bitwise Tile Index</h3>
+						<p>The following method  provides a unique index number for each tile. Add up  the yellow edges or corners, (ignore   blue), with the following binary weightings:</p>
+						<p>North edge  = 1 <br>
+							NorthEast corner  = 2<br>
+							East edge  = 4<br>
+							SouthEast corner  = 8<br>
+							South edge  = 16 <br>
+							Sout-West corner  = 32<br>
+							West edge  = 64<br>
+							NorthWest corner  = 128 </p></td>
+					<td><br>
+						<table class="sq4" cellspacing="0" cellpadding="0">
+							<caption>
+								2-edge 2-corner weightings
+								</caption>
+							<tbody><tr>
+								<td>NorthWest<br>
+									=128</td>
+								<td>North<br>
+									= 1</td>
+								<td>NorthEast<br>
+									= 2</td>
+							</tr>
+							<tr>
+								<td>West<br>
+									= 64</td>
+								<td><img src="../art/blob/wang-2e2c/71.gif" width="32" height="32" alt="tile"></td>
+								<td>East<br>
+									= 4</td>
+							</tr>
+							<tr>
+								<td>SouthWest<br>
+									= 32</td>
+								<td>South<br>
+									= 16</td>
+								<td>SouthEast<br>
+									= 8</td>
+							</tr>
+						</tbody></table>
+						<p>This tile has 'North' + 'NorthEast' + 'East' + 'West', or 1 + 2 + 4 + 64 , giving an index of '71'.</p></td>
+				</tr>
+			</tbody></table>
+			<p>Applying weightings in a continuous clockwise cycle allows easy tile rotation. Simply multiply the index by 4 to rotate clockwise by 90°. If greater than 255  subtract 256, like clock arithmetic. Similarly, sprites can easily calculate exits, or rotate to face different allowable exit directions.</p>
+			<p>Here is a typical yellow carpet on blue background layout, showing internal and external corners.</p>
+			<div class="stage"><p>Stage: Blob tileset - Carpet layout</p>
+		<img src="../art/carpet.png" width="592" height="272" alt="carpet"></div>
+		<p>Note that the center of every tile is yellow (except for all blue tile_0). So you can't make a blue carpet on a yellow background with this Blob tileset. However 47 tiles is a lot less than 256. </p>
+		<h3>Minimum Packing</h3>
+		<p>We can pack the complete tileset into  a 6x8 array with just a single duplicate of the 'solid' tile-255. Or a  7x7 array with 3 copies of the empty tile-0. </p>
+		<p>Both these minimum packing layouts were discovered by <a href="http://opengameart.org/content/seamless-tileset-template-ii">Caeles at OpenGameArt.org</a> using an exhaustive computer search of all possible tile arrangements. Many thanks Caeles - great work. </p>
+		<p>See the other <a href="blob_g.html">tilesets</a> in 7x7 arrangement.</p>
+		<table cellpadding="0" cellspacing="0" class="lout">
+			<tbody><tr>
+				<td><table cellpadding="0" cellspacing="0" class="sq3">
+					<caption>
+						Minimum 6x8  layout
+						</caption>
+					<tbody><tr class="sq">
+						<td><img src="../art/grab-array/blob/blob47_6x8.png" width="256" height="192" alt="blob47"></td>
+					</tr>
+				</tbody></table>
+					<h3>&nbsp;</h3></td>
+				<td><table cellpadding="0" cellspacing="0" class="sq3">
+					<caption>
+						Minimum 7x7  layout
+						</caption>
+					<tbody><tr class="sq">
+						<td><img src="../art/atlas/blob/wangbl.png" width="224" height="224" alt="Wang blob tileset"></td>
+					</tr>
+				</tbody></table></td>
+			</tr>
+		</tbody></table>
+		<h3>Islands Tileset</h3>
+		<p>Here is a more artistic 'island' tileset, with boardwalk connections.</p>
+		<table class="sq" cellspacing="0" cellpadding="0">
+			<caption>
+				Complete Blob Wang tileset
+				</caption>
+			<tbody><tr>
+				<td><img src="../art/blob/islands/0.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/blob/islands/1.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/blob/islands/5.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/blob/islands/7.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/blob/islands/17.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/blob/islands/21.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/blob/islands/23.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/blob/islands/29.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/blob/islands/31.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/blob/islands/85.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/blob/islands/87.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/blob/islands/95.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/blob/islands/119.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/blob/islands/127.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/blob/islands/255.gif" width="32" height="32" alt="tile"></td>
+			</tr>
+			<tr>
+				<td>0</td>
+				<td>1</td>
+				<td>5</td>
+				<td>7</td>
+				<td>17</td>
+				<td>21</td>
+				<td>23</td>
+				<td>29</td>
+				<td>31</td>
+				<td>85</td>
+				<td>87</td>
+				<td>95</td>
+				<td>119</td>
+				<td>127</td>
+				<td>255</td>
+			</tr>
+			<tr>
+				<td>&nbsp;</td>
+				<td>4<br>
+					16<br>
+					64</td>
+				<td>20<br>
+					80<br>
+					65</td>
+				<td>28<br>
+					112<br>
+					193</td>
+				<td>68</td>
+				<td>84<br>
+					81<br>
+					69</td>
+				<td>92<br>
+					113<br>
+					197</td>
+				<td>116<br>
+					209<br>
+					71</td>
+				<td>124<br>
+					241<br>
+					199</td>
+				<td>&nbsp;</td>
+				<td>93<br>
+					117<br>
+					213</td>
+				<td>125<br>
+					245<br>
+					215</td>
+				<td>221</td>
+				<td>253<br>
+					247<br>
+					223</td>
+				<td>&nbsp;</td>
+			</tr>
+		</tbody></table>
+		<p>We can use this tileset to create the following layout. Much more maze like.<br>
+			See <a href="stage.html">Stage</a> to generate your own random islands.</p>
+		<div class="stage"><p>Stage: Random - Blob Tileset - Islands</p>
+		<img src="../art/grabs/blob/islands.png" width="576" height="384" alt="Blob Islands Tileset"></div>
+		<p>The tileset produces a clump of random islands interlinked with boardwalks. There is no guarantee that every island is reachable when randomly generated. However, if the array is generated using the maze, then it is 'perfect' and every island is reachable from any other island.</p>
+		<table class="sq3" cellspacing="0" cellpadding="0">
+			<caption>
+				Complete Blob Islands tileset
+				</caption>
+			<tbody><tr>
+				<td><img src="../art/isle47.png" width="384" height="128" alt="tile"></td>
+			</tr>
+		</tbody></table>
+		<h3>Reduction Methods</h3>
+		<p>The clever thing about Blob tilesets is there exists  easy and reliable methods to reduce the 256 tiles down to 47. Here are two different reduction methods. They are selectable with the checkbox below the [Stage] Blob menu.<br>
+			There is also a third
+			method which is to generate a perfect maze. See <a href="perfect.html">mazes</a>.</p>
+		<table cellpadding="0" cellspacing="0" class="lout">
+			<tbody><tr>
+				<td><p>This diagram may help. It shows a layout of  12 blue tiles, 4 wide by 3 high (the black outline).</p>
+					<p>Each tile has a center (yellow square), 4 corners (red circles) and 4 edges (green rectangles).
+						</p><p>The tiles overlay a data array, (white outline), where each tile center, edge and corner  is held in a corresponding cell.
+						</p><p>The data array needs to be 'twice plus 1' the width and height of the tile array. So  4x3 tiles require 9x7 cells.</p></td>
+				<td><img src="../art/forums/array.png" width="309" height="263" alt="tile array"></td>
+			</tr>
+		</tbody></table>
+		<h3>Method 1</h3>
+		<p>The above 'island' image was produced by the following procedure:</p>
+		<p>1/ Fill all edge and corner  cells with a random '0' or '1'. </p>
+		<p> For each tile, if the edge is a '0' then make both the corners, either side of the edge a '0' as well. So…</p>
+		<p>2/ Step through the array,  visiting the  top and left edge of each tile. If this is '0' then set both corners either side to '0'. </p>
+		<p> // if top = 0:    topLeft = 0, topRight = 0<br>
+			// if left = 0:    topLeft = 0, bottomLeft = 0 </p>
+		<p>Calculate the index for each tile. Here are all the tiles with their index numbers. Each tile rotation is 4x the previous index number, (mod 255).</p>
+		<table class="sq" cellspacing="0" cellpadding="0">
+			<caption>
+				Complete Blob Wang tileset
+				</caption>
+			<tbody><tr>
+				<td><img src="../art/blob/wang-2e2c/0.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/blob/wang-2e2c/1.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/blob/wang-2e2c/5.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/blob/wang-2e2c/7.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/blob/wang-2e2c/17.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/blob/wang-2e2c/21.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/blob/wang-2e2c/23.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/blob/wang-2e2c/29.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/blob/wang-2e2c/31.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/blob/wang-2e2c/85.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/blob/wang-2e2c/87.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/blob/wang-2e2c/95.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/blob/wang-2e2c/119.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/blob/wang-2e2c/127.gif" width="32" height="32" alt="tile"></td>
+				<td><img src="../art/blob/wang-2e2c/255.gif" width="32" height="32" alt="tile"></td>
+			</tr>
+			<tr>
+				<td>0</td>
+				<td>1</td>
+				<td>5</td>
+				<td>7</td>
+				<td>17</td>
+				<td>21</td>
+				<td>23</td>
+				<td>29</td>
+				<td>31</td>
+				<td>85</td>
+				<td>87</td>
+				<td>95</td>
+				<td>119</td>
+				<td>127</td>
+				<td>255</td>
+			</tr>
+			<tr>
+				<td>&nbsp;</td>
+				<td>4<br>
+					16<br>
+					64</td>
+				<td>20<br>
+					80<br>
+					65</td>
+				<td>28<br>
+					112<br>
+					193</td>
+				<td>68</td>
+				<td>84<br>
+					81<br>
+					69</td>
+				<td>92<br>
+					113<br>
+					197</td>
+				<td>116<br>
+					209<br>
+					71</td>
+				<td>124<br>
+					241<br>
+					199</td>
+				<td>&nbsp;</td>
+				<td>93<br>
+					117<br>
+					213</td>
+				<td>125<br>
+					245<br>
+					215</td>
+				<td>221</td>
+				<td>253<br>
+					247<br>
+					223</td>
+				<td>&nbsp;</td>
+			</tr>
+		</tbody></table>
+		<p>5/ Step through the array again, only visiting the tile centers. Add up the corner and edge cells with the following weightings: </p>
+		<table cellpadding="0" cellspacing="0" class="lout">
+			<tbody><tr>
+				<td width="70%"><p>Index = top + 2*topRight + 4*right + 8*bottomRight + 16*bottom + 32*bottomLeft + 64*left + 128* topLeft</p>
+					<p>You should end up with an index of one of 47 numbers. This represents the correct tile to be used.</p>
+					<p>As an optional step, I also remove 90% of all the 1x1 holes which form at the tile corners. Looks much better.</p></td>
+				<td><table class="sq4" cellspacing="0" cellpadding="0">
+					<caption>
+						Bitwise tile index
+						</caption>
+					<tbody><tr>
+						<td>NorthWest<br>
+							= 128</td>
+						<td><p>North<br>
+							= 1</p></td>
+						<td>NorthEast<br>
+							= 2</td>
+					</tr>
+					<tr>
+						<td>West<br>
+							= 64</td>
+						<td><img src="../art/blob/wang-2e2c/85.gif" width="32" height="32" alt="tile"></td>
+						<td>East<br>
+							= 4</td>
+					</tr>
+					<tr>
+						<td>SouthWest<br>
+							= 32</td>
+						<td>South<br>
+							= 16</td>
+						<td>SouthEast<br>
+							= 8</td>
+					</tr>
+				</tbody></table></td>
+			</tr>
+		</tbody></table>
+		<h3>Method 2</h3>
+		<p>This second method creates a slightly different  layout, using the same 47 Blob tiles.
+		</p><p>1/ Create an array as above method 1 and fill with '0's.					
+		</p><p> 2/ Fill each tile center with a random '0' or '1'.					
+		</p><p>3/ Visit every edge cell. If the tiles either side are both '1', then make the edge a '1'.					
+		</p><p>4/ Visit every corner cell. If it is surrounded by 4 edges which are all '1', (or 4 tiles all '1') then make the corner cell a '1'.					
+		</p><p>5/
+			<hen as="" above,="" 5="" step="" through="" the="" array="" again,="" just="" visiting="" tile="" centres.="" add="" up="" corner="" and="" edge="" cells="" with="" following="" weightings:="">
+			Then as above, step through the array again, only visiting the tile centers. Add up the corner and edge cells with the tile weightings, giving an index of one of 47 numbers which represents the  tile to be used.
+		</hen></p><h3>Procedural Dungeon Creation</h3>
+				<p>Blob tilesets make good  room layouts. To ensure all rooms are connected, use the Maze generator function with the [<a href="stage.html">Stage</a>] tile explorer. This guarantees  all areas are reachable.</p>
+				<div class="stage"><p>Stage: Maze - Blob Tileset - Commune</p>
+		<img src="../art/grabs/blob/commune.png" width="576" height="384" alt="Blob Commune Tileset"></div>
+		<!-- #EndEditable --><!-- end .content --></div></td>
+		<td class="side"><ul>
+				<li class="nolink">Intro</li>
+					<li><a href="intro.html">Wang tiles</a></li>
+					<li><a href="array.html">Maze arrays</a></li>
+					<li class="nolink">Wang Tiles</li>
+					<li><a href="2edge.html">2-edge tiles</a></li>
+					<li><a href="2corn.html">2-corner tiles</a></li>
+					<li><a href="3edge.html">3-edge tiles</a></li>
+					<li><a href="3corn.html">3-corner tiles</a></li>
+                    <li><a href="4ord.html">4-order tiles</a></li>
+					<li class="nolink">Tilesets</li>
+					<li><a href="blob.html">Blob tileset</a></li>
+					<li><a href="lout2e.html">Layout 2-edge</a></li>
+                    <li><a href="reduced.html">Reduced sets</a></li>
+					<li class="nolink">Single Side</li>
+					<li><a href="block.html">Block tiles</a></li>
+					<li><a href="1sideedge.html">1-side edge</a></li>
+					<li><a href="1sidecorn.html">1-side corner</a></li>
+					<li class="nolink">Paths</li>
+					<li><a href="angled.html">Angled paths</a></li>
+					<li><a href="border.html">Border paths</a></li>
+					<!--<li>Colour paths</li>-->
+					<li><a href="directed.html">Directed path</a></li>
+					<li><a href="isometric.html">Isometric path</a></li>
+					<li><a href="positioned.html">Position path</a></li>
+					<li><a href="shape.html">Shape tiles</a></li>
+					<li class="nolink">Mazes</li>
+					<li><a href="perfect.html">Perfect</a></li>
+					<li><a href="connect.html">Connected</a></li>
+                    <li><a href="imperfect.html">Imperfect</a></li>
+                    <li><a href="labyrinth.html">Labyrinth</a></li>
+                    <li><a href="twin.html">Twin maze</a></li>
+					<li class="nolink">Gallery</li>
+					<li><a href="tiles_e.html">Tiles 2-edge</a></li>
+					<li><a href="tiles_c.html">Tiles 2-corner</a></li>
+                    <li><a href="tiles_3ec.html">Tiles 3-order</a></li>
+                    <li><a href="blob_g.html">Blob tilesets</a></li>
+                    <li><a href="twin_g.html">Twin tilesets</a></li>
+					<li><a href="truch_g.html">Truchet tiles</a></li>
+					<li><a href="block_g.html">Block tiles</a></li>
+					<li><a href="patts.html">Patterns</a></li>
+					<li><a href="icons.html">Icons</a></li>
+					<li class="nolink">Info</li>
+					<li><a href="maths.html">Maths</a></li>
+					<li><a href="knots.html">Knots</a></li>
+                    <li><a href="pattern.html">Patterns</a></li>
+                    <li><a href="puzzle.html">Puzzles</a></li>
+					<li><a href="web.html">Web news</a></li>
+					<li><a href="glossary.html">Glossary</a></li>
+					<li>&nbsp;</li>
+			</ul></td>
+	</tr>
+</tbody></table>
+<table cellspacing="0" cellpadding="0" class="foot">
+	<tbody><tr>
+		<td class="main"><p>cr31.co.uk</p></td>
+		<td class="side">&nbsp;</td>
+	</tr>
+</tbody></table>
+
+
+</body><!-- #EndTemplate --></html>

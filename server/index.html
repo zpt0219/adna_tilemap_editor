@@ -34,6 +34,16 @@
     .card h2 { font-size: 18px; margin: 0 0 6px; }
     .card p { margin: 0; color: var(--muted); font-size: 13.5px; }
     .card .go { margin-top: 14px; color: var(--accent); font-size: 13px; font-weight: 600; }
+    .section-title {
+      width: 100%; max-width: 1080px; margin: 48px 0 18px;
+      display: flex; align-items: center; gap: 14px;
+    }
+    .section-title h2 { font-size: 18px; margin: 0; white-space: nowrap; }
+    .section-title .line { flex: 1; height: 1px; background: var(--line); }
+    .section-title .label { color: var(--muted); font-size: 13px; }
+    .archive-card { border-color: #2e3340; }
+    .archive-card:hover { border-color: #d4a853; }
+    .archive-card .go { color: #d4a853; }
     footer { margin-top: 44px; display: flex; gap: 14px; align-items: center; flex-wrap: wrap; justify-content: center; }
     .btn {
       text-decoration: none; color: var(--fg); border: 1px solid var(--line);
@@ -88,6 +98,21 @@
     </a>
   </main>
 
+  <div class="section-title">
+    <h2 id="archive-title">📚 参考存档</h2>
+    <span class="line"></span>
+    <span class="label" id="archive-label">镜像保存，以供学习</span>
+  </div>
+
+  <section class="cards">
+    <a class="card archive-card" href="/wang_tiles/">
+      <div class="ico">🀄</div>
+      <h2>Wang Tiles Archive</h2>
+      <p id="card6-desc">王浩教授 Wang Tiles 理论资料存档 — 边匹配 · 角匹配 · 互动演示 · 迷宫生成。原站 cr31.co.uk 已停服。</p>
+      <div class="go" id="card6-go">查看存档 →</div>
+    </a>
+  </section>
+
   <footer>
     <a class="btn" href="https://github.com/zpt0219/adna_tilemap_editor" target="_blank" rel="noopener">
       <span>⌥</span> <span id="btn-github">GitHub 仓库</span>
@@ -113,6 +138,10 @@
         card4_go: "打开应用 →",
         card5_desc: "轻量级像素画编辑器，支持多图层编辑、网格绘制、橡皮擦与油漆桶，导出透明 PNG。",
         card5_go: "打开应用 →",
+        card6_desc: "王浩教授 Wang Tiles 理论资料存档 — 边匹配 · 角匹配 · 互动演示 · 迷宫生成。原站 cr31.co.uk 已停服。",
+        card6_go: "查看存档 →",
+        archive_title: "📚 参考存档",
+        archive_label: "镜像保存，以供学习",
         btn_github: "GitHub 仓库",
         btn_pages: "GitHub Pages 镜像",
         footer_dim: "self-hosted · nginx · 东京",
@@ -130,6 +159,10 @@
         card4_go: "Open App →",
         card5_desc: "Lightweight pixel sprite editor: multi-layer compositions, custom grids, paint buckets, shape drawing, and transparent PNG export.",
         card5_go: "Open App →",
+        card6_desc: "Archive of Prof. Hao Wang's tile theory — edge matching, corner matching, interactive demos, and maze generation. Original site cr31.co.uk is offline.",
+        card6_go: "View Archive →",
+        archive_title: "📚 Reference Archives",
+        archive_label: "Mirrored for learning",
         btn_github: "GitHub Repository",
         btn_pages: "GitHub Pages Mirror",
         footer_dim: "self-hosted · nginx · Tokyo",
@@ -149,6 +182,10 @@
       document.getElementById("card4-go").textContent = TRANSLATIONS[lang].card4_go;
       document.getElementById("card5-desc").textContent = TRANSLATIONS[lang].card5_desc;
       document.getElementById("card5-go").textContent = TRANSLATIONS[lang].card5_go;
+      document.getElementById("card6-desc").textContent = TRANSLATIONS[lang].card6_desc;
+      document.getElementById("card6-go").textContent = TRANSLATIONS[lang].card6_go;
+      document.getElementById("archive-title").textContent = TRANSLATIONS[lang].archive_title;
+      document.getElementById("archive-label").textContent = TRANSLATIONS[lang].archive_label;
       document.getElementById("btn-github").textContent = TRANSLATIONS[lang].btn_github;
       document.getElementById("btn-pages").textContent = TRANSLATIONS[lang].btn_pages;
       document.getElementById("footer-dim").textContent = TRANSLATIONS[lang].footer_dim;

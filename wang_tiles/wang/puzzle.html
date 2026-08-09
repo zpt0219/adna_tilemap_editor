@@ -1,0 +1,837 @@
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><!-- #BeginTemplate "/Templates/wang.dwt" --><!-- DW6 --><head>
+<!-- #BeginEditable "doctitle" -->
+<title>Puzzle Tilesets</title>
+<!-- #EndEditable -->
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<!-- #BeginEditable "Meta" -->
+<link rel="stylesheet" href="../wang/text.css" type="text/css">
+<script src="../js/wang.js" type="text/JavaScript"></script>
+<meta name="description" content="Stagecast puzzles, games, animation and sims">
+<meta name="keywords" content="Wang, maze, tile, tile set, tileset, labyrinth, Stagecast, seamless, icon, terrain, path, 32x32, game">
+<!-- #EndEditable -->
+</head>
+
+<body>
+<table class="tabs">
+	<tbody><tr>
+		<td><p style="margin:0">
+          Originally published on <a href="http://www.cr31.co.uk/stagecast/wang/intro.html">cr31.co.uk</a>
+          by Guy Walker. Mirrored from
+          <a href="https://www.boristhebrave.com/permanent/24/06/cr31/stagecast/wang/intro.html">boristhebrave.com</a>.
+        </p>
+        <p style="margin:4px 0 0; font-style:italic; opacity:0.85">
+          In memory of Professor Hao Wang (王浩, 1921 – 1995), whose elegant tiling theory continues to inspire generations of mathematicians and game designers.
+        </p></td>
+	</tr>
+</tbody></table>
+
+<table cellspacing="0" cellpadding="0" class="head">
+	<tbody><tr>
+		<td class="main"><h1>Wang Tiles</h1></td>
+		<td class="side">&nbsp;</td>
+	</tr>
+</tbody></table>
+<table cellspacing="0" cellpadding="0" class="strap">
+	<tbody><tr>
+		<td class="main"><p>edge and corner matched tilesets</p></td>
+		<td class="side"><p>menu</p></td>
+	</tr>
+</tbody></table>
+<table cellspacing="0" cellpadding="0" class="cont">
+	<tbody><tr>
+		<td class="main"><div class="content"><!-- #BeginEditable "contents" -->
+			<h2>Tile Matching Puzzles</h2>
+			<p>A set of Wang tiles makes a natural  tile matching puzzle. Typically, the pieces need to be formed into a square or rectangular array with all tiles matching up correctly. Sometimes, the array perimeter needs to be a single color too.</p>
+			<p>There are two main types of puzzle,  those using an edge matching tileset and those using a corner matching tileset.</p>
+			<p>When using Wang tiles  as Puzzle tiles,  tiles can be rotated. This gives 1, 2 or 4 different Wang tiles for each Puzzle tile. To denote this, tiles depict the lowest Wang index number on a circular instead of square background. Tile-8 is the only tile that can be mis-read upside down. It has a green North edge or North-East corner.</p>
+			<hr>
+			<h3>Edge Matching Tileset Puzzles</h3>
+			<hr>
+			<h3>3-edge tiles</h3>
+			<p>A complete set of Wang tiles with three different types of edge has 4^3= 81 tiles. The complete set can be arranged in a 9x9 array (or layout). See <a href="3edge.html">3-edge</a> Wang tiles page for both recursive and a symmetrical layout.</p>
+			<p>Some tiles are self-similar when rotated. The table below lists all 81 tiles in 24 self similar groups. Each index number represents a 90° rotation clockwise. The tile with the lowest index number in each group is shown. If we allow rotation of tiles then we can reduce the 81 tiles to 24 tiles, by selecting one tile from each group.</p>
+			<table class="sq" cellspacing="0" cellpadding="0">
+				<caption>
+					3-edge Wang tiles - self-similar rotations
+					</caption>
+				<tbody><tr>
+					<td><img src="../art/edge/wang-3e/0.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-3e/40.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-3e/80.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-3e/10.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-3e/20.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-3e/50.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-3e/1.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-3e/2.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-3e/13.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-3e/41.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-3e/26.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-3e/53.gif" width="32" height="32" alt="tile"></td>
+				</tr>
+				<tr>
+					<td>0</td>
+					<td>40</td>
+					<td>80</td>
+					<td>10<br>
+						30</td>
+					<td>20<br>
+						60</td>
+					<td>50<br>
+						70</td>
+					<td>1<br>
+						3<br>
+						9<br>
+						27</td>
+					<td>2<br>
+						6<br>
+						18<br>
+						54</td>
+					<td>13<br>
+						39<br>
+						37<br>
+						31</td>
+					<td>41<br>
+						43<br>
+						49<br>
+						67</td>
+					<td>26<br>
+						78<br>
+						74<br>
+						62</td>
+					<td>53<br>
+						79<br>
+						77<br>
+						71</td>
+				</tr>
+				<tr>
+					<td><img src="../art/edge/wang-3e/4.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-3e/8.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-3e/44.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-3e/5.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-3e/7.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-3e/22.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-3e/14.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-3e/17.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-3e/25.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-3e/11.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-3e/16.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-3e/23.gif" width="32" height="32" alt="tile"></td>
+				</tr>
+				<tr>
+					<td>4<br>
+						12<br>
+						36<br>
+						28</td>
+					<td>8<br>
+						24<br>
+						72<br>
+						56</td>
+					<td>44<br>
+						52<br>
+						76<br>
+						68</td>
+					<td>5<br>
+						15<br>
+						45<br>
+						55</td>
+					<td>7<br>
+						21<br>
+						63<br>
+						29 </td>
+					<td>22<br>
+						66<br>
+						38<br>
+						34</td>
+					<td>14<br>
+						42<br>
+						46<br>
+						58</td>
+					<td>17<br>
+						51<br>
+						73<br>
+						59</td>
+					<td>25<br>
+						75<br>
+						65<br>
+						35</td>
+					<td>11<br>
+						33<br>
+						19<br>
+						57</td>
+					<td>16<br>
+						48<br>
+						64<br>
+						32</td>
+					<td>23<br>
+						69<br>
+						47<br>
+						61</td>
+				</tr>
+			</tbody></table>
+			<p> These 24 tiles are  called  'MacMahon Squares'.<br>
+			</p>
+			<h3>MacMahon Squares</h3>
+			<p>This 3-color  edge matching puzzle set was invented by British mathematician Major Percy MacMahon. He introduced them in the first edition of his book, <em>New Mathematical Pastimes</em> in 1921. <br>
+				These 24 square 'puzzle' tiles are a sub-set of the full 81 3-edge Wang tile set. The pieces, unlike Wang tiles, can be rotated. Tiles are denoted by their  'lowest' Wang index number for each group as shown.</p>
+			<table class="sq" cellspacing="0" cellpadding="0">
+				<caption>
+					MacMahon Squares Tileset
+					</caption>
+				<tbody><tr>
+					<td><img src="../art/edge/puzzle/0.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/puzzle/40.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/puzzle/80.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/puzzle/10.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/puzzle/20.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/puzzle/50.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/puzzle/1.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/puzzle/2.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/puzzle/13.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/puzzle/41.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/puzzle/26.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/puzzle/53.gif" width="32" height="32" alt="tile"></td>
+				</tr>
+				<tr>
+					<td><img src="../art/edge/puzzle/4.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/puzzle/8.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/puzzle/44.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/puzzle/5.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/puzzle/7.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/puzzle/22.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/puzzle/14.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/puzzle/17.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/puzzle/25.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/puzzle/11.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/puzzle/16.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/puzzle/23.gif" width="32" height="32" alt="tile"></td>
+				</tr>
+			</tbody></table>
+			<p>The task is to arrange the 24 tiles into a 6x4 array. Slightly more difficult is to ensure the perimeter of the array is a single color. Some of  the many (12,261) possible solutions are shown below.</p>
+			<table cellspacing="0" cellpadding="0">
+				<tbody><tr>
+					<td><table cellpadding="0" cellspacing="0" class="sq3">
+						<caption>
+							MacMahon 6x4 solution
+							</caption>
+						<tbody><tr>
+							<td><img src="../art/edge/puzzle/0.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/1.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/4.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/30.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/31.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/40.gif" width="32" height="32" alt="tile"></td>
+						</tr>
+						<tr>
+							<td><img src="../art/edge/puzzle/21.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/33.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/75.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/45.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/24.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/61.gif" width="32" height="32" alt="tile"></td>
+						</tr>
+						<tr>
+							<td><img src="../art/edge/puzzle/71.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/54.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/26.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/80.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/68.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/51.gif" width="32" height="32" alt="tile"></td>
+						</tr>
+						<tr>
+							<td><img src="../art/edge/puzzle/22.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/48.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/50.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/41.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/46.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/20.gif" width="32" height="32" alt="tile"></td>
+						</tr>
+					</tbody></table></td>
+					<td><table cellpadding="0" cellspacing="0" class="sq3">
+						<caption>
+							Single perimeter
+							solution
+							</caption>
+						<tbody><tr>
+							<td><img src="../art/edge/puzzle/0.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/6.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/78.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/66.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/51.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/63.gif" width="32" height="32" alt="tile"></td>
+						</tr>
+						<tr>
+							<td><img src="../art/edge/puzzle/3.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/33.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/77.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/40.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/44.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/64.gif" width="32" height="32" alt="tile"></td>
+						</tr>
+						<tr>
+							<td><img src="../art/edge/puzzle/24.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/60.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/80.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/70.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/67.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/37.gif" width="32" height="32" alt="tile"></td>
+						</tr>
+						<tr>
+							<td><img src="../art/edge/puzzle/5.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/30.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/35.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/61.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/58.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/28.gif" width="32" height="32" alt="tile"></td>
+						</tr>
+					</tbody></table></td>
+				</tr>
+			</tbody></table>
+			<p>And another couple of solutions from <em>Sphere Packing, Lewis Caroll and Reversi</em> by Martin Gardner. A lobster shape of largest single color area and three isolated diamonds of different colors. </p>
+			<table cellspacing="0" cellpadding="0">
+				<tbody><tr>
+					<td><table cellpadding="0" cellspacing="0" class="sq3">
+						<caption>
+							'Lobster'
+							</caption>
+						<tbody><tr>
+							<td><img src="../art/edge/puzzle/24.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/69.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/75.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/36.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/0.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/18.gif" width="32" height="32" alt="tile"></td>
+						</tr>
+						<tr>
+							<td><img src="../art/edge/puzzle/17.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/79.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/68.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/40.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/27.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/20.gif" width="32" height="32" alt="tile"></td>
+						</tr>
+						<tr>
+							<td><img src="../art/edge/puzzle/16.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/80.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/70.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/67.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/30.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/38.gif" width="32" height="32" alt="tile"></td>
+						</tr>
+						<tr>
+							<td><img src="../art/edge/puzzle/7.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/62.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/58.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/31.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/33.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/55.gif" width="32" height="32" alt="tile"></td>
+						</tr>
+					</tbody></table></td>
+					<td><table cellpadding="0" cellspacing="0" class="sq3">
+						<caption>
+							3 isolated diamonds
+							</caption>
+						<tbody><tr>
+							<td><img src="../art/edge/puzzle/21.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/39.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/48.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/45.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/0.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/18.gif" width="32" height="32" alt="tile"></td>
+						</tr>
+						<tr>
+							<td><img src="../art/edge/puzzle/17.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/70.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/80.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/68.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/27.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/20.gif" width="32" height="32" alt="tile"></td>
+						</tr>
+						<tr>
+							<td><img src="../art/edge/puzzle/22.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/43.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/77.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/40.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/33.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/65.gif" width="32" height="32" alt="tile"></td>
+						</tr>
+						<tr>
+							<td><img src="../art/edge/puzzle/8.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/61.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/62.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/58.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/30.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/28.gif" width="32" height="32" alt="tile"></td>
+						</tr>
+					</tbody></table></td>
+				</tr>
+			</tbody></table>
+			<table cellpadding="0" cellspacing="0" class="lout">
+				<tbody><tr>
+					<td width="50%"><p>The <em>MacMahon Squares</em> can also be arranged into a 5x5 array with a vacant space in the middle. The solution shown also has a single color outside perimeter.</p></td>
+					<td><table cellpadding="0" cellspacing="0" class="sq3">
+						<caption>
+							5x5
+							solution
+							</caption>
+						<tbody><tr>
+							<td><img src="../art/edge/puzzle/15.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/78.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/57.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/39.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/36.gif" width="32" height="32" alt="tile"></td>
+						</tr>
+						<tr>
+							<td><img src="../art/edge/puzzle/22.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/41.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/30.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/52.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/64.gif" width="32" height="32" alt="tile"></td>
+						</tr>
+						<tr>
+							<td><img src="../art/edge/puzzle/23.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/40.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/block/none.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/50.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/46.gif" width="32" height="32" alt="tile"></td>
+						</tr>
+						<tr>
+							<td><img src="../art/edge/puzzle/17.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/79.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/60.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/80.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/65.gif" width="32" height="32" alt="tile"></td>
+						</tr>
+						<tr>
+							<td><img src="../art/edge/puzzle/7.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/56.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/0.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/2.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/1.gif" width="32" height="32" alt="tile"></td>
+						</tr>
+					</tbody></table></td>
+				</tr>
+			</tbody></table>
+			<p>We can reduce this set further by choosing tiles which contain a single color or only two colors in a 50/50 split. This leaves 15 'puzzle'  tiles. </p>
+			<table class="sq" cellspacing="0" cellpadding="0">
+				<caption>
+					Reduced MacMahon Tileset
+					</caption>
+				<tbody><tr>
+					<td><img src="../art/edge/puzzle/0.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/puzzle/40.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/puzzle/80.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/puzzle/10.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/puzzle/20.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/puzzle/50.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/puzzle/1.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/puzzle/2.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/puzzle/13.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/puzzle/41.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/puzzle/26.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/puzzle/53.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/puzzle/4.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/puzzle/8.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/puzzle/44.gif" width="32" height="32" alt="tile"></td>
+				</tr>
+			</tbody></table>
+			<table cellpadding="0" cellspacing="0" class="lout">
+				<tbody><tr>
+					<td width="50%">These 15 tiles can be arranged in a 5x3 array. A not very challenging puzzle. It is not possible to have a single color perimeter. It may be possible for the array to wrap.</td>
+					<td><table cellpadding="0" cellspacing="0" class="sq3">
+						<caption>
+							5x3
+							solution
+							</caption>
+						<tbody><tr>
+							<td><img src="../art/edge/puzzle/60.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/70.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/71.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/80.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/76.gif" width="32" height="32" alt="tile"></td>
+						</tr>
+						<tr>
+							<td><img src="../art/edge/puzzle/30.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/40.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/43.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/56.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/26.gif" width="32" height="32" alt="tile"></td>
+						</tr>
+						<tr>
+							<td><img src="../art/edge/puzzle/3.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/31.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/28.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/0.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/edge/puzzle/2.gif" width="32" height="32" alt="tile"></td>
+						</tr>
+					</tbody></table></td>
+				</tr>
+			</tbody></table>
+			<table cellpadding="0" cellspacing="0" class="lout">
+				<tbody><tr>
+					<td><h3>MultiMatch I</h3>
+						<p>"A 3-color set of 24 all-different edge-colored tiles"<br>
+							is sold  as <a href="http://www.gamepuzzles.com/edgemtch.htm#M2">MULTIMATCH® I</a> by Kadon Enterprises. </p></td>
+					<td><a href="http://www.gamepuzzles.com/edgemtch.htm#M2">
+						<img src="../art/web/multimatch1.png" alt="multimatch1" width="87" height="87" align="top" class="bord">
+					</a></td>
+				</tr>
+			</tbody></table>
+			<h3>4-edge tiles</h3>
+			<p>The complete Wang tileset contains 4^4 = 256 tiles. We can reduce the tileset by removing tiles that are self-similar when rotated by 90°. This produces a 'puzzle' tileset of 70 tiles which can be arranged into a 10x7 grid. The solution below also has a single color stage perimeter.</p>
+			<table cellpadding="0" cellspacing="0" class="lout">
+				<tbody><tr>
+					<td><table cellpadding="0" cellspacing="0" class="sq3">
+						<caption>
+							4-edge 'puzzle' tiles arranged in a 10x7 array
+							</caption>
+						<tbody><tr>
+							<td><img src="../art/grab-array/four-edge.png" width="320" height="224" alt="four edge tiles"></td>
+						</tr>
+					</tbody></table></td>
+					<td width="40%"><table cellpadding="0" cellspacing="0" class="sq3">
+						<caption>
+							16 'puzzle' tileset
+							</caption>
+						<tbody><tr>
+							<td><img src="../art/grab-array/marshall-4e.png" width="128" height="128" alt="four edge tiles"></td>
+						</tr>
+					</tbody></table></td>
+				</tr>
+			</tbody></table>
+			<p>We can reduce this set further by choosing tiles which contain a single color or only two colors in a 50/50 split. This leaves 16 'puzzle'  tiles, which can be arranged in a 4x4 square array. </p>
+			<h3>5-edge Marshall Tileset</h3>
+			<p>A complete set of Wang tiles with five different types of edge contains 5^4= 625 tiles. Some tiles are self-similar when rotated by 90°. Removing these tiles produces a reduced tile set of 165 tiles. 
+				We can reduce this set further by choosing tiles which contain a single color or only two colors in a 50/50 split. This leaves 25 'puzzle'  tiles, which can be arranged in a 5x5 square array.</p>
+			<table cellpadding="0" cellspacing="0" class="lout">
+				<tbody><tr>
+					<td><table cellpadding="0" cellspacing="0" class="sq3">
+						<caption>
+							Marshall tileset
+							</caption>
+						<tbody><tr>
+							<td><img src="../art/grab-array/marshall-tiles.png" width="160" height="160" alt="marshall tiles"></td>
+						</tr>
+					</tbody></table></td>
+					<td><table cellpadding="0" cellspacing="0" class="sq3">
+						<caption>
+							A 5x5 solution
+							</caption>
+						<tbody><tr>
+							<td><img src="../art/grab-array/marshall.png" width="160" height="160" alt="marshall tile solution"></td>
+						</tr>
+					</tbody></table></td>
+				</tr>
+			</tbody></table>
+			<hr>
+			<h3>Corner Matching Tileset Puzzles</h3>
+			<hr>
+			<h3>3-corner tiles </h3>
+			<p>A complete set of Wang tiles with three different types of corner has 4^3= 81 tiles. (Also see <a href="3corn.html">3-corner</a> Wang tiles). Some tiles are self-similar when rotated by 90°. </p>
+			<table class="sq" cellspacing="0" cellpadding="0">
+				<caption>
+					3-corner Wang Tileset - self-similar rotations
+					</caption>
+				<tbody><tr>
+					<td><img src="../art/corn/wang-3c/0.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/corn/wang-3c/40.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/corn/wang-3c/80.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/corn/wang-3c/10.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/corn/wang-3c/20.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/corn/wang-3c/50.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/corn/wang-3c/1.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/corn/wang-3c/2.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/corn/wang-3c/13.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/corn/wang-3c/41.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/corn/wang-3c/26.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/corn/wang-3c/53.gif" width="32" height="32" alt="tile"></td>
+				</tr>
+				<tr>
+					<td>0</td>
+					<td>40</td>
+					<td>80</td>
+					<td>10<br>
+						30</td>
+					<td>20<br>
+						60</td>
+					<td>50<br>
+						70</td>
+					<td>1<br>
+						3<br>
+						9<br>
+						27</td>
+					<td>2<br>
+						6<br>
+						18<br>
+						54</td>
+					<td>13<br>
+						39<br>
+						37<br>
+						31</td>
+					<td>41<br>
+						43<br>
+						49<br>
+						67</td>
+					<td>26<br>
+						78<br>
+						74<br>
+						62</td>
+					<td>53<br>
+						79<br>
+						77<br>
+						71</td>
+				</tr>
+				<tr>
+					<td><img src="../art/corn/wang-3c/4.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/corn/wang-3c/8.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/corn/wang-3c/44.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/corn/wang-3c/5.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/corn/wang-3c/7.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/corn/wang-3c/22.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/corn/wang-3c/14.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/corn/wang-3c/17.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/corn/wang-3c/25.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/corn/wang-3c/11.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/corn/wang-3c/16.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/corn/wang-3c/23.gif" width="32" height="32" alt="tile"></td>
+				</tr>
+				<tr>
+					<td>4<br>
+						12<br>
+						36<br>
+						28</td>
+					<td>8<br>
+						24<br>
+						72<br>
+						56</td>
+					<td>44<br>
+						52<br>
+						76<br>
+						68</td>
+					<td>5<br>
+						15<br>
+						45<br>
+						55</td>
+					<td>7<br>
+						21<br>
+						63<br>
+						29 </td>
+					<td>22<br>
+						66<br>
+						38<br>
+						34</td>
+					<td>14<br>
+						42<br>
+						46<br>
+						58</td>
+					<td>17<br>
+						51<br>
+						73<br>
+						59</td>
+					<td>25<br>
+						75<br>
+						65<br>
+						35</td>
+					<td>11<br>
+						33<br>
+						19<br>
+						57</td>
+					<td>16<br>
+						48<br>
+						64<br>
+						32</td>
+					<td>23<br>
+						69<br>
+						47<br>
+						61</td>
+				</tr>
+			</tbody></table>
+			<p>In a similar manner to MacMahon Squares above, we can remove self-similar tiles and reduce the set to 24 'puzzle' tiles. </p>
+			<table class="sq" cellspacing="0" cellpadding="0">
+				<caption>
+					3-corner puzzle Tileset
+					</caption>
+				<tbody><tr>
+					<td><img src="../art/corn/puzzle/0.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/corn/puzzle/40.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/corn/puzzle/80.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/corn/puzzle/10.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/corn/puzzle/20.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/corn/puzzle/50.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/corn/puzzle/1.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/corn/puzzle/2.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/corn/puzzle/13.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/corn/puzzle/41.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/corn/puzzle/26.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/corn/puzzle/53.gif" width="32" height="32" alt="tile"></td>
+				</tr>
+				<tr>
+					<td><img src="../art/corn/puzzle/4.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/corn/puzzle/8.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/corn/puzzle/44.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/corn/puzzle/5.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/corn/puzzle/7.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/corn/puzzle/22.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/corn/puzzle/14.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/corn/puzzle/17.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/corn/puzzle/25.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/corn/puzzle/11.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/corn/puzzle/16.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/corn/puzzle/23.gif" width="32" height="32" alt="tile"></td>
+				</tr>
+			</tbody></table>
+			<p>The tiles can  be used to create  a 6x4 array, or 5x5 array with a vacant space in the middle. Again, each tile can now be rotated.</p>
+			<table cellpadding="0" cellspacing="0" class="lout">
+				<tbody><tr>
+					<td><table cellpadding="0" cellspacing="0" class="sq3">
+						<caption>
+							3-corner 6x4 solution
+							</caption>
+						<tbody><tr>
+							<td><img src="../art/corn/puzzle/70.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/corn/puzzle/51.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/corn/puzzle/21.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/corn/puzzle/12.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/corn/puzzle/10.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/corn/puzzle/32.gif" width="32" height="32" alt="tile"></td>
+						</tr>
+						<tr>
+							<td><img src="../art/corn/puzzle/35.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/corn/puzzle/80.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/corn/puzzle/76.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/corn/puzzle/40.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/corn/puzzle/42.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/corn/puzzle/19.gif" width="32" height="32" alt="tile"></td>
+						</tr>
+						<tr>
+							<td><img src="../art/corn/puzzle/20.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/corn/puzzle/56.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/corn/puzzle/55.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/corn/puzzle/31.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/corn/puzzle/41.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/corn/puzzle/69.gif" width="32" height="32" alt="tile"></td>
+						</tr>
+						<tr>
+							<td><img src="../art/corn/puzzle/78.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/corn/puzzle/18.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/corn/puzzle/0.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/corn/puzzle/1.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/corn/puzzle/34.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/corn/puzzle/53.gif" width="32" height="32" alt="tile"></td>
+						</tr>
+					</tbody></table></td>
+					<td><table cellpadding="0" cellspacing="0" class="sq3">
+						<caption>
+							5x5
+							solution
+							</caption>
+						<tbody><tr>
+							<td><img src="../art/corn/puzzle/0.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/corn/puzzle/1.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/corn/puzzle/28.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/corn/puzzle/30.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/corn/puzzle/13.gif" width="32" height="32" alt="tile"></td>
+						</tr>
+						<tr>
+							<td><img src="../art/corn/puzzle/6.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/corn/puzzle/21.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/corn/puzzle/15.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/corn/puzzle/22.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/corn/puzzle/40.gif" width="32" height="32" alt="tile"></td>
+						</tr>
+						<tr>
+							<td><img src="../art/corn/puzzle/8.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/corn/puzzle/79.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/block/none.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/corn/puzzle/61.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/corn/puzzle/49.gif" width="32" height="32" alt="tile"></td>
+						</tr>
+						<tr>
+							<td><img src="../art/corn/puzzle/17.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/corn/puzzle/80.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/corn/puzzle/78.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/corn/puzzle/20.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/corn/puzzle/58.gif" width="32" height="32" alt="tile"></td>
+						</tr>
+						<tr>
+							<td><img src="../art/corn/puzzle/50.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/corn/puzzle/68.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/corn/puzzle/65.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/corn/puzzle/57.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/corn/puzzle/16.gif" width="32" height="32" alt="tile"></td>
+						</tr>
+					</tbody></table></td>
+				</tr>
+			</tbody></table>
+			<table cellpadding="0" cellspacing="0" class="lout">
+				<tbody><tr>
+					<td><h3>MultiMatch II</h3>
+						"set of 24 unique 3-color squares"<br>
+						is sold  as <a href="http://www.gamepuzzles.com/edgemtch.htm#M2">MULTIMATCH® II</a> by Kadon Enterprises.</td>
+					<td><a href="http://www.gamepuzzles.com/edgemtch.htm#M2">
+						<img src="../art/web/multimatch2.png" alt="multimatch2" width="87" height="87" align="top" class="bord">
+					</a></td>
+				</tr>
+			</tbody></table>
+		<!-- #EndEditable --><!-- end .content --></div></td>
+		<td class="side"><ul>
+				<li class="nolink">Intro</li>
+					<li><a href="intro.html">Wang tiles</a></li>
+					<li><a href="array.html">Maze arrays</a></li>
+					<li class="nolink">Wang Tiles</li>
+					<li><a href="2edge.html">2-edge tiles</a></li>
+					<li><a href="2corn.html">2-corner tiles</a></li>
+					<li><a href="3edge.html">3-edge tiles</a></li>
+					<li><a href="3corn.html">3-corner tiles</a></li>
+                    <li><a href="4ord.html">4-order tiles</a></li>
+					<li class="nolink">Tilesets</li>
+					<li><a href="blob.html">Blob tileset</a></li>
+					<li><a href="lout2e.html">Layout 2-edge</a></li>
+                    <li><a href="reduced.html">Reduced sets</a></li>
+					<li class="nolink">Single Side</li>
+					<li><a href="block.html">Block tiles</a></li>
+					<li><a href="1sideedge.html">1-side edge</a></li>
+					<li><a href="1sidecorn.html">1-side corner</a></li>
+					<li class="nolink">Paths</li>
+					<li><a href="angled.html">Angled paths</a></li>
+					<li><a href="border.html">Border paths</a></li>
+					<!--<li>Colour paths</li>-->
+					<li><a href="directed.html">Directed path</a></li>
+					<li><a href="isometric.html">Isometric path</a></li>
+					<li><a href="positioned.html">Position path</a></li>
+					<li><a href="shape.html">Shape tiles</a></li>
+					<li class="nolink">Mazes</li>
+					<li><a href="perfect.html">Perfect</a></li>
+					<li><a href="connect.html">Connected</a></li>
+                    <li><a href="imperfect.html">Imperfect</a></li>
+                    <li><a href="labyrinth.html">Labyrinth</a></li>
+                    <li><a href="twin.html">Twin maze</a></li>
+					<li class="nolink">Gallery</li>
+					<li><a href="tiles_e.html">Tiles 2-edge</a></li>
+					<li><a href="tiles_c.html">Tiles 2-corner</a></li>
+                    <li><a href="tiles_3ec.html">Tiles 3-order</a></li>
+                    <li><a href="blob_g.html">Blob tilesets</a></li>
+                    <li><a href="twin_g.html">Twin tilesets</a></li>
+					<li><a href="truch_g.html">Truchet tiles</a></li>
+					<li><a href="block_g.html">Block tiles</a></li>
+					<li><a href="patts.html">Patterns</a></li>
+					<li><a href="icons.html">Icons</a></li>
+					<li class="nolink">Info</li>
+					<li><a href="maths.html">Maths</a></li>
+					<li><a href="knots.html">Knots</a></li>
+                    <li><a href="pattern.html">Patterns</a></li>
+                    <li><a href="puzzle.html">Puzzles</a></li>
+					<li><a href="web.html">Web news</a></li>
+					<li><a href="glossary.html">Glossary</a></li>
+					<li>&nbsp;</li>
+			</ul></td>
+	</tr>
+</tbody></table>
+<table cellspacing="0" cellpadding="0" class="foot">
+	<tbody><tr>
+		<td class="main"><p>cr31.co.uk</p></td>
+		<td class="side">&nbsp;</td>
+	</tr>
+</tbody></table>
+
+
+</body><!-- #EndTemplate --></html>

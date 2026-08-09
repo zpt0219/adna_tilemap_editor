@@ -1,0 +1,430 @@
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><!-- #BeginTemplate "/Templates/wang.dwt" --><!-- DW6 --><head>
+<!-- #BeginEditable "doctitle" -->
+<title>Twin Mazes</title>
+<!-- #EndEditable -->
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<!-- #BeginEditable "Meta" -->
+<link rel="stylesheet" href="../wang/text.css" type="text/css">
+<script src="../js/wang.js" type="text/JavaScript"></script>
+<meta name="description" content="Stagecast puzzles, games, animation and sims">
+<meta name="keywords" content="Wang, maze, tile, tile set, tileset, labyrinth, Stagecast, seamless, icon, terrain, path, 32x32, game">
+<!-- #EndEditable -->
+</head>
+
+<body>
+<table class="tabs">
+	<tbody><tr>
+		<td><p style="margin:0">
+          Originally published on <a href="http://www.cr31.co.uk/stagecast/wang/intro.html">cr31.co.uk</a>
+          by Guy Walker. Mirrored from
+          <a href="https://www.boristhebrave.com/permanent/24/06/cr31/stagecast/wang/intro.html">boristhebrave.com</a>.
+        </p>
+        <p style="margin:4px 0 0; font-style:italic; opacity:0.85">
+          In memory of Professor Hao Wang (王浩, 1921 – 1995), whose elegant tiling theory continues to inspire generations of mathematicians and game designers.
+        </p></td>
+	</tr>
+</tbody></table>
+
+<table cellspacing="0" cellpadding="0" class="head">
+	<tbody><tr>
+		<td class="main"><h1>Wang Tiles</h1></td>
+		<td class="side">&nbsp;</td>
+	</tr>
+</tbody></table>
+<table cellspacing="0" cellpadding="0" class="strap">
+	<tbody><tr>
+		<td class="main"><p>edge and corner matched tilesets</p></td>
+		<td class="side"><p>menu</p></td>
+	</tr>
+</tbody></table>
+<table cellspacing="0" cellpadding="0" class="cont">
+	<tbody><tr>
+		<td class="main"><div class="content"><!-- #BeginEditable "contents" -->
+			<h2><a name="twin"></a>Twin Mazes</h2>
+			<p>An alternative  layout method is to use a <a href="3edge.html">3-edge</a> tileset to create two independent mazes on the same grid. We only need 33 of the available (3^4)=81 tiles. So Twin mazes use a <a href="reduced.html">reduced</a> 3-edge tileset.<br>
+			</p>
+			<table class="sq" cellspacing="0" cellpadding="0">
+				<caption>
+					3-edge Ground/Bridge
+					only
+					</caption>
+				<tbody><tr>
+					<td><img src="../art/edge/wang-3e/1.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-3e/3.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-3e/4.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-3e/9.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-3e/10.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-3e/12.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-3e/13.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-3e/27.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-3e/28.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-3e/30.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-3e/31.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-3e/36.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-3e/37.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-3e/39.gif" width="32" height="32" alt="tile"></td>
+				</tr>
+				<tr>
+					<td><img src="../art/twin/brench/1.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/twin/brench/3.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/twin/brench/4.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/twin/brench/9.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/twin/brench/10.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/twin/brench/12.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/twin/brench/13.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/twin/brench/27.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/twin/brench/28.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/twin/brench/30.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/twin/brench/31.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/twin/brench/36.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/twin/brench/37.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/twin/brench/39.gif" width="32" height="32" alt="tile"></td>
+				</tr>
+				<tr>
+					<td>1</td>
+					<td>3</td>
+					<td>4</td>
+					<td>9</td>
+					<td>10</td>
+					<td>12</td>
+					<td>13</td>
+					<td>27</td>
+					<td>28</td>
+					<td>30</td>
+					<td>31</td>
+					<td>36</td>
+					<td>37</td>
+					<td>39</td>
+				</tr>
+			</tbody></table>
+			<table class="sq" cellspacing="0" cellpadding="0">
+				<caption>
+					3-edge 
+					Ground/Trench only
+					</caption>
+				<tbody><tr>
+					<td><img src="../art/edge/wang-3e/2.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-3e/6.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-3e/8.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-3e/18.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-3e/20.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-3e/24.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-3e/26.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-3e/54.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-3e/56.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-3e/60.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-3e/62.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-3e/72.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-3e/74.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-3e/78.gif" width="32" height="32" alt="tile"></td>
+				</tr>
+				<tr>
+					<td><img src="../art/twin/brench/2.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/twin/brench/6.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/twin/brench/8.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/twin/brench/18.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/twin/brench/20.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/twin/brench/24.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/twin/brench/26.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/twin/brench/54.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/twin/brench/56.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/twin/brench/60.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/twin/brench/62.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/twin/brench/72.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/twin/brench/74.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/twin/brench/78.gif" width="32" height="32" alt="tile"></td>
+				</tr>
+				<tr>
+					<td>2</td>
+					<td>6</td>
+					<td>8</td>
+					<td>18</td>
+					<td>20</td>
+					<td>24</td>
+					<td>26</td>
+					<td>54</td>
+					<td>56</td>
+					<td>60</td>
+					<td>62</td>
+					<td>72</td>
+					<td>74</td>
+					<td>78</td>
+				</tr>
+			</tbody></table>
+			<table class="sq" cellspacing="0" cellpadding="0">
+				<caption>
+					plus...
+					</caption>
+				<tbody><tr>
+					<td><img src="../art/edge/wang-3e/0.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-3e/40.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-3e/50.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-3e/70.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/edge/wang-3e/80.gif" width="32" height="32" alt="tile"></td>
+				</tr>
+				<tr>
+					<td><img src="../art/twin/brench/0.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/twin/brench/40.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/twin/brench/50.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/twin/brench/70.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/twin/brench/80.gif" width="32" height="32" alt="tile"></td>
+				</tr>
+				<tr>
+					<td>0</td>
+					<td>40</td>
+					<td>50</td>
+					<td>70</td>
+					<td>80</td>
+				</tr>
+			</tbody></table>
+			<p>Here are the 33 required tiles and also their equivalent Wang tiles for reference.<br>
+				A default layout would look like this:</p>
+			<table cellpadding="0" cellspacing="0" class="sq3">
+				<caption>
+					Twin maze layout and equivalent 3-edge reduced Wang tileset
+					</caption>
+				<tbody><tr>
+					<td width="33"><img src="../art/grab-array/twinmaze.png" width="414" height="222" alt="Twin Maze layout"></td>
+				</tr>
+			</tbody></table>
+			<p>See <a href="../wang/stage.html">Stage</a> for more random twin path mazes. Both Bridge and Trench mazes are  'perfect' and independent of each other. After maze generation, some alternative 'link' tiles are added to the Brench array only, see <a href="twin_g.html">Twin tilesets</a>.			</p>
+			<h3>Link tiles </h3>
+			<table cellpadding="0" cellspacing="0" class="lout">
+				<tbody><tr>
+					<td width="66%">They can only be added where the steps align correctly on two sides of an empty grass tile. The tiles 'link' the upper Bridge and lower Trench mazes. </td>
+					<td><table cellpadding="0" cellspacing="0" class="sq4">
+						<caption>
+							'Link' tiles
+							</caption>
+						<tbody><tr>
+							<td><img src="../art/twin/brench/0ne.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/twin/brench/0sw.gif" width="32" height="32" alt="tile"></td>
+						</tr>
+					</tbody></table></td>
+				</tr>
+			</tbody></table>
+			<table cellspacing="0" cellpadding="0">
+				<tbody><tr>
+					<td><table cellpadding="0" cellspacing="0" class="sq3">
+						<tbody><tr>
+							<td><img src="../art/twin/brench/27.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/twin/brench/0.gif" width="32" height="32" alt="tile"></td>
+						</tr>
+						<tr>
+							<td><img src="../art/twin/brench/0ne.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/twin/brench/18.gif" width="32" height="32" alt="tile"></td>
+						</tr>
+					</tbody></table></td>
+					<td><table cellpadding="0" cellspacing="0" class="sq3">
+						<tbody><tr>
+							<td><img src="../art/twin/brench/1.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/twin/brench/0sw.gif" width="32" height="32" alt="tile"></td>
+						</tr>
+						<tr>
+							<td><img src="../art/twin/brench/0.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/twin/brench/6.gif" width="32" height="32" alt="tile"></td>
+						</tr>
+					</tbody></table></td>
+					<td><table cellpadding="0" cellspacing="0" class="sq3">
+						<tbody><tr>
+							<td><img src="../art/twin/brench/31.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/twin/brench/30.gif" width="32" height="32" alt="tile"></td>
+						</tr>
+						<tr>
+							<td><img src="../art/twin/brench/0ne.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/twin/brench/18.gif" width="32" height="32" alt="tile"></td>
+						</tr>
+					</tbody></table></td>
+					<td><table cellpadding="0" cellspacing="0" class="sq3">
+						<tbody><tr>
+							<td><img src="../art/twin/brench/37.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/twin/brench/0sw.gif" width="32" height="32" alt="tile"></td>
+						</tr>
+						<tr>
+							<td><img src="../art/twin/brench/10.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/twin/brench/6.gif" width="32" height="32" alt="tile"></td>
+						</tr>
+					</tbody></table></td>
+				</tr>
+				<tr>
+					<td><table cellpadding="0" cellspacing="0" class="sq3">
+						<tbody><tr>
+							<td><img src="../art/twin/brench/27.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/twin/brench/20.gif" width="32" height="32" alt="tile"></td>
+						</tr>
+						<tr>
+							<td><img src="../art/twin/brench/0ne.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/twin/brench/26.gif" width="32" height="32" alt="tile"></td>
+						</tr>
+					</tbody></table></td>
+					<td><table cellpadding="0" cellspacing="0" class="sq3">
+						<tbody><tr>
+							<td><img src="../art/twin/brench/1.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/twin/brench/0sw.gif" width="32" height="32" alt="tile"></td>
+						</tr>
+						<tr>
+							<td><img src="../art/twin/brench/60.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/twin/brench/78.gif" width="32" height="32" alt="tile"></td>
+						</tr>
+					</tbody></table></td>
+					<td><table cellpadding="0" cellspacing="0" class="sq3">
+						<tbody><tr>
+							<td><img src="../art/twin/brench/31.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/twin/brench/50.gif" width="32" height="32" alt="tile"></td>
+						</tr>
+						<tr>
+							<td><img src="../art/twin/brench/0ne.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/twin/brench/26.gif" width="32" height="32" alt="tile"></td>
+						</tr>
+					</tbody></table></td>
+					<td><table cellpadding="0" cellspacing="0" class="sq3">
+						<tbody><tr>
+							<td><img src="../art/twin/brench/37.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/twin/brench/0sw.gif" width="32" height="32" alt="tile"></td>
+						</tr>
+						<tr>
+							<td><img src="../art/twin/brench/70.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/twin/brench/78.gif" width="32" height="32" alt="tile"></td>
+						</tr>
+					</tbody></table></td>
+				</tr>
+			</tbody></table>
+			<h3>Weave 'cross' tiles</h3>
+			<table cellpadding="0" cellspacing="0" class="lout">
+				<tbody><tr>
+					<td width="66%">If a more random weave effect is needed, then alternate 'cross' designs for both tile-50 and tile-70 can be randomly substituted.<br>
+						Bridge/Trench have no alternatives because a bridge can only appear above (or over) a trench. Pipes can have alternatives. The Route tileset can have alternate 'cross' tiles with road barriers open or closed.</td>
+					<td><table cellpadding="0" cellspacing="0" class="sq4">
+						<caption>
+							Pipes 'cross' tiles
+							</caption>
+						<tbody><tr>
+							<td><img src="../art/twin/pipes/50.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/twin/pipes/70.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/twin/pipes/50x.gif" width="32" height="32" alt="tile"></td>
+							<td><img src="../art/twin/pipes/70x.gif" width="32" height="32" alt="tile"></td>
+						</tr>
+					</tbody></table>
+						<br>
+						<table cellpadding="0" cellspacing="0" class="sq4">
+							<caption>
+								Route 'cross' tiles
+								</caption>
+							<tbody><tr>
+								<td><img src="../art/twin/routes/50.gif" width="32" height="32" alt="tile"></td>
+								<td><img src="../art/twin/routes/70.gif" width="32" height="32" alt="tile"></td>
+								<td><img src="../art/twin/routes/50x.gif" width="32" height="32" alt="tile"></td>
+								<td><img src="../art/twin/routes/70x.gif" width="32" height="32" alt="tile"></td>
+							</tr>
+						</tbody></table></td>
+				</tr>
+			</tbody></table>
+			<h3>Alternate tiles </h3>
+			<table cellpadding="0" cellspacing="0" class="sq5">
+				<tbody><tr>
+					<td><strong>Tileset</strong></td>
+					<td><strong>Tile-0</strong><br>
+						'link'</td>
+					<td><strong>Tile-15</strong><br>
+						'weave'</td>
+					<td><strong>Tile-5</strong><br>
+						'straight'</td>
+					<td><strong>Tile-10</strong><br>
+						'straight'</td>
+				</tr>
+				<tr>
+					<td>Brench</td>
+					<td><img src="../art/twin/brench/0ne.gif" width="32" height="32" alt="tile">
+						<img src="../art/twin/brench/0sw.gif" width="32" height="32" alt="tile"></td>
+					<td>none</td>
+					<td><img src="../art/twin/brench/10x.gif" width="32" height="32" alt="tile">
+						same</td>
+					<td><img src="../art/twin/brench/30x.gif" width="32" height="32" alt="tile">
+						same</td>
+				</tr>
+				<tr>
+					<td>Pipes</td>
+					<td><img src="../art/twin/pipes/0ne.gif" width="32" height="32" alt="tile">
+						<img src="../art/twin/pipes/0sw.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/twin/pipes/50x.gif" width="32" height="32" alt="tile">
+						<img src="../art/twin/pipes/70x.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/twin/pipes/10x.gif" width="32" height="32" alt="tile">
+						<img src="../art/twin/pipes/20x.gif" width="32" height="32" alt="tile"></td>
+					<td><img src="../art/twin/pipes/30x.gif" width="32" height="32" alt="tile">
+						<img src="../art/twin/pipes/60x.gif" width="32" height="32" alt="tile"></td>
+				</tr>
+				<tr>
+					<td>Route</td>
+					<td>none</td>
+					<td><img src="../art/twin/routes/50x.gif" width="32" height="32" alt="tile">
+						<img src="../art/twin/routes/70x.gif" width="32" height="32" alt="tile"></td>
+					<td>same
+						<img src="../art/twin/routes/20x.gif" width="32" height="32" alt="tile"></td>
+					<td>same
+						<img src="../art/twin/routes/60x.gif" width="32" height="32" alt="tile"></td>
+				</tr>
+			</tbody></table>
+			<div class="stage"><p>Stage: Random Twin 2-edge  'Bridge &amp; Trench' Tileset</p>
+		<img src="../art/grabs/twin/twin-path.png" width="576" height="384" alt="Twin Path Bridge &amp; Trench &amp; 3-edge Wang"></div><!-- #EndEditable --><!-- end .content --></div></td>
+		<td class="side"><ul>
+				<li class="nolink">Intro</li>
+					<li><a href="intro.html">Wang tiles</a></li>
+					<li><a href="array.html">Maze arrays</a></li>
+					<li class="nolink">Wang Tiles</li>
+					<li><a href="2edge.html">2-edge tiles</a></li>
+					<li><a href="2corn.html">2-corner tiles</a></li>
+					<li><a href="3edge.html">3-edge tiles</a></li>
+					<li><a href="3corn.html">3-corner tiles</a></li>
+                    <li><a href="4ord.html">4-order tiles</a></li>
+					<li class="nolink">Tilesets</li>
+					<li><a href="blob.html">Blob tileset</a></li>
+					<li><a href="lout2e.html">Layout 2-edge</a></li>
+                    <li><a href="reduced.html">Reduced sets</a></li>
+					<li class="nolink">Single Side</li>
+					<li><a href="block.html">Block tiles</a></li>
+					<li><a href="1sideedge.html">1-side edge</a></li>
+					<li><a href="1sidecorn.html">1-side corner</a></li>
+					<li class="nolink">Paths</li>
+					<li><a href="angled.html">Angled paths</a></li>
+					<li><a href="border.html">Border paths</a></li>
+					<!--<li>Colour paths</li>-->
+					<li><a href="directed.html">Directed path</a></li>
+					<li><a href="isometric.html">Isometric path</a></li>
+					<li><a href="positioned.html">Position path</a></li>
+					<li><a href="shape.html">Shape tiles</a></li>
+					<li class="nolink">Mazes</li>
+					<li><a href="perfect.html">Perfect</a></li>
+					<li><a href="connect.html">Connected</a></li>
+                    <li><a href="imperfect.html">Imperfect</a></li>
+                    <li><a href="labyrinth.html">Labyrinth</a></li>
+                    <li><a href="twin.html">Twin maze</a></li>
+					<li class="nolink">Gallery</li>
+					<li><a href="tiles_e.html">Tiles 2-edge</a></li>
+					<li><a href="tiles_c.html">Tiles 2-corner</a></li>
+                    <li><a href="tiles_3ec.html">Tiles 3-order</a></li>
+                    <li><a href="blob_g.html">Blob tilesets</a></li>
+                    <li><a href="twin_g.html">Twin tilesets</a></li>
+					<li><a href="truch_g.html">Truchet tiles</a></li>
+					<li><a href="block_g.html">Block tiles</a></li>
+					<li><a href="patts.html">Patterns</a></li>
+					<li><a href="icons.html">Icons</a></li>
+					<li class="nolink">Info</li>
+					<li><a href="maths.html">Maths</a></li>
+					<li><a href="knots.html">Knots</a></li>
+                    <li><a href="pattern.html">Patterns</a></li>
+                    <li><a href="puzzle.html">Puzzles</a></li>
+					<li><a href="web.html">Web news</a></li>
+					<li><a href="glossary.html">Glossary</a></li>
+					<li>&nbsp;</li>
+			</ul></td>
+	</tr>
+</tbody></table>
+<table cellspacing="0" cellpadding="0" class="foot">
+	<tbody><tr>
+		<td class="main"><p>cr31.co.uk</p></td>
+		<td class="side">&nbsp;</td>
+	</tr>
+</tbody></table>
+
+
+</body><!-- #EndTemplate --></html>

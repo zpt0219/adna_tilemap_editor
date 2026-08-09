@@ -1,0 +1,241 @@
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><!-- #BeginTemplate "/Templates/wang.dwt" --><!-- DW6 --><head>
+<!-- #BeginEditable "doctitle" -->
+<title>4-order Wang Tiles</title>
+<!-- #EndEditable -->
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<!-- #BeginEditable "Meta" -->
+<link rel="stylesheet" href="../wang/text.css" type="text/css">
+<script src="../js/wang.js" type="text/JavaScript"></script>
+<meta name="description" content="Stagecast puzzles, games, animation and sims">
+<meta name="keywords" content="Wang, maze, tile, tile set, tileset, labyrinth, Stagecast, seamless, icon, terrain, path, 32x32, game">
+<!-- #EndEditable -->
+</head>
+
+<body>
+<table class="tabs">
+	<tbody><tr>
+		<td><p style="margin:0">
+          Originally published on <a href="http://www.cr31.co.uk/stagecast/wang/intro.html">cr31.co.uk</a>
+          by Guy Walker. Mirrored from
+          <a href="https://www.boristhebrave.com/permanent/24/06/cr31/stagecast/wang/intro.html">boristhebrave.com</a>.
+        </p>
+        <p style="margin:4px 0 0; font-style:italic; opacity:0.85">
+          In memory of Professor Hao Wang (王浩, 1921 – 1995), whose elegant tiling theory continues to inspire generations of mathematicians and game designers.
+        </p></td>
+	</tr>
+</tbody></table>
+
+<table cellspacing="0" cellpadding="0" class="head">
+	<tbody><tr>
+		<td class="main"><h1>Wang Tiles</h1></td>
+		<td class="side">&nbsp;</td>
+	</tr>
+</tbody></table>
+<table cellspacing="0" cellpadding="0" class="strap">
+	<tbody><tr>
+		<td class="main"><p>edge and corner matched tilesets</p></td>
+		<td class="side"><p>menu</p></td>
+	</tr>
+</tbody></table>
+<table cellspacing="0" cellpadding="0" class="cont">
+	<tbody><tr>
+		<td class="main"><div class="content"><!-- #BeginEditable "contents" -->
+			<h2>4-order Wang Tile Recursive Layouts</h2>
+			<p>A 4-order Wang tileset require 4^4 = 256 tiles in a complete tileset. Too many to be practical for Stagecast sims or the web Stage. </p>
+			<h3>Edge Wang Tilesets</h3>
+			<p>Tiles of any order can be arranged in a recursive manner. Below is shown the layouts for Wang edge tiles of orders 1, 2, 3, and 4. All layouts place the '0' tile in the lower left. For each layout, the lower left quadrant is a repeat of the previous order.</p>
+			<p>Tile-0 (shown) and also tile-1 always have the same index number. All other tiles have to be renumbered for each order. See Wang <a href="2edge.html">2-edge</a> and <a href="3edge.html">3-edge</a> for index number creation.</p>
+			<p>All layouts wrap top-bottom and left-right.</p>
+			<table cellpadding="0" cellspacing="0" class="lout">
+				<tbody><tr>
+					<td width="40%"><h3>Recursive layouts </h3>
+						<br>
+						<table class="sq3" cellspacing="0" cellpadding="0">
+							<caption>
+								1-e
+								</caption>
+							<tbody><tr>
+								<td><img src="../art/edge/wang-2e/0.gif" alt="tile" width="32" height="32"></td>
+							</tr>
+						</tbody></table>
+						<br>
+						<table class="sq3" cellspacing="0" cellpadding="0">
+							<caption>
+								Wang 2-edge
+								</caption>
+							<tbody><tr>
+								<td><img src="../art/edge/wang-2e/6.gif" width="32" height="32" alt="tile"></td>
+								<td><img src="../art/edge/wang-2e/15.gif" width="32" height="32" alt="tile"></td>
+								<td><img src="../art/edge/wang-2e/14.gif" width="32" height="32" alt="tile"></td>
+								<td><img src="../art/edge/wang-2e/12.gif" width="32" height="32" alt="tile"></td>
+							</tr>
+							<tr>
+								<td><img src="../art/edge/wang-2e/11.gif" width="32" height="32" alt="tile"></td>
+								<td><img src="../art/edge/wang-2e/13.gif" width="32" height="32" alt="tile"></td>
+								<td><img src="../art/edge/wang-2e/5.gif" width="32" height="32" alt="tile"></td>
+								<td><img src="../art/edge/wang-2e/7.gif" width="32" height="32" alt="tile"></td>
+							</tr>
+							<tr>
+								<td><img src="../art/edge/wang-2e/10.gif" alt="tile" width="32" height="32"></td>
+								<td><img src="../art/edge/wang-2e/9.gif" alt="tile" width="32" height="32"></td>
+								<td><img src="../art/edge/wang-2e/1.gif" width="32" height="32" alt="tile"></td>
+								<td><img src="../art/edge/wang-2e/3.gif" width="32" height="32" alt="tile"></td>
+							</tr>
+							<tr>
+								<td><img src="../art/edge/wang-2e/0.gif" alt="tile" width="32" height="32"></td>
+								<td><img src="../art/edge/wang-2e/4.gif" alt="tile" width="32" height="32"></td>
+								<td><img src="../art/edge/wang-2e/2.gif" width="32" height="32" alt="tile"></td>
+								<td><img src="../art/edge/wang-2e/8.gif" width="32" height="32" alt="tile"></td>
+							</tr>
+						</tbody></table></td>
+					<td><table cellpadding="0" cellspacing="0" class="sq3">
+						<caption>
+							Recursive layout of  3-edge Wang tiles
+							</caption>
+						<tbody><tr>
+							<td><img src="../art/grab-array/9x9/wang3e_f.png" alt="Wang tiles 3 edge recursive packing" width="288" height="288"></td>
+						</tr>
+					</tbody></table></td>
+				</tr>
+				<tr>
+					<td colspan="2"><table class="sq3" cellspacing="0" cellpadding="0">
+						<caption>
+							Recursive layout of  4-edge Wang tiles
+							</caption>
+						<tbody><tr>
+							<td><img src="../art/grab-array/wang4e.png" width="512" height="512" alt="wang 4 edge recursive layout"></td>
+						</tr>
+					</tbody></table></td>
+				</tr>
+			</tbody></table>
+			<h3>Corner Wang Tilesets</h3>
+			<p>Again, the lower left quadrant is a repeat of the previous order. Tile-0 (shown) and also tile-1 always have the same index number. See Wang <a href="2corn.html">2-corner</a> and <a href="3corn.html">3-corner</a> for index number creation.<br>
+				Also see <a href="puzzle.html">Puzzle Tilesets</a> for reduced 3-corner tile sets used in tile matching puzzles. </p>
+			<table cellpadding="0" cellspacing="0" class="lout">
+				<tbody><tr>
+					<td width="40%"><h3>Recursive layouts </h3>
+						<br>
+						<table class="sq3" cellspacing="0" cellpadding="0">
+							<caption>
+								1-c
+								</caption>
+							<tbody><tr>
+								<td><img src="../art/edge/wang-2e/0.gif" alt="tile" width="32" height="32"></td>
+							</tr>
+						</tbody></table>
+						<br>
+						<table class="sq3" cellspacing="0" cellpadding="0">
+							<caption>
+								Wang 2-corner
+								</caption>
+							<tbody><tr>
+								<td><img src="../art/corn/wang-2c/4.gif" alt="6" width="32" height="32"></td>
+								<td><img src="../art/corn/wang-2c/3.gif" alt="14" width="32" height="32"></td>
+								<td><img src="../art/corn/wang-2c/14.gif" alt="8" width="32" height="32"></td>
+								<td><img src="../art/corn/wang-2c/6.gif" alt="4" width="32" height="32"></td>
+							</tr>
+							<tr>
+								<td><img src="../art/corn/wang-2c/10.gif" width="32" height="32" alt="1"></td>
+								<td><img src="../art/corn/wang-2c/7.gif" width="32" height="32" alt="7"></td>
+								<td><img src="../art/corn/wang-2c/15.gif" width="32" height="32" alt="12"></td>
+								<td><img src="../art/corn/wang-2c/13.gif" width="32" height="32" alt="5"></td>
+							</tr>
+							<tr>
+								<td><img src="../art/corn/wang-2c/1.gif" width="32" height="32" alt="2"></td>
+								<td><img src="../art/corn/wang-2c/9.gif" width="32" height="32" alt="15"></td>
+								<td><img src="../art/corn/wang-2c/11.gif" width="32" height="32" alt="11"></td>
+								<td><img src="../art/corn/wang-2c/12.gif" width="32" height="32" alt="13"></td>
+							</tr>
+							<tr>
+								<td><img src="../art/corn/wang-2c/0.gif" width="32" height="32" alt="3"></td>
+								<td><img src="../art/corn/wang-2c/2.gif" width="32" height="32" alt="3"></td>
+								<td><img src="../art/corn/wang-2c/5.gif" width="32" height="32" alt="8"></td>
+								<td><img src="../art/corn/wang-2c/8.gif" width="32" height="32" alt="1"></td>
+							</tr>
+						</tbody></table></td>
+					<td><table cellpadding="0" cellspacing="0" class="sq3">
+						<caption>
+							Recursive layout of  3-corner Wang tiles
+							</caption>
+						<tbody><tr>
+							<td><img src="../art/atlas/corn/wang3c_f.png" alt="Wang tiles recursive array" width="288" height="288"></td>
+						</tr>
+					</tbody></table></td>
+				</tr>
+				<tr>
+					<td colspan="2"><table class="sq3" cellspacing="0" cellpadding="0">
+						<caption>
+							Recursive layout of  4-corner Wang tiles
+							</caption>
+						<tbody><tr>
+							<td><img src="../art/grab-array/wang4c.png" width="512" height="512" alt="wang 4 corner recursive layout"></td>
+						</tr>
+					</tbody></table></td>
+				</tr>
+			</tbody></table>
+			<p>Order 4 Wang tile layouts waiting for tile index numbers to be added. The weightings will be 1, 4, 16 and 64. </p>
+			<h3>2 x 2-order Wang Tiles</h3>
+			<p>A possible alternative arrangement it is  to overlay a 2-order Wang tileset on top of another 2-order tileset. This will produce 16x16=256 combinations. The upper tileset will need to have a transparent background so the lower tiles show through. It may also require wider paths or patch areas. In theory, and with a good tile design, this should produce a 4-corner Wang tileset.</p>
+		<!-- #EndEditable --><!-- end .content --></div></td>
+		<td class="side"><ul>
+				<li class="nolink">Intro</li>
+					<li><a href="intro.html">Wang tiles</a></li>
+					<li><a href="array.html">Maze arrays</a></li>
+					<li class="nolink">Wang Tiles</li>
+					<li><a href="2edge.html">2-edge tiles</a></li>
+					<li><a href="2corn.html">2-corner tiles</a></li>
+					<li><a href="3edge.html">3-edge tiles</a></li>
+					<li><a href="3corn.html">3-corner tiles</a></li>
+                    <li><a href="4ord.html">4-order tiles</a></li>
+					<li class="nolink">Tilesets</li>
+					<li><a href="blob.html">Blob tileset</a></li>
+					<li><a href="lout2e.html">Layout 2-edge</a></li>
+                    <li><a href="reduced.html">Reduced sets</a></li>
+					<li class="nolink">Single Side</li>
+					<li><a href="block.html">Block tiles</a></li>
+					<li><a href="1sideedge.html">1-side edge</a></li>
+					<li><a href="1sidecorn.html">1-side corner</a></li>
+					<li class="nolink">Paths</li>
+					<li><a href="angled.html">Angled paths</a></li>
+					<li><a href="border.html">Border paths</a></li>
+					<!--<li>Colour paths</li>-->
+					<li><a href="directed.html">Directed path</a></li>
+					<li><a href="isometric.html">Isometric path</a></li>
+					<li><a href="positioned.html">Position path</a></li>
+					<li><a href="shape.html">Shape tiles</a></li>
+					<li class="nolink">Mazes</li>
+					<li><a href="perfect.html">Perfect</a></li>
+					<li><a href="connect.html">Connected</a></li>
+                    <li><a href="imperfect.html">Imperfect</a></li>
+                    <li><a href="labyrinth.html">Labyrinth</a></li>
+                    <li><a href="twin.html">Twin maze</a></li>
+					<li class="nolink">Gallery</li>
+					<li><a href="tiles_e.html">Tiles 2-edge</a></li>
+					<li><a href="tiles_c.html">Tiles 2-corner</a></li>
+                    <li><a href="tiles_3ec.html">Tiles 3-order</a></li>
+                    <li><a href="blob_g.html">Blob tilesets</a></li>
+                    <li><a href="twin_g.html">Twin tilesets</a></li>
+					<li><a href="truch_g.html">Truchet tiles</a></li>
+					<li><a href="block_g.html">Block tiles</a></li>
+					<li><a href="patts.html">Patterns</a></li>
+					<li><a href="icons.html">Icons</a></li>
+					<li class="nolink">Info</li>
+					<li><a href="maths.html">Maths</a></li>
+					<li><a href="knots.html">Knots</a></li>
+                    <li><a href="pattern.html">Patterns</a></li>
+                    <li><a href="puzzle.html">Puzzles</a></li>
+					<li><a href="web.html">Web news</a></li>
+					<li><a href="glossary.html">Glossary</a></li>
+					<li>&nbsp;</li>
+			</ul></td>
+	</tr>
+</tbody></table>
+<table cellspacing="0" cellpadding="0" class="foot">
+	<tbody><tr>
+		<td class="main"><p>cr31.co.uk</p></td>
+		<td class="side">&nbsp;</td>
+	</tr>
+</tbody></table>
+
+
+</body><!-- #EndTemplate --></html>

@@ -1,0 +1,54 @@
+@charset "UTF-8";
+/* CSS Document Stage 2 */
+
+/*table {margin: 0 auto; border-collapse: collapse; border: 0; width: 100%; margin-bottom: 1em; border-style: none; }
+td {vertical-align: top; border: 0; border-style: none; }
+#cent table.cont {width: auto; margin-bottom: 6px; }  */
+
+table.stagebox {margin-top: 15px; background-color: #4c4c4c; }
+
+#stagearea {position: relative; margin: 15px; border: 1px solid #003; }
+
+#stage {border-collapse: collapse; border: 0; }
+#stage td {width: 32px; height: 32px; margin: 0; padding: 0; }
+#stage.bevel td {box-shadow: inset 1px 1px rgba(0,0,0,.3); }
+
+table.tank {width: auto; margin: 15px auto; border: 1px solid #777; }
+table.tank td {text-align: center; color: #fff; font-size: 14px; font-weight: normal;  padding: 2px 8px 0 8px; border: 1px solid #777; }
+
+table.tank td.bg1 {background-color: #606060; }
+table.tank td.bg2 {background-color: #806060; }
+table.tank td.bg3 {background-color: #607060; }
+table.tank td.bg4 {background-color: #808060; }
+table.bgfull td {line-height: 1.5; border: none; }
+
+#auto {border: 1px solid #806060; }
+
+select {display: block; width: 64px; }  /* buttons */
+
+#title {
+    margin: 0; padding: 14px 0 0 0; text-align: center; color: #fff; font-size: 14px; font-weight: normal; border: none;
+}
+
+/*#op {text-align: left; padding-left: 32px; font-size: 12px; color: #fff; }*/
+
+/*#sprite img {position: absolute; pointer-events:none; xdisplay: none; }*/
+
+#cursor {position: absolute; top: 0; left: 0; width: 50%; bottom:0; pointer-events: none; }
+#cursor img {position: absolute; border: none; }
+#over {pointer-events: auto; }
+
+/* pointer-events: none; else cannot rollover tile below */
+
+div#shde {display: none; width: 642px; margin: 0 auto; }
+
+input[type="button"] {
+    /*background-color: red;*/
+    /*border: none;*/
+    /*color: red;*/
+    padding: none;
+    /*text-align: center;*/
+    /*text-decoration: none;*/
+    margin: none;
+    cursor: pointer;
+}
