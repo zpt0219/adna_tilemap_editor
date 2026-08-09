@@ -14,13 +14,15 @@ const ALGOS = TEXTURE_PRESETS.map((p) => p.id).filter((id) => id !== 'none');
 const DEEP_BLUE = { r: 0x00, g: 0x18, b: 0xa0 };
 const NEAR_WHITE = { r: 0xf8, g: 0xf8, b: 0xf8 };
 
+const wrapN = (v: number, n: number) => ((v % n) + n) % n;
+
 /** Baked art keeps its lightest tone as bare terrain, so it never inks everything. */
 const BAKED = [
   'weave', 'paving', 'paving3', 'paving5', 'stone_floor', 'breeze_block', 'brick_wall', 'cobbles2', 'brick_floor',
   'hexagon', 'isometric', 'octagonal', 'water', 'field', 'rubble', 'nonslip',
   // Not baked art, but the same kind of texture: these name a shade per cell
   // rather than thresholding a field, so the cells dealt shade 0 stay bare.
-  'cells', 'medium_cells', 'small_cells',
+  'cells',
 ] as const;
 
 /**
@@ -108,9 +110,7 @@ describe('texture presets', () => {
     ['paving', 960 / 1024],
     ['paving3', 692 / 1024],
     ['paving5', 817 / 1024],
-    ['cells', 789 / 1024],
-    ['medium_cells', 772 / 1024],
-    ['small_cells', 814 / 1024],
+    ['cells', 802 / 1024],
   ] as const)('%s leaves its lightest tone as bare terrain at full amount', (algo, want) => {
     expect(coverage(algo, 1)).toBeCloseTo(want, 6);
   });
@@ -129,36 +129,36 @@ describe('texture presets', () => {
     expect(counts[MAX_TEXTURE_SHADES]).toBeLessThan((p * p) / 3);
   });
 
-  it.each(['cells', 'medium_cells', 'small_cells'] as const)(
-    '%s deals every shade below the grout to some cell', (algo) => {
+  it.each([2, 3, 4, 5, 6] as const)(
+    'cells at scale %i deals every shade below the grout to some cell', (scale) => {
       // The regression this whole model exists for. Cells used to go through the
       // scatter path, which squares its input before scaling: an interior value
       // of at most 0.24 gave `1 + floor(4 * 0.24^2)` = 1 for every cell however
       // the hash fell, so all cells were one colour and only the boundary ever
       // climbed — a wireframe, not a paving. Every interior step must be spoken
       // for, or the ramp is being wasted again.
-      const p = texturePeriod(algo);
+      const p = texturePeriod('cells');
       const seen = new Set<number>();
       for (let y = 0; y < p; y++) {
-        for (let x = 0; x < p; x++) seen.add(textureShadeAt(algo, x, y, 0, 1, MAX_TEXTURE_SHADES));
+        for (let x = 0; x < p; x++) seen.add(textureShadeAt('cells', x, y, 0, 1, MAX_TEXTURE_SHADES, scale));
       }
       for (let k = 0; k <= MAX_TEXTURE_SHADES; k++) expect(seen).toContain(k);
     });
 
-  it.each(['cells', 'medium_cells', 'small_cells'] as const)(
-    '%s paints each cell flat, not as a gradient', (algo) => {
+  it.each([2, 3, 4, 5, 6] as const)(
+    'cells at scale %i paints each cell flat, not as a gradient', (scale) => {
       // A cell is one block of colour. Counting how many pixels sit on a shade
       // boundary catches a field that has started ramping inside a cell: a flat
       // deal only changes shade at the grout, which is a small fraction of the
       // tile.
-      const p = texturePeriod(algo);
+      const p = texturePeriod('cells');
       const at = (x: number, y: number) =>
-        textureShadeAt(algo, ((x % p) + p) % p, ((y % p) + p) % p, 0, 1, MAX_TEXTURE_SHADES);
+        textureShadeAt('cells', wrapN(x, p), wrapN(y, p), 0, 1, MAX_TEXTURE_SHADES, scale);
       let edges = 0;
       for (let y = 0; y < p; y++) {
         for (let x = 0; x < p; x++) if (at(x, y) !== at(x + 1, y)) edges++;
       }
-      expect(edges).toBeLessThan(p * p * 0.25);
+      expect(edges).toBeLessThan(p * p * (scale >= 5 ? 0.4 : 0.25));
     });
 
   it('changes with the seed', () => {
@@ -324,7 +324,7 @@ describe('geometric textures', () => {
     });
 
 
-  it('cells has sparse boundaries at low amount and varied interiors at full amount', () => {
+  it.each([2, 3, 4, 5, 6] as const)('cells at scale %i generates cellular grid', (scale) => {
     const sparse = lit('cells', 0.35);
     expect(sparse.length).toBeGreaterThan(0);
     expect(sparse.length).toBeLessThan(32 * 32);
@@ -332,35 +332,7 @@ describe('geometric textures', () => {
     const shades = new Set<number>();
     for (let y = 0; y < 16; y++) {
       for (let x = 0; x < 16; x++) {
-        shades.add(textureShadeAt('cells', x, y, 0, 1, MAX_TEXTURE_SHADES));
-      }
-    }
-    expect(shades.size).toBeGreaterThan(2);
-  });
-
-  it('medium_cells generates a 3x3 cellular grid', () => {
-    const sparse = lit('medium_cells', 0.35);
-    expect(sparse.length).toBeGreaterThan(0);
-    expect(sparse.length).toBeLessThan(32 * 32);
-
-    const shades = new Set<number>();
-    for (let y = 0; y < 16; y++) {
-      for (let x = 0; x < 16; x++) {
-        shades.add(textureShadeAt('medium_cells', x, y, 0, 1, MAX_TEXTURE_SHADES));
-      }
-    }
-    expect(shades.size).toBeGreaterThan(2);
-  });
-
-  it('small_cells generates a dense 4x4 cellular grid', () => {
-    const sparse = lit('small_cells', 0.35);
-    expect(sparse.length).toBeGreaterThan(0);
-    expect(sparse.length).toBeLessThan(32 * 32);
-
-    const shades = new Set<number>();
-    for (let y = 0; y < 16; y++) {
-      for (let x = 0; x < 16; x++) {
-        shades.add(textureShadeAt('small_cells', x, y, 0, 1, MAX_TEXTURE_SHADES));
+        shades.add(textureShadeAt('cells', x, y, 0, 1, MAX_TEXTURE_SHADES, scale));
       }
     }
     expect(shades.size).toBeGreaterThan(2);
@@ -639,6 +611,20 @@ describe('texture applied to a tile', () => {
     const b = REFERENCE_ROLE_COLOURS.terrainB;
     for (let i = 0; i < flat.length; i += 4) {
       expect([flat[i], flat[i + 1], flat[i + 2]]).toEqual([b.r, b.g, b.b]);
+    }
+  });
+
+  it('ripple_diag exhibits diagonal correlation and 32px periodicity', () => {
+    expect(texturePeriod('ripple_diag')).toBe(32);
+    expect(coverage('ripple_diag', 0.5)).toBeGreaterThan(0);
+
+    // Verify 32px periodicity explicitly
+    for (let y = 0; y < 32; y++) {
+      for (let x = 0; x < 32; x++) {
+        const val = textureShadeAt('ripple_diag', x, y, 42, 0.5);
+        expect(textureShadeAt('ripple_diag', x + 32, y, 42, 0.5)).toBe(val);
+        expect(textureShadeAt('ripple_diag', x, y + 32, 42, 0.5)).toBe(val);
+      }
     }
   });
 });

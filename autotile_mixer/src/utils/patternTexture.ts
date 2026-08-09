@@ -21,38 +21,67 @@ import type { RGB } from './patternPaint';
  * an edge wants and a material does not.
  */
 export type TextureId =
-  | 'none' | NoiseId | 'ripple' | 'cells' | 'medium_cells' | 'small_cells'
+  | 'none' | NoiseId | 'ripple' | 'ripple_diag' | 'cells'
   | 'breeze_block' | 'brick_wall' | 'cobbles2' | 'brick_floor'
   | 'hexagon' | 'isometric' | 'octagonal'
   | 'weave' | 'paving' | 'paving3' | 'paving5' | 'stone_floor' | 'water'
   | 'field' | 'rubble' | 'nonslip';
 
-export const TEXTURE_PRESETS: readonly { id: TextureId; zh: string; en: string }[] = [
-  { id: 'none', zh: '无纹理', en: 'None' },
-  { id: 'ripple', zh: '波纹 · 横向短划（水面）', en: 'Ripples — short horizontal dashes' },
-  { id: 'water', zh: 'Water · 水面边线（仅调边线色）', en: 'Water — edge lines only' },
-  { id: 'field', zh: 'Field · 草地颗粒', en: 'Field — grassy ground' },
-  { id: 'rubble', zh: 'Rubble · 碎石地面', en: 'Rubble — broken stone' },
-  { id: 'nonslip', zh: 'Non-slip · 防滑纹', en: 'Non-slip — textured grip' },
-  { id: 'cells', zh: '大细胞 · 2x2 多边形', en: 'Large Cells — 2x2 polygonal cells' },
-  { id: 'medium_cells', zh: '中细胞 · 3x3 多边形', en: 'Medium Cells — 3x3 polygonal cells' },
-  { id: 'small_cells', zh: '小细胞 · 4x4 细小多边形', en: 'Small Cells — 4x4 fine polygonal cells' },
-  { id: 'breeze_block', zh: '通风砖 · 细孔砖墙（32）', en: 'Breeze Block — perforated masonry (32)' },
-  { id: 'brick_wall', zh: '砖墙 · 错缝砌砖（32）', en: 'Brick Wall — running-bond masonry (32)' },
-  { id: 'cobbles2', zh: '细密砖 · 小块错缝铺装', en: 'Cobbles2 — fine running-bond bricks' },
-  { id: 'brick_floor', zh: '斜铺砖 · 45° 错缝铺装', en: 'Brick Floor — diagonal 45° bond' },
-  { id: 'hexagon', zh: '六边形 · 规则六边砖（32）', en: 'Hexagon — regular hexagonal tiles (32)' },
-  { id: 'isometric', zh: '等距砖 · 菱形立体块（32）', en: 'Isometric — diamond blocks (32)' },
-  { id: 'octagonal', zh: '八边形 · 切角方砖（32）', en: 'Octagonal — chamfered square tiles (32)' },
-  { id: 'weave', zh: '斜铺砖 · 菱格编织', en: 'Weave — diagonal interlocking bricks' },
-  { id: 'paving', zh: '乱砌石板 · 大小板错拼（32）', en: 'Paving — random ashlar flags (32)' },
-  { id: 'paving3', zh: '立方体 · 等距方块（32）', en: 'Paving3 — isometric cubes (32)' },
-  { id: 'paving5', zh: '互锁铺砖 · 曲边咬合（32）', en: 'Paving5 — interlocking curved pavers (32)' },
-  { id: 'stone_floor', zh: '石板地面 · 不规则砖石（32）', en: 'Stone Floor — irregular stone slabs (32)' },
-  { id: 'white', zh: '白噪散点 · 细碎', en: 'White speckle — fine' },
-  { id: 'blue', zh: '蓝噪散点 · 均匀', en: 'Blue speckle — even' },
-  { id: 'ordered', zh: '有序网点 · 规则', en: 'Ordered — regular' },
+export const TEXTURE_GROUPS: readonly {
+  zh: string; en: string;
+  items: readonly { id: TextureId; zh: string; en: string }[];
+}[] = [
+  {
+    zh: '无纹理', en: 'None',
+    items: [
+      { id: 'none', zh: '无纹理', en: 'None' },
+    ],
+  },
+  {
+    zh: '自然与有机', en: 'Nature & Organic',
+    items: [
+      { id: 'field', zh: '草地颗粒 · Field', en: 'Field — grassy ground' },
+      { id: 'rubble', zh: '碎石地面 · Rubble', en: 'Rubble — broken stone' },
+      { id: 'ripple', zh: '水面波纹 · Ripples', en: 'Ripples — short horizontal dashes' },
+      { id: 'ripple_diag', zh: '斜向水波 · Diagonal Ripples', en: 'Diagonal Ripples — 45° short dashes' },
+      { id: 'water', zh: '水面边线 · Water', en: 'Water — edge lines only' },
+    ],
+  },
+  {
+    zh: '程序与几何', en: 'Procedural & Geometry',
+    items: [
+      { id: 'cells', zh: '多边形细胞 · Voronoi 细胞网格', en: 'Polygonal Cells — Voronoi cell mesh' },
+      { id: 'hexagon', zh: '规则六边形 (32px)', en: 'Hexagon — regular hexagonal tiles (32)' },
+      { id: 'isometric', zh: '等距菱形块 (32px)', en: 'Isometric — diamond blocks (32)' },
+      { id: 'octagonal', zh: '八边切角砖 (32px)', en: 'Octagonal — chamfered square tiles (32)' },
+      { id: 'nonslip', zh: '交叉防滑纹', en: 'Non-slip — textured grip' },
+    ],
+  },
+  {
+    zh: '砖石与石板铺装', en: 'Masonry & Paving',
+    items: [
+      { id: 'brick_wall', zh: '错缝砖墙 (32px)', en: 'Brick Wall — running-bond masonry (32)' },
+      { id: 'cobbles2', zh: '细密错缝砖 (16px)', en: 'Cobbles2 — fine running-bond bricks' },
+      { id: 'brick_floor', zh: '45° 斜铺砖 (16px)', en: 'Brick Floor — diagonal 45° bond' },
+      { id: 'weave', zh: '菱格编织砖 (16px)', en: 'Weave — diagonal interlocking bricks' },
+      { id: 'breeze_block', zh: '镂空通风砖 (32px)', en: 'Breeze Block — perforated masonry (32)' },
+      { id: 'paving', zh: '乱砌石板 (32px)', en: 'Paving — random ashlar flags (32)' },
+      { id: 'paving3', zh: '等距立体方块 (32px)', en: 'Paving3 — isometric cubes (32)' },
+      { id: 'paving5', zh: '曲边咬合铺砖 (32px)', en: 'Paving5 — interlocking curved pavers (32)' },
+      { id: 'stone_floor', zh: '不规则石板地面 (32px)', en: 'Stone Floor — irregular stone slabs (32)' },
+    ],
+  },
+  {
+    zh: '散点与半调噪声', en: 'Speckle & Noise',
+    items: [
+      { id: 'white', zh: '白噪散点 · 随机沙粒', en: 'White speckle — random sand' },
+      { id: 'blue', zh: '蓝噪散点 · 均匀细颗粒', en: 'Blue speckle — even fine grain' },
+      { id: 'ordered', zh: '有序网点 · 规则半调', en: 'Ordered — regular halftone' },
+    ],
+  },
 ];
+
+export const TEXTURE_PRESETS = TEXTURE_GROUPS.flatMap((g) => g.items);
 
 /**
  * The three Stagecast pavings are traced from 32x32 art that is genuinely
@@ -69,7 +98,7 @@ const PERIOD_32: readonly TextureId[] = [
   // and looked like a finer material sitting next to a coarser one. Widening the
   // Motif scale and output period are independent; all source masonry tiles
   // listed above are genuinely 32-periodic.
-  'ripple', 'cells', 'medium_cells', 'small_cells',
+  'ripple', 'ripple_diag', 'cells',
 ];
 
 /**
@@ -87,6 +116,12 @@ export const MIN_TEXTURE_SHADES = 1;
 export const MAX_TEXTURE_SHADES = 4;
 export const DEFAULT_TEXTURE_SHADES = 4;
 export const DEFAULT_TEXTURE_SEED = 0;
+export const DEFAULT_CELL_SCALE = 3;
+export const MIN_CELL_SCALE = 2;
+export const MAX_CELL_SCALE = 6;
+export const DEFAULT_RIPPLE_SCALE = 4;
+export const MIN_RIPPLE_SCALE = 2;
+export const MAX_RIPPLE_SCALE = 8;
 
 /** Salt the texture field so its own algorithms do not share a phase. */
 const TEXTURE_SALT = 0x5bd1;
@@ -109,14 +144,26 @@ const smooth = (t: number) => t * t * (3 - 2 * t);
  * thresholds into the short horizontal dashes pixel art draws water with —
  * which no isotropic field produces, however it is tuned.
  */
-function rippleField(x: number, y: number, seed: number): number {
-  const perX = 4;   // 4 cells across 32px -> ~8px of horizontal correlation
+function rippleField(x: number, y: number, seed: number, perX: number = DEFAULT_RIPPLE_SCALE): number {
   const perY = 32;  // one cell per row -> rows stay independent
   const fx = (x / 32) * perX;
   const iy = ((y % perY) + perY) % perY;
   const x0 = Math.floor(fx);
   const u = smooth(fx - x0);
   const h = (ix: number) => hash01(((ix % perX) + perX) % perX, iy, seed);
+  return h(x0) * (1 - u) + h(x0 + 1) * u;
+}
+
+/**
+ * Anisotropic value noise rotated 45°: correlated diagonally (top-left to bottom-right),
+ * thresholding into short 45° diagonal dashes common in pixel art tilesets.
+ */
+function rippleDiagField(x: number, y: number, seed: number, perDiag: number = DEFAULT_RIPPLE_SCALE): number {
+  const diagLine = wrapN(x - y, 32);
+  const along = ((x + y) / 32) * perDiag;
+  const x0 = Math.floor(along);
+  const u = smooth(along - x0);
+  const h = (ix: number) => hash01(((ix % perDiag) + perDiag) % perDiag, diagLine, seed);
   return h(x0) * (1 - u) + h(x0 + 1) * u;
 }
 
@@ -208,9 +255,17 @@ function cellsShade(
   // at every size rather than near-uniform. The seed rotates where the deal
   // starts, so the dice still reshuffles which cell is which tone.
   const n = per * per;
-  const idx = nearestY * per + nearestX;
-  const off = Math.floor(hash01(0, 0, seed) * n);
-  const dealt = (idx * 5 + off) % n;
+  // Rank the current cell by its pseudo-random 2D hash score relative to all other cells.
+  // This guarantees exact even split across shades while completely scattering colors
+  // in 2D space without any vertical/horizontal/diagonal striping at any scale.
+  const hashSalt = seed ^ 0x3c6ef3;
+  const myScore = hash01(nearestX, nearestY, hashSalt);
+  let dealt = 0;
+  for (let cy = 0; cy < per; cy++) {
+    for (let cx = 0; cx < per; cx++) {
+      if (hash01(cx, cy, hashSalt) < myScore) dealt++;
+    }
+  }
   const rank = onBoundary ? shades : Math.floor((dealt * shades) / n);
   return Math.max(0, Math.min(shades, Math.round(rank * Math.min(1, amount))));
 }
@@ -836,7 +891,9 @@ export function textureShadeAt(
   y: number,
   seed: number,
   amount: number,
-  shades: number = DEFAULT_TEXTURE_SHADES
+  shades: number = DEFAULT_TEXTURE_SHADES,
+  cellScale: number = DEFAULT_CELL_SCALE,
+  rippleScale: number = DEFAULT_RIPPLE_SCALE
 ): number {
   if (texture === 'none' || amount <= 0 || shades < 1) return 0;
   const s = (seed ^ TEXTURE_SALT) >>> 0;
@@ -866,10 +923,11 @@ export function textureShadeAt(
   if (texture === 'nonslip') return bakedShade(NONSLIP, 32, x, y, s, amount, shades);
   // Cells name their shade too — see cellsShade for why the scatter path below
   // flattened them into a wireframe.
-  if (texture === 'cells') return cellsShade(x, y, s, 2, amount, shades);
-  if (texture === 'medium_cells') return cellsShade(x, y, s, 3, amount, shades);
-  if (texture === 'small_cells') return cellsShade(x, y, s, 4, amount, shades);
-  const n = texture === 'ripple' ? rippleField(x, y, s) : sample(texture, x, y, s);
+  if (texture === 'cells') return cellsShade(x, y, s, Math.max(MIN_CELL_SCALE, Math.min(MAX_CELL_SCALE, cellScale)), amount, shades);
+  const rScale = Math.max(MIN_RIPPLE_SCALE, Math.min(MAX_RIPPLE_SCALE, rippleScale));
+  const n = texture === 'ripple' ? rippleField(x, y, s, rScale)
+    : texture === 'ripple_diag' ? rippleDiagField(x, y, s, rScale)
+    : sample(texture, x, y, s);
   const cut = 1 - Math.min(1, amount);
   if (n < cut) return 0;
   const u = cut >= 1 ? 1 : (n - cut) / (1 - cut);
@@ -891,13 +949,15 @@ export function textureShadeAt(
 export function usedTextureShades(
   texture: TextureId,
   amount: number,
-  shades: number = DEFAULT_TEXTURE_SHADES
+  shades: number = DEFAULT_TEXTURE_SHADES,
+  cellScale: number = DEFAULT_CELL_SCALE,
+  rippleScale: number = DEFAULT_RIPPLE_SCALE
 ): Set<number> {
   const used = new Set<number>();
   if (texture === 'none') return used;
   const p = texturePeriod(texture);
   for (let y = 0; y < p; y++) {
-    for (let x = 0; x < p; x++) used.add(textureShadeAt(texture, x, y, 0, amount, shades));
+    for (let x = 0; x < p; x++) used.add(textureShadeAt(texture, x, y, 0, amount, shades, cellScale, rippleScale));
   }
   return used;
 }

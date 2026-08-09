@@ -26,8 +26,10 @@ import {
   ribbonUsesInvert, ribbonUsesPeriod, usedRibbonShades, type RibbonId,
 } from './utils/patternRibbon';
 import {
-  TEXTURE_PRESETS, DEFAULT_TEXTURE, DEFAULT_TEXTURE_SHADES, textureRamp, usedTextureShades,
-  MIN_TEXTURE_SHADES, MAX_TEXTURE_SHADES, DEFAULT_TEXTURE_SEED, WATER_DOT_COLOUR, type TextureId,
+  TEXTURE_GROUPS, DEFAULT_TEXTURE, DEFAULT_TEXTURE_SHADES, textureRamp, usedTextureShades,
+  MIN_TEXTURE_SHADES, MAX_TEXTURE_SHADES, DEFAULT_TEXTURE_SEED, WATER_DOT_COLOUR,
+  DEFAULT_CELL_SCALE, MIN_CELL_SCALE, MAX_CELL_SCALE,
+  DEFAULT_RIPPLE_SCALE, MIN_RIPPLE_SCALE, MAX_RIPPLE_SCALE, type TextureId,
 } from './utils/patternTexture';
 
 /**
@@ -194,6 +196,10 @@ export default function App() {
   const [textureShadesB, setTextureShadesB] = useState(DEFAULT_TEXTURE_SHADES);
   const [textureSeedA, setTextureSeedA] = useState(DEFAULT_TEXTURE_SEED);
   const [textureSeedB, setTextureSeedB] = useState(DEFAULT_TEXTURE_SEED);
+  const [cellScaleA, setCellScaleA] = useState(DEFAULT_CELL_SCALE);
+  const [cellScaleB, setCellScaleB] = useState(DEFAULT_CELL_SCALE);
+  const [rippleScaleA, setRippleScaleA] = useState(DEFAULT_RIPPLE_SCALE);
+  const [rippleScaleB, setRippleScaleB] = useState(DEFAULT_RIPPLE_SCALE);
   // Picked independently of the terrain colours: the speckle in hand-drawn
   // pixel art is usually a different material, not a lighter version of the
   // ground it sits on.
@@ -229,6 +235,10 @@ export default function App() {
       shadesB: effectiveTextureShadesB,
       seedA: textureSeedA,
       seedB: textureSeedB,
+      cellScaleA,
+      cellScaleB,
+      rippleScaleA,
+      rippleScaleB,
       colourA: DEFAULT_TEXTURE_COLOURS.terrainA,
       colourB: DEFAULT_TEXTURE_COLOURS.terrainB,
       rampA: textureRampFor('terrainA', textureAlgoA, effectiveTextureShadesA),
@@ -236,7 +246,8 @@ export default function App() {
     };
   }, [textureAlgoA, textureAlgoB, textureAmountA, textureAmountB,
        effectiveTextureShadesA, effectiveTextureShadesB,
-       textureSeedA, textureSeedB, customTexHex]);
+       textureSeedA, textureSeedB, cellScaleA, cellScaleB,
+       rippleScaleA, rippleScaleB, customTexHex]);
 
   const TEXTURE_SHADE_CHOICES = Array.from(
     { length: MAX_TEXTURE_SHADES - MIN_TEXTURE_SHADES + 1 },
@@ -348,10 +359,10 @@ export default function App() {
 
   /** Which texture shades each terrain is actually painting right now. */
   const reachable = useMemo(() => ({
-    terrainA: usedTextureShades(textureAlgoA, textureAmountA, effectiveTextureShadesA),
-    terrainB: usedTextureShades(textureAlgoB, textureAmountB, effectiveTextureShadesB),
+    terrainA: usedTextureShades(textureAlgoA, textureAmountA, effectiveTextureShadesA, cellScaleA, rippleScaleA),
+    terrainB: usedTextureShades(textureAlgoB, textureAmountB, effectiveTextureShadesB, cellScaleB, rippleScaleB),
   }), [textureAlgoA, textureAmountA, textureAlgoB, textureAmountB,
-    effectiveTextureShadesA, effectiveTextureShadesB]);
+    effectiveTextureShadesA, effectiveTextureShadesB, cellScaleA, cellScaleB, rippleScaleA, rippleScaleB]);
 
   // Custom noise colors state (null = derived from band ramp)
   const [customNoiseHex, setCustomNoiseHex] = useState<{ b?: string; edge?: string; a?: string } | null>(null);
@@ -861,6 +872,7 @@ export default function App() {
               step={OUTLINE_WIDTH_STEP}
               value={outlineWidth}
               onChange={(e) => setOutlineWidth(parseFloat(e.target.value))}
+              onDragStart={(e) => e.preventDefault()}
             />
 
             {/* The marker sits outside the <label>: inside it, clicking the
@@ -890,6 +902,7 @@ export default function App() {
               min={-1} max={1} step={0.05}
               value={bandBias}
               onChange={(e) => setBandBias(parseFloat(e.target.value))}
+              onDragStart={(e) => e.preventDefault()}
             />
             <div style={{
               display: 'flex', justifyContent: 'space-between',
@@ -1086,6 +1099,7 @@ export default function App() {
                   min={0} max={MAX_NOISE_STRENGTH} step={0.05}
                   value={patternNoiseStrength}
                   onChange={(e) => setPatternNoiseStrength(parseFloat(e.target.value))}
+                  onDragStart={(e) => e.preventDefault()}
                 />
 
                 <div className="slider-header" style={{ marginBottom: '6px' }}>
@@ -1166,12 +1180,15 @@ export default function App() {
             {([
               ['terrainA', textureAlgoA, setTextureAlgoA, textureAmountA, setTextureAmountA,
                 textureShadesA, setTextureShadesA, textureSeedA, setTextureSeedA,
-                t.textureAlgoA, t.textureAmountA, t.textureColourA, t.textureSeedA],
+                cellScaleA, setCellScaleA, rippleScaleA, setRippleScaleA,
+                t.textureAlgoA, t.textureAmountA, t.textureColourA, t.textureSeedA, t.textureCellScaleA, t.textureRippleScaleA],
               ['terrainB', textureAlgoB, setTextureAlgoB, textureAmountB, setTextureAmountB,
                 textureShadesB, setTextureShadesB, textureSeedB, setTextureSeedB,
-                t.textureAlgoB, t.textureAmountB, t.textureColourB, t.textureSeedB],
+                cellScaleB, setCellScaleB, rippleScaleB, setRippleScaleB,
+                t.textureAlgoB, t.textureAmountB, t.textureColourB, t.textureSeedB, t.textureCellScaleB, t.textureRippleScaleB],
             ] as const).map(([role, algo, setAlgo, val, set, shadeCount, setShadeCount,
-              seedValue, setSeed, algoLabel, amountLabel, colourLabel, seedLabel]) => {
+              seedValue, setSeed, cellScaleVal, setCellScale, rippleScaleVal, setRippleScale,
+              algoLabel, amountLabel, colourLabel, seedLabel, cellScaleLabel, rippleScaleLabel]) => {
               const isWater = algo === 'water';
               const effectiveShadeCount = isWater ? 2 : shadeCount;
               const effectiveColourLabel = isWater ? t.textureWaterEdgeColour : colourLabel;
@@ -1188,12 +1205,48 @@ export default function App() {
                   value={algo}
                   onChange={(e) => setAlgo(e.target.value as TextureId)}
                 >
-                  {TEXTURE_PRESETS.map((p) => (
-                    <option key={p.id} value={p.id}>{lang === 'zh' ? p.zh : p.en}</option>
+                  {TEXTURE_GROUPS.map((g) => (
+                    <optgroup key={g.en} label={lang === 'zh' ? g.zh : g.en}>
+                      {g.items.map((p) => (
+                        <option key={p.id} value={p.id}>{lang === 'zh' ? p.zh : p.en}</option>
+                      ))}
+                    </optgroup>
                   ))}
                 </select>
 
                 {algo !== 'none' && (<>
+                  {algo === 'cells' && (<>
+                    <div className="slider-header" style={{ margin: '8px 0 4px' }}>
+                      <span className="slider-name" style={{ fontSize: '11px' }}>{cellScaleLabel}</span>
+                      <span className="slider-val">{cellScaleVal}×{cellScaleVal}</span>
+                    </div>
+                    <input
+                      type="range"
+                      className="slider-input"
+                      style={{ width: '100%' }}
+                      min={MIN_CELL_SCALE} max={MAX_CELL_SCALE} step={1}
+                      value={cellScaleVal}
+                      onChange={(e) => setCellScale(parseInt(e.target.value, 10))}
+                      onDragStart={(e) => e.preventDefault()}
+                    />
+                  </>)}
+
+                  {(algo === 'ripple' || algo === 'ripple_diag') && (<>
+                    <div className="slider-header" style={{ margin: '8px 0 4px' }}>
+                      <span className="slider-name" style={{ fontSize: '11px' }}>{rippleScaleLabel}</span>
+                      <span className="slider-val">{rippleScaleVal}</span>
+                    </div>
+                    <input
+                      type="range"
+                      className="slider-input"
+                      style={{ width: '100%' }}
+                      min={MIN_RIPPLE_SCALE} max={MAX_RIPPLE_SCALE} step={1}
+                      value={rippleScaleVal}
+                      onChange={(e) => setRippleScale(parseInt(e.target.value, 10))}
+                      onDragStart={(e) => e.preventDefault()}
+                    />
+                  </>)}
+
                   <div className="slider-header" style={{ margin: '8px 0 4px' }}>
                     <span className="slider-name">{amountLabel}</span>
                     <span className="slider-val">
@@ -1207,6 +1260,7 @@ export default function App() {
                     min={0} max={1} step={0.05}
                     value={val}
                     onChange={(e) => set(parseFloat(e.target.value))}
+                    onDragStart={(e) => e.preventDefault()}
                   />
 
                   <div className="slider-header" style={{ margin: '8px 0 4px' }}>

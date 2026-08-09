@@ -29,8 +29,8 @@ import {
   NO_RIBBON, ribbonShadeAt, type RibbonOptions,
 } from './patternRibbon';
 import {
-  DEFAULT_TEXTURE, DEFAULT_TEXTURE_SHADES, textureColour, textureRamp, textureShadeAt,
-  type TextureId,
+  DEFAULT_TEXTURE, DEFAULT_TEXTURE_SHADES, DEFAULT_CELL_SCALE, DEFAULT_RIPPLE_SCALE,
+  textureColour, textureRamp, textureShadeAt, type TextureId,
 } from './patternTexture';
 
 /**
@@ -49,6 +49,10 @@ export interface TextureOptions {
   shadesB: number;
   seedA: number;
   seedB: number;
+  cellScaleA?: number;
+  cellScaleB?: number;
+  rippleScaleA?: number;
+  rippleScaleB?: number;
   /**
    * What each terrain's texture fades toward. Independent of the terrain and
    * band colours on purpose — the speckle in hand-drawn pixel art is usually a
@@ -76,6 +80,10 @@ export const NO_TEXTURE: TextureOptions = {
   shadesB: DEFAULT_TEXTURE_SHADES,
   seedA: 0,
   seedB: 0,
+  cellScaleA: DEFAULT_CELL_SCALE,
+  cellScaleB: DEFAULT_CELL_SCALE,
+  rippleScaleA: DEFAULT_RIPPLE_SCALE,
+  rippleScaleB: DEFAULT_RIPPLE_SCALE,
 };
 
 export interface RGB {
@@ -368,10 +376,16 @@ export function paintPatternTileRGBA(
         );
         if (k > 0) rgb = ribRamp[k];
       } else if (texA && level === solid) {
-        const k = textureShadeAt(texture.algoA, x, y, texture.seedA, texture.amountA, shadesA);
+        const k = textureShadeAt(
+          texture.algoA, x, y, texture.seedA, texture.amountA, shadesA,
+          texture.cellScaleA ?? DEFAULT_CELL_SCALE, texture.rippleScaleA ?? DEFAULT_RIPPLE_SCALE
+        );
         if (k > 0) rgb = texA[k];
       } else if (texB && level === 0) {
-        const k = textureShadeAt(texture.algoB, x, y, texture.seedB, texture.amountB, shadesB);
+        const k = textureShadeAt(
+          texture.algoB, x, y, texture.seedB, texture.amountB, shadesB,
+          texture.cellScaleB ?? DEFAULT_CELL_SCALE, texture.rippleScaleB ?? DEFAULT_RIPPLE_SCALE
+        );
         if (k > 0) rgb = texB[k];
       }
       const { r, g, b } = rgb;

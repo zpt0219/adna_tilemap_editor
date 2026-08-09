@@ -458,27 +458,43 @@ body {
   display: flex;
   justify-content: space-between;
   font-size: 12.5px;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .slider-name {
   color: var(--fg);
   font-weight: 500;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .slider-val {
   color: var(--accent-hover);
   font-family: monospace;
   font-weight: 600;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .slider-input {
   -webkit-appearance: none;
+  appearance: none;
   width: 100%;
   height: 6px;
   border-radius: 3px;
   background: var(--panel-hi);
   outline: none;
   transition: background 0.15s;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-user-drag: none;
+  touch-action: none;
+  cursor: grab;
+}
+
+.slider-input:active {
+  cursor: grabbing;
 }
 
 .slider-input::-webkit-slider-thumb {
@@ -488,7 +504,7 @@ body {
   height: 16px;
   border-radius: 50%;
   background: var(--accent);
-  cursor: pointer;
+  cursor: grab;
   border: 2px solid var(--fg);
   box-shadow: 0 0 4px rgba(0, 0, 0, 0.5);
   transition: transform 0.1s;
@@ -497,6 +513,30 @@ body {
 .slider-input::-webkit-slider-thumb:hover {
   transform: scale(1.2);
   background: var(--accent-hover);
+}
+
+.slider-input::-webkit-slider-thumb:active {
+  cursor: grabbing;
+}
+
+.slider-input::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: grab;
+  border: 2px solid var(--fg);
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.5);
+  transition: transform 0.1s;
+}
+
+.slider-input::-moz-range-thumb:hover {
+  transform: scale(1.2);
+  background: var(--accent-hover);
+}
+
+.slider-input::-moz-range-thumb:active {
+  cursor: grabbing;
 }
 
 /* Seed & General Inputs */
