@@ -22,7 +22,7 @@ import {
 } from './utils/patternNoise';
 import {
   TEXTURE_PRESETS, DEFAULT_TEXTURE, DEFAULT_TEXTURE_SHADES, textureRamp, usedTextureShades,
-  MIN_TEXTURE_SHADES, MAX_TEXTURE_SHADES, type TextureId,
+  MIN_TEXTURE_SHADES, MAX_TEXTURE_SHADES, DEFAULT_TEXTURE_SEED, type TextureId,
 } from './utils/patternTexture';
 
 /**
@@ -176,7 +176,10 @@ export default function App() {
   const [textureAlgoB, setTextureAlgoB] = useState<TextureId>(DEFAULT_TEXTURE);
   const [textureAmountA, setTextureAmountA] = useState(0.4);
   const [textureAmountB, setTextureAmountB] = useState(0.4);
-  const [textureShades, setTextureShades] = useState(DEFAULT_TEXTURE_SHADES);
+  const [textureShadesA, setTextureShadesA] = useState(DEFAULT_TEXTURE_SHADES);
+  const [textureShadesB, setTextureShadesB] = useState(DEFAULT_TEXTURE_SHADES);
+  const [textureSeedA, setTextureSeedA] = useState(DEFAULT_TEXTURE_SEED);
+  const [textureSeedB, setTextureSeedB] = useState(DEFAULT_TEXTURE_SEED);
   // Picked independently of the terrain colours: the speckle in hand-drawn
   // pixel art is usually a different material, not a lighter version of the
   // ground it sits on.
@@ -196,14 +199,16 @@ export default function App() {
     algoB: textureAlgoB,
     amountA: textureAmountA,
     amountB: textureAmountB,
-    shades: textureShades,
-    seed: patternNoiseSeed,
+    shadesA: textureShadesA,
+    shadesB: textureShadesB,
+    seedA: textureSeedA,
+    seedB: textureSeedB,
     colourA: DEFAULT_TEXTURE_COLOURS.terrainA,
     colourB: DEFAULT_TEXTURE_COLOURS.terrainB,
     rampA: customTexHex.terrainA?.map((h) => (h ? parseHexColour(h) : undefined)),
     rampB: customTexHex.terrainB?.map((h) => (h ? parseHexColour(h) : undefined)),
   }), [textureAlgoA, textureAlgoB, textureAmountA, textureAmountB,
-       textureShades, patternNoiseSeed, customTexHex]);
+       textureShadesA, textureShadesB, textureSeedA, textureSeedB, customTexHex]);
 
   const TEXTURE_SHADE_CHOICES = Array.from(
     { length: MAX_TEXTURE_SHADES - MIN_TEXTURE_SHADES + 1 },
@@ -292,19 +297,19 @@ export default function App() {
     const build = (role: 'terrainA' | 'terrainB') => textureRamp(
       roleColours[role],
       DEFAULT_TEXTURE_COLOURS[role],
-      textureShades,
-      customTexHex[role]?.length === textureShades + 1
+      role === 'terrainA' ? textureShadesA : textureShadesB,
+      customTexHex[role]?.length === (role === 'terrainA' ? textureShadesA : textureShadesB) + 1
         ? customTexHex[role]?.map((h) => (h ? parseHexColour(h) : undefined))
         : undefined
     );
     return { terrainA: build('terrainA'), terrainB: build('terrainB') };
-  }, [roleColours, textureShades, customTexHex]);
+  }, [roleColours, textureShadesA, textureShadesB, customTexHex]);
 
   /** Which texture shades each terrain is actually painting right now. */
   const reachable = useMemo(() => ({
-    terrainA: usedTextureShades(textureAlgoA, textureAmountA, textureShades),
-    terrainB: usedTextureShades(textureAlgoB, textureAmountB, textureShades),
-  }), [textureAlgoA, textureAmountA, textureAlgoB, textureAmountB, textureShades]);
+    terrainA: usedTextureShades(textureAlgoA, textureAmountA, textureShadesA),
+    terrainB: usedTextureShades(textureAlgoB, textureAmountB, textureShadesB),
+  }), [textureAlgoA, textureAmountA, textureAlgoB, textureAmountB, textureShadesA, textureShadesB]);
 
   // Custom noise colors state (null = derived from band ramp)
   const [customNoiseHex, setCustomNoiseHex] = useState<{ b?: string; edge?: string; a?: string } | null>(null);
@@ -925,11 +930,14 @@ export default function App() {
 
             {([
               ['terrainA', textureAlgoA, setTextureAlgoA, textureAmountA, setTextureAmountA,
-                t.textureAlgoA, t.textureAmountA, t.textureColourA],
+                textureShadesA, setTextureShadesA, textureSeedA, setTextureSeedA,
+                t.textureAlgoA, t.textureAmountA, t.textureColourA, t.textureSeedA],
               ['terrainB', textureAlgoB, setTextureAlgoB, textureAmountB, setTextureAmountB,
-                t.textureAlgoB, t.textureAmountB, t.textureColourB],
-            ] as const).map(([role, algo, setAlgo, val, set, algoLabel, amountLabel, colourLabel]) => (
-              <div key={role} style={{ marginBottom: '12px' }}>
+                textureShadesB, setTextureShadesB, textureSeedB, setTextureSeedB,
+                t.textureAlgoB, t.textureAmountB, t.textureColourB, t.textureSeedB],
+            ] as const).map(([role, algo, setAlgo, val, set, shadeCount, setShadeCount,
+              seedValue, setSeed, algoLabel, amountLabel, colourLabel, seedLabel]) => (
+              <div key={role} className={`texture-material-block texture-material-${role}`}>
                 <div className="slider-header" style={{ marginBottom: '4px' }}>
                   <span className="slider-name">{algoLabel}</span>
                 </div>
@@ -960,6 +968,17 @@ export default function App() {
                   />
 
                   <div className="slider-header" style={{ margin: '8px 0 4px' }}>
+                    <span className="slider-name" style={{ fontSize: '11px' }}>
+                      {seedLabel}<InfoTip text={t.textureSeedHint} />
+                    </span>
+                  </div>
+                  <SeedField
+                    value={seedValue}
+                    onChange={setSeed}
+                    diceTitle={t.randomSeed}
+                  />
+
+                  <div className="slider-header" style={{ margin: '8px 0 4px' }}>
                     <span className="slider-name" style={{ fontSize: '11px' }}>{colourLabel}</span>
                     {customTexHex[role]?.some(Boolean) && (
                       <ResetLink
@@ -979,7 +998,7 @@ export default function App() {
                       // swatch that silently does nothing when clicked.
                       const isDisabled = !reachable[role].has(k);
                       const ramp = textureRamps[role];
-                      const hex = toHexColour(ramp[isDisabled ? textureShades : k]);
+                      const hex = toHexColour(ramp[isDisabled ? shadeCount : k]);
                       return (
                         <ColourSwatch
                           key={k}
@@ -993,9 +1012,9 @@ export default function App() {
                             // Start from an override of the RIGHT LENGTH; a stale
                             // one from a different step count would mis-index.
                             const prev = p[role];
-                            const base = prev && prev.length === textureShades + 1
+                            const base = prev && prev.length === shadeCount + 1
                               ? [...prev]
-                              : new Array<string | undefined>(textureShades + 1).fill(undefined);
+                              : new Array<string | undefined>(shadeCount + 1).fill(undefined);
                             base[k] = next;
                             return { ...p, [role]: base };
                           })}
@@ -1003,28 +1022,25 @@ export default function App() {
                       );
                     })}
                   </div>
+                  <div className="slider-header" style={{ margin: '8px 0 4px' }}>
+                    <span className="slider-name" style={{ fontSize: '11px' }}>{t.textureShades}</span>
+                    <span className="slider-val">{shadeCount}</span>
+                  </div>
+                  <div className="type-tabs" style={{ marginBottom: '6px' }}>
+                    {TEXTURE_SHADE_CHOICES.map((n) => (
+                      <button
+                        key={n}
+                        className={`tab-btn ${shadeCount === n ? 'active' : ''}`}
+                        onClick={() => setShadeCount(n)}
+                      >
+                        {n}
+                      </button>
+                    ))}
+                  </div>
                 </>)}
               </div>
             ))}
 
-            {(textureAlgoA !== 'none' || textureAlgoB !== 'none') && (<>
-              {/* Shared: this is rendering granularity, not a look decision that
-                  differs between the two materials. */}
-              <div className="slider-header" style={{ marginBottom: '6px' }}>
-                <span className="slider-name">{t.textureShades}</span>
-              </div>
-              <div className="type-tabs" style={{ marginBottom: '6px' }}>
-                {TEXTURE_SHADE_CHOICES.map((n) => (
-                  <button
-                    key={n}
-                    className={`tab-btn ${textureShades === n ? 'active' : ''}`}
-                    onClick={() => setTextureShades(n)}
-                  >
-                    {n}
-                  </button>
-                ))}
-              </div>
-            </>)}
           </section>
 
         </aside>

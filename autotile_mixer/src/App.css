@@ -146,6 +146,18 @@ body {
 .content-area { grid-area: center; }
 .sidebar-right { grid-area: right; }
 
+/* Keep the three surface-detail groups visually distinct: band grain, then
+   terrain A texture, then terrain B texture. */
+.texture-material-block {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 2px solid var(--accent);
+}
+
+.texture-material-terrainA {
+  margin-top: 4px;
+}
+
 /* Not enough width for three columns: stack both control columns on the left
    and let the canvases run full height beside them. */
 @media (max-width: 1500px) {

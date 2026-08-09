@@ -44,7 +44,8 @@
 | `customNoise` | `{b?,edge?,a?} \| null` | 每项 `#rrggbb` | `customNoiseHex` |
 | `textureAlgoA` `textureAlgoB` | `TextureId` | 10 个之一 | 同名 |
 | `textureAmountA` `textureAmountB` | float | 0..1 | 同名 |
-| `textureShades` | int | 1..4 | `textureShades` |
+| `textureShadesA` `textureShadesB` | int | 1..4 | åŒå |
+| `textureSeedA` `textureSeedB` | int | 0..99999 | åŒå |
 | `textureColourA` `textureColourB` | `#rrggbb` | — | `texHex` |
 | `tileSize` | int | 16 或 32 | `tileSize` |
 

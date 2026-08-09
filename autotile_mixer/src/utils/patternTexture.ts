@@ -71,8 +71,9 @@ export const DEFAULT_TEXTURE: TextureId = 'none';
 export const MIN_TEXTURE_SHADES = 1;
 export const MAX_TEXTURE_SHADES = 4;
 export const DEFAULT_TEXTURE_SHADES = 4;
+export const DEFAULT_TEXTURE_SEED = 0;
 
-/** Salt, so texture never lands in step with the band grain off one seed. */
+/** Salt the texture field so its own algorithms do not share a phase. */
 const TEXTURE_SALT = 0x5bd1;
 
 // --- texture-only fields ---------------------------------------------------

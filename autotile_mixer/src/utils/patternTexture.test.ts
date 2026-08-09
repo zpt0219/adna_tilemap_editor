@@ -7,7 +7,7 @@ import {
 import {
   REFERENCE_ROLE_COLOURS, paintPatternTileRGBA, patternRamp, toHexColour, NO_TEXTURE,
 } from './patternPaint';
-import { DEFAULT_PATTERN } from './blob47Pattern';
+import { DEFAULT_PATTERN, patternLevelsForMask } from './blob47Pattern';
 import { sample } from './patternNoise';
 
 const ALGOS = TEXTURE_PRESETS.map((p) => p.id).filter((id) => id !== 'none');
@@ -509,20 +509,32 @@ describe('texture applied to a tile', () => {
   const paint = (tex: Partial<typeof NO_TEXTURE>) =>
     paintPatternTileRGBA(DEFAULT_PATTERN, 110, REFERENCE_ROLE_COLOURS, 16, [], 0, 0, 1, 3,
       { ...NO_TEXTURE, ...tex });
+  const paint32 = (
+    tex: Partial<typeof NO_TEXTURE>, noises: readonly ('white' | 'blue' | 'clumped' | 'ordered')[] = [],
+    noiseSeed = 0,
+  ) => paintPatternTileRGBA(
+    DEFAULT_PATTERN, 110, REFERENCE_ROLE_COLOURS, 32, noises, 0, noiseSeed, 1, 3,
+    { ...NO_TEXTURE, ...tex }
+  );
+
+  const roleAt = (p: number, tileSize = 32) => {
+    const level = patternLevelsForMask(DEFAULT_PATTERN, 110, 0, tileSize, 3).charCodeAt(p) - 48;
+    return level === 0 ? 'terrainB' : level === 4 ? 'terrainA' : 'band';
+  };
 
   it('ignores an override array left over from a different step count', () => {
     // A stale array would recolour the wrong steps, so the painter drops any
     // whose length does not match the current count.
     const stale = [undefined, DEEP_BLUE, DEEP_BLUE, DEEP_BLUE, DEEP_BLUE];
-    const withStale = paint({ algoA: 'cells', amountA: 1, shades: 2, rampA: stale });
-    const withNone = paint({ algoA: 'cells', amountA: 1, shades: 2 });
+    const withStale = paint({ algoA: 'cells', amountA: 1, shadesA: 2, rampA: stale });
+    const withNone = paint({ algoA: 'cells', amountA: 1, shadesA: 2 });
     expect(Array.from(withStale)).toEqual(Array.from(withNone));
   });
 
   it('recolours only the step it was given', () => {
-    const base = paint({ algoA: 'cells', amountA: 1, shades: 2 });
+    const base = paint({ algoA: 'cells', amountA: 1, shadesA: 2 });
     const one = paint({
-      algoA: 'cells', amountA: 1, shades: 2,
+      algoA: 'cells', amountA: 1, shadesA: 2,
       rampA: [undefined, DEEP_BLUE, undefined],
     });
     let changed = 0;
@@ -558,6 +570,69 @@ describe('texture applied to a tile', () => {
     const onlyA = paint({ algoA: 'white', algoB: 'white', amountA: 0.6, amountB: 0 });
     const onlyB = paint({ algoA: 'white', algoB: 'white', amountA: 0, amountB: 0.6 });
     expect(Array.from(onlyA)).not.toEqual(Array.from(onlyB));
+  });
+
+  it('gives terrain A and B independent shade counts', () => {
+    const base = paint32({
+      algoA: 'paving', algoB: 'paving', amountA: 1, amountB: 1,
+      shadesA: 1, shadesB: 4,
+    });
+    const changedA = paint32({
+      algoA: 'paving', algoB: 'paving', amountA: 1, amountB: 1,
+      shadesA: 4, shadesB: 4,
+    });
+    let aDiff = 0;
+    for (let p = 0; p < 32 * 32; p++) {
+      const i = p * 4;
+      if (roleAt(p) === 'terrainB') {
+        expect(Array.from(changedA.subarray(i, i + 4))).toEqual(Array.from(base.subarray(i, i + 4)));
+      } else if (roleAt(p) === 'terrainA') {
+        if (base[i] !== changedA[i] || base[i + 1] !== changedA[i + 1] || base[i + 2] !== changedA[i + 2]) aDiff++;
+      }
+    }
+    expect(aDiff).toBeGreaterThan(0);
+  });
+
+  it('gives terrain A and B independent texture seeds', () => {
+    const base = paint32({
+      algoA: 'white', algoB: 'white', amountA: 1, amountB: 1, seedA: 7, seedB: 11,
+    });
+    const changedA = paint32({
+      algoA: 'white', algoB: 'white', amountA: 1, amountB: 1, seedA: 8, seedB: 11,
+    });
+    let aDiff = 0;
+    for (let p = 0; p < 32 * 32; p++) {
+      const i = p * 4;
+      if (roleAt(p) === 'terrainB') {
+        expect(Array.from(changedA.subarray(i, i + 4))).toEqual(Array.from(base.subarray(i, i + 4)));
+      } else if (roleAt(p) === 'terrainA') {
+        if (base[i] !== changedA[i] || base[i + 1] !== changedA[i + 1] || base[i + 2] !== changedA[i + 2]) aDiff++;
+      }
+    }
+    expect(aDiff).toBeGreaterThan(0);
+  });
+
+  it('keeps texture seeds independent from band noise seed', () => {
+    const base = paint32(
+      { algoA: 'white', algoB: 'white', amountA: 1, amountB: 1, seedA: 7, seedB: 11 },
+      ['white'], 21
+    );
+    const changedTexture = paint32(
+      { algoA: 'white', algoB: 'white', amountA: 1, amountB: 1, seedA: 8, seedB: 12 },
+      ['white'], 21
+    );
+    const changedNoise = paint32(
+      { algoA: 'white', algoB: 'white', amountA: 1, amountB: 1, seedA: 7, seedB: 11 },
+      ['white'], 22
+    );
+    for (let p = 0; p < 32 * 32; p++) {
+      const i = p * 4;
+      if (roleAt(p) === 'band') {
+        expect(Array.from(changedTexture.subarray(i, i + 4))).toEqual(Array.from(base.subarray(i, i + 4)));
+      } else {
+        expect(Array.from(changedNoise.subarray(i, i + 4))).toEqual(Array.from(base.subarray(i, i + 4)));
+      }
+    }
   });
 
   it('leaves the background tile flat unless terrain B is textured', () => {

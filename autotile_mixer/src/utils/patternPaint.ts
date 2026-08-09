@@ -40,8 +40,10 @@ export interface TextureOptions {
   algoB: TextureId;
   amountA: number;
   amountB: number;
-  shades: number;
-  seed: number;
+  shadesA: number;
+  shadesB: number;
+  seedA: number;
+  seedB: number;
   /**
    * What each terrain's texture fades toward. Independent of the terrain and
    * band colours on purpose — the speckle in hand-drawn pixel art is usually a
@@ -51,8 +53,8 @@ export interface TextureOptions {
   colourA?: RGB;
   colourB?: RGB;
   /**
-   * Per-step overrides of the ramps above, sparse and indexed from the bare
-   * terrain at 0. Length must match `shades + 1` or it is ignored — a stale
+   * Per-step overrides of the A/B ramps above, sparse and indexed from the bare
+   * terrain at 0. Length must match that terrain's shade count + 1 or it is ignored — a stale
    * array from a different step count would recolour the wrong steps, which is
    * the same guard the band ramp carries.
    */
@@ -65,8 +67,10 @@ export const NO_TEXTURE: TextureOptions = {
   algoB: DEFAULT_TEXTURE,
   amountA: 0,
   amountB: 0,
-  shades: DEFAULT_TEXTURE_SHADES,
-  seed: 0,
+  shadesA: DEFAULT_TEXTURE_SHADES,
+  shadesB: DEFAULT_TEXTURE_SHADES,
+  seedA: 0,
+  seedB: 0,
 };
 
 export interface RGB {
@@ -227,12 +231,13 @@ export function paintPatternTileRGBA(
   // Texture shades are a handful of colours, not a per-pixel computation.
   const fitRamp = (r: readonly (RGB | undefined)[] | undefined, n: number) =>
     r && r.length === n + 1 ? r : undefined;
-  const shades = Math.max(1, texture.shades);
+  const shadesA = Math.max(1, texture.shadesA);
+  const shadesB = Math.max(1, texture.shadesB);
   const texA = texture.algoA !== 'none' && texture.amountA > 0
-    ? textureRamp(colours.terrainA, texture.colourA, shades, fitRamp(texture.rampA, shades))
+    ? textureRamp(colours.terrainA, texture.colourA, shadesA, fitRamp(texture.rampA, shadesA))
     : null;
   const texB = texture.algoB !== 'none' && texture.amountB > 0
-    ? textureRamp(colours.terrainB, texture.colourB, shades, fitRamp(texture.rampB, shades))
+    ? textureRamp(colours.terrainB, texture.colourB, shadesB, fitRamp(texture.rampB, shadesB))
     : null;
   // Grain displacement scales with the band so it keeps reading as the band
   // widens; at the default step count this is 1 and nothing changes.
@@ -290,10 +295,10 @@ export function paintPatternTileRGBA(
         }
       }
       if (texA && level === solid) {
-        const k = textureShadeAt(texture.algoA, x, y, texture.seed, texture.amountA, shades);
+        const k = textureShadeAt(texture.algoA, x, y, texture.seedA, texture.amountA, shadesA);
         if (k > 0) rgb = texA[k];
       } else if (texB && level === 0) {
-        const k = textureShadeAt(texture.algoB, x, y, texture.seed, texture.amountB, shades);
+        const k = textureShadeAt(texture.algoB, x, y, texture.seedB, texture.amountB, shadesB);
         if (k > 0) rgb = texB[k];
       }
       const { r, g, b } = rgb;
