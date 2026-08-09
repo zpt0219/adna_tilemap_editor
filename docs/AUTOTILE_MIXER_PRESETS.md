@@ -37,7 +37,7 @@
 | `hardEdgeB` | bool | — | `hardEdgeB` |
 | `bandBias` | float | −1..1 | `bandBias` |
 | `customShades` | `(string \| null)[] \| null` | 长度必须 `= bandSteps + 2` | `customShadesHex` |
-| `noise` | `NoiseId[]` | `white`/`blue`/`clumped`/`ordered` 的子集 | `patternNoise` |
+| `noise` | `NoiseId[]` | `white`/`blue`/`ordered` 的子集 | `patternNoise` |
 | `noiseSeed` | int | 0..99999 | `patternNoiseSeed` |
 | `noiseStrength` | float | 0..2 | `patternNoiseStrength` |
 | `noiseTargets` | `NoiseTargetId[]` | `edge`/`terrainA`/`terrainB` 的子集 | `noiseTargets` |

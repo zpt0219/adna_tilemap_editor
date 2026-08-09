@@ -1049,18 +1049,24 @@ export default function App() {
                 {patternNoise.length === 0 ? t.noiseOff : `${patternNoise.length}`}
               </span>
             </div>
-            <div style={{ marginBottom: '6px' }}>
-              {NOISE_PRESETS.map((n) => (
-                <label key={n.id} className="checkbox-group" style={{ marginBottom: '4px' }}>
-                  <input
-                    type="checkbox"
-                    className="checkbox-input"
-                    checked={patternNoise.includes(n.id)}
-                    onChange={() => toggleNoise(n.id)}
-                  />
-                  <span className="checkbox-label">{lang === 'zh' ? n.zh : n.en}</span>
-                </label>
-              ))}
+            <div className="noise-preset-tabs" style={{ marginBottom: '8px' }}>
+              {NOISE_PRESETS.map((n) => {
+                const isActive = patternNoise.includes(n.id);
+                const shortLabel = lang === 'zh'
+                  ? n.zh.split(' · ')[0]
+                  : n.en.split(' — ')[0];
+                return (
+                  <button
+                    key={n.id}
+                    type="button"
+                    className={`noise-preset-btn ${isActive ? 'active' : ''}`}
+                    onClick={() => toggleNoise(n.id)}
+                    title={lang === 'zh' ? n.zh : n.en}
+                  >
+                    {shortLabel}
+                  </button>
+                );
+              })}
             </div>
 
             {patternNoise.length > 0 && (
@@ -1092,25 +1098,25 @@ export default function App() {
                 />
 
                 <div className="slider-header" style={{ margin: '10px 0 4px' }}>
-                  <span className="slider-name" style={{ fontSize: '11px' }}>{t.noiseTargets}</span>
+                  <span className="slider-name" style={{ fontSize: '11px' }}>
+                    {t.noiseTargets}<InfoTip text={t.noiseTargetsHint} />
+                  </span>
                 </div>
-                {/* Kept always visible rather than parked behind an InfoTip:
-                    the old labels read as the terrains themselves, which are
-                    never touched by band grain, so this is the note that stops
-                    the control looking broken. */}
-                <p className="field-note">{t.noiseTargetsHint}</p>
-                <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
-                  {NOISE_TARGETS.map((tTarget) => (
-                    <label key={tTarget.id} className="checkbox-group" style={{ fontSize: '11px', cursor: 'pointer', margin: 0 }}>
-                      <input
-                        type="checkbox"
-                        className="checkbox-input"
-                        checked={noiseTargets.includes(tTarget.id)}
-                        onChange={() => toggleNoiseTarget(tTarget.id)}
-                      />
-                      <span className="checkbox-label">{lang === 'zh' ? tTarget.zh : tTarget.en}</span>
-                    </label>
-                  ))}
+                <div className="noise-preset-tabs" style={{ marginBottom: '10px' }}>
+                  {NOISE_TARGETS.map((tTarget) => {
+                    const isActive = noiseTargets.includes(tTarget.id);
+                    return (
+                      <button
+                        key={tTarget.id}
+                        type="button"
+                        className={`noise-preset-btn compact ${isActive ? 'active' : ''}`}
+                        onClick={() => toggleNoiseTarget(tTarget.id)}
+                        title={lang === 'zh' ? tTarget.zh : tTarget.en}
+                      >
+                        {lang === 'zh' ? tTarget.shortZh : tTarget.shortEn}
+                      </button>
+                    );
+                  })}
                 </div>
 
                 <div className="slider-header" style={{ margin: '12px 0 6px' }}>

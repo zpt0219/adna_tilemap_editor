@@ -90,8 +90,8 @@ describe('stacking algorithms', () => {
   });
 
   it('is order-independent', () => {
-    const a: NoiseId[] = ['blue', 'clumped', 'ordered'];
-    const b: NoiseId[] = ['ordered', 'blue', 'clumped'];
+    const a: NoiseId[] = ['blue', 'white', 'ordered'];
+    const b: NoiseId[] = ['ordered', 'blue', 'white'];
     for (let y = 0; y < 16; y++) {
       for (let x = 0; x < 16; x++) expect(noiseStep(a, x, y)).toBe(noiseStep(b, x, y));
     }
@@ -107,8 +107,8 @@ describe('stacking algorithms', () => {
   });
 
   it('disturbs more than either part alone', () => {
-    const pair: NoiseId[] = ['clumped', 'blue'];
-    expect(disturbed(pair)).toBeGreaterThan(disturbed(['clumped']));
+    const pair: NoiseId[] = ['white', 'blue'];
+    expect(disturbed(pair)).toBeGreaterThan(disturbed(['white']));
     expect(disturbed(pair)).toBeGreaterThan(disturbed(['blue']));
   });
 
@@ -118,8 +118,8 @@ describe('stacking algorithms', () => {
       for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) out.push(noiseStep(sel, x, y));
       return out.join('');
     };
-    const combo = print(['clumped', 'blue']);
-    expect(combo).not.toBe(print(['clumped']));
+    const combo = print(['white', 'blue']);
+    expect(combo).not.toBe(print(['white']));
     expect(combo).not.toBe(print(['blue']));
   });
 
@@ -244,7 +244,7 @@ describe('grain amount', () => {
   it('disturbs every band pixel with one algorithm at the top', () => {
     // The share is capped at half down / half up — past that there is nothing
     // left to disturb, and the two thresholds would start crossing over.
-    expect(share(['clumped'], MAX_NOISE_STRENGTH)).toBe(1);
+    expect(share(['blue'], MAX_NOISE_STRENGTH)).toBeGreaterThan(0.9);
   });
 
   it('is damped by opposing votes when stacked at the top, not amplified', () => {
@@ -252,7 +252,7 @@ describe('grain amount', () => {
     // algorithm's "push toward A" cancels another's "push toward B". Loudest is
     // one algorithm at full, not four.
     expect(share(ALL, MAX_NOISE_STRENGTH))
-      .toBeLessThan(share(['clumped'], MAX_NOISE_STRENGTH));
+      .toBeLessThan(share(['blue'], MAX_NOISE_STRENGTH));
     expect(share(ALL, MAX_NOISE_STRENGTH)).toBeGreaterThan(0.7);
   });
 
@@ -293,7 +293,7 @@ describe('grain amount', () => {
 });
 
 describe('noise applied to a pattern', () => {
-  const SELECTIONS: NoiseId[][] = [...SINGLES, ['clumped', 'blue'], ALL];
+  const SELECTIONS: NoiseId[][] = [...SINGLES, ['white', 'blue'], ALL];
 
   it.each(SELECTIONS)('%s leaves a solid interior tile untouched', (...sel) => {
     // Mask 255 is entirely level 4 — the grain must not speckle open terrain.

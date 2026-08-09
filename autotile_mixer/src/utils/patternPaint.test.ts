@@ -314,7 +314,7 @@ describe('transition-band steps', () => {
     for (const mask of [0, 31, 110, 255]) {
       const px = paintPatternTileRGBA(id, mask, REFERENCE_ROLE_COLOURS, {
         tileSize: PATTERN_TILE_SIZE, bandSteps: MAX_BAND_STEPS, noiseStrength: 2,
-        noises: ['blue', 'white', 'clumped', 'ordered'],
+        noises: ['blue', 'white', 'ordered'],
       });
       for (let i = 0; i < px.length; i += 4) {
         expect(allowed).toContain(toHexColour({ r: px[i], g: px[i + 1], b: px[i + 2] }));
@@ -890,7 +890,7 @@ it('applies grain in the picked colours', () => {
     // The whole point of gating grain on `0 < level < solid`: a custom colour
     // reaching a solid terrain would tile as speckle across open ground.
     const px = paintPatternTileRGBA(PATTERN, MASK, REFERENCE_ROLE_COLOURS, {
-      tileSize: TS, noises: ['white', 'clumped'], noiseSeed: 7, noiseStrength: 2,
+      tileSize: TS, noises: ['white', 'blue'], noiseSeed: 7, noiseStrength: 2,
       noiseColours: { b: CYAN, edge: YELLOW, a: MAGENTA },
     });
     const grid = levelsOf();

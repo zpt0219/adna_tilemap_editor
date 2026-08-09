@@ -10,14 +10,13 @@
 // The grain is applied only to levels 1..3 — the transition band. Levels 0 and
 // 4 are the solid terrains and stay clean.
 
-export type NoiseId = 'white' | 'blue' | 'clumped' | 'ordered';
+export type NoiseId = 'white' | 'blue' | 'ordered';
 
 export type NoiseTargetId = 'edge' | 'terrainA' | 'terrainB';
 
 export const NOISE_PRESETS: readonly { id: NoiseId; zh: string; en: string }[] = [
   { id: 'blue', zh: '蓝噪点 · 均匀细颗粒', en: 'Blue noise — even fine grain' },
   { id: 'white', zh: '白噪点 · 随机沙粒', en: 'White noise — random sand' },
-  { id: 'clumped', zh: '云斑 · 成团斑驳', en: 'Clumped — patchy blotches' },
   { id: 'ordered', zh: '有序网点 · 规则半调', en: 'Ordered — regular halftone' },
 ];
 
@@ -31,10 +30,10 @@ export const NOISE_PRESETS: readonly { id: NoiseId; zh: string; en: string }[] =
  * zones is one ~1px ring hugging the outline, so the names have to say so or
  * the control looks broken.
  */
-export const NOISE_TARGETS: readonly { id: NoiseTargetId; zh: string; en: string }[] = [
-  { id: 'terrainA', zh: '描边内侧（A 侧）', en: 'Inside the outline (A side)' },
-  { id: 'edge', zh: '描边本身', en: 'The outline itself' },
-  { id: 'terrainB', zh: '描边外侧（B 侧）', en: 'Outside the outline (B side)' },
+export const NOISE_TARGETS: readonly { id: NoiseTargetId; zh: string; en: string; shortZh: string; shortEn: string }[] = [
+  { id: 'terrainA', zh: '描边内侧（A 侧）', en: 'Inside the outline (A side)', shortZh: '描边内', shortEn: 'A Side' },
+  { id: 'edge', zh: '描边本身', en: 'The outline itself', shortZh: '描边本身', shortEn: 'Outline' },
+  { id: 'terrainB', zh: '描边外侧（B 侧）', en: 'Outside the outline (B side)', shortZh: '描边外', shortEn: 'B Side' },
 ];
 
 export const DEFAULT_NOISE_TARGETS: readonly NoiseTargetId[] = ['edge', 'terrainA', 'terrainB'];
@@ -54,7 +53,6 @@ export const MAX_NOISE_STRENGTH = 2;
 const AMOUNT: Record<NoiseId, number> = {
   white: 0.22,
   blue: 0.24,
-  clumped: 0.26,
   ordered: 0.19,
 };
 
@@ -120,23 +118,6 @@ function seedBits(seed: number, salt: number): number {
   return (n ^ (n >>> 13)) >>> 0;
 }
 
-const fade = (t: number) => t * t * (3 - 2 * t);
-
-/** Value noise on a 4x4 lattice over the tile — period 16, so it wraps. */
-function valueNoise(x: number, y: number, seed: number): number {
-  const per = 4;
-  const fx = (x / 16) * per;
-  const fy = (y / 16) * per;
-  const x0 = Math.floor(fx);
-  const y0 = Math.floor(fy);
-  const u = fade(fx - x0);
-  const v = fade(fy - y0);
-  const h = (ix: number, iy: number) =>
-    hash01(((ix % per) + per) % per, ((iy % per) + per) % per, seed);
-  const a = h(x0, y0) * (1 - u) + h(x0 + 1, y0) * u;
-  const b = h(x0, y0 + 1) * (1 - u) + h(x0 + 1, y0 + 1) * u;
-  return a * (1 - v) + b * v;
-}
 
 /**
  * Noise value in [0,1) for a pattern-space pixel.
@@ -167,7 +148,6 @@ export function sample(noise: NoiseId, x: number, y: number, seed: number): numb
       const ay = (py + ((s >>> 3) & 7)) & 7;
       return BAYER8[ay * 8 + ax] / 64;
     }
-    case 'clumped': return valueNoise(px, py, seed);
     case 'white': return hash01(px, py, seed);
     default: return 0.5;
   }
