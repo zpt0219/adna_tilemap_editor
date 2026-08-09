@@ -29,7 +29,8 @@ import {
   TEXTURE_GROUPS, DEFAULT_TEXTURE, DEFAULT_TEXTURE_SHADES, textureRamp, usedTextureShades,
   MIN_TEXTURE_SHADES, MAX_TEXTURE_SHADES, DEFAULT_TEXTURE_SEED, WATER_DOT_COLOUR,
   DEFAULT_CELL_SCALE, MIN_CELL_SCALE, MAX_CELL_SCALE,
-  DEFAULT_RIPPLE_SCALE, MIN_RIPPLE_SCALE, MAX_RIPPLE_SCALE, type TextureId,
+  DEFAULT_RIPPLE_SCALE, MIN_RIPPLE_SCALE, MAX_RIPPLE_SCALE,
+  DEFAULT_GEO_SCALE, GEO_SCALES, textureUsesGeoScale, type TextureId,
 } from './utils/patternTexture';
 
 /**
@@ -108,11 +109,12 @@ function ColourSwatch({ hex, onChange, title, isCustom = false, disabled = false
   );
 }
 
-/** Typed seed plus a dice roll. Used by both the edge and the grain seed. */
-function SeedField({ value, onChange, diceTitle }: {
+/** Typed seed plus a dice roll and reset. Used by edge, noise, and texture seeds. */
+function SeedField({ value, onChange, diceTitle, resetTitle }: {
   value: number;
   onChange: (seed: number) => void;
   diceTitle: string;
+  resetTitle?: string;
 }) {
   return (
     <div className="seed-field">
@@ -126,6 +128,9 @@ function SeedField({ value, onChange, diceTitle }: {
       />
       <button className="btn-action btn-secondary btn-dice" onClick={() => onChange(rollSeed())} title={diceTitle}>
         🎲
+      </button>
+      <button className="btn-action btn-secondary btn-reset-seed" onClick={() => onChange(0)} title={resetTitle || '重置种子 (0)'}>
+        ↺
       </button>
     </div>
   );
@@ -200,6 +205,9 @@ export default function App() {
   const [cellScaleB, setCellScaleB] = useState(DEFAULT_CELL_SCALE);
   const [rippleScaleA, setRippleScaleA] = useState(DEFAULT_RIPPLE_SCALE);
   const [rippleScaleB, setRippleScaleB] = useState(DEFAULT_RIPPLE_SCALE);
+  // Motif size for the two generated geometric pavings.
+  const [geoScaleA, setGeoScaleA] = useState(DEFAULT_GEO_SCALE);
+  const [geoScaleB, setGeoScaleB] = useState(DEFAULT_GEO_SCALE);
   // Picked independently of the terrain colours: the speckle in hand-drawn
   // pixel art is usually a different material, not a lighter version of the
   // ground it sits on.
@@ -239,6 +247,8 @@ export default function App() {
       cellScaleB,
       rippleScaleA,
       rippleScaleB,
+      geoScaleA,
+      geoScaleB,
       colourA: DEFAULT_TEXTURE_COLOURS.terrainA,
       colourB: DEFAULT_TEXTURE_COLOURS.terrainB,
       rampA: textureRampFor('terrainA', textureAlgoA, effectiveTextureShadesA),
@@ -247,7 +257,7 @@ export default function App() {
   }, [textureAlgoA, textureAlgoB, textureAmountA, textureAmountB,
        effectiveTextureShadesA, effectiveTextureShadesB,
        textureSeedA, textureSeedB, cellScaleA, cellScaleB,
-       rippleScaleA, rippleScaleB, customTexHex]);
+       rippleScaleA, rippleScaleB, geoScaleA, geoScaleB, customTexHex]);
 
   const TEXTURE_SHADE_CHOICES = Array.from(
     { length: MAX_TEXTURE_SHADES - MIN_TEXTURE_SHADES + 1 },
@@ -359,10 +369,11 @@ export default function App() {
 
   /** Which texture shades each terrain is actually painting right now. */
   const reachable = useMemo(() => ({
-    terrainA: usedTextureShades(textureAlgoA, textureAmountA, effectiveTextureShadesA, cellScaleA, rippleScaleA),
-    terrainB: usedTextureShades(textureAlgoB, textureAmountB, effectiveTextureShadesB, cellScaleB, rippleScaleB),
+    terrainA: usedTextureShades(textureAlgoA, textureAmountA, effectiveTextureShadesA, cellScaleA, rippleScaleA, geoScaleA),
+    terrainB: usedTextureShades(textureAlgoB, textureAmountB, effectiveTextureShadesB, cellScaleB, rippleScaleB, geoScaleB),
   }), [textureAlgoA, textureAmountA, textureAlgoB, textureAmountB,
-    effectiveTextureShadesA, effectiveTextureShadesB, cellScaleA, cellScaleB, rippleScaleA, rippleScaleB]);
+    effectiveTextureShadesA, effectiveTextureShadesB, cellScaleA, cellScaleB, rippleScaleA, rippleScaleB,
+    geoScaleA, geoScaleB]);
 
   // Custom noise colors state (null = derived from band ramp)
   const [customNoiseHex, setCustomNoiseHex] = useState<{ b?: string; edge?: string; a?: string } | null>(null);
@@ -801,7 +812,7 @@ export default function App() {
                 <span className="slider-name">{t.edgeSeed}<InfoTip text={t.edgeRerollHint} /></span>
                 {edgeSeed === 0 && <span className="slider-val">{t.edgeSeedOriginal}</span>}
               </div>
-              <SeedField value={edgeSeed} onChange={setEdgeSeed} diceTitle={t.randomSeed} />
+              <SeedField value={edgeSeed} onChange={setEdgeSeed} diceTitle={t.randomSeed} resetTitle={t.resetSeed} />
             </>)}
 
             <div className="slider-header" style={{ margin: '14px 0 6px' }}>
@@ -1109,6 +1120,7 @@ export default function App() {
                   value={patternNoiseSeed}
                   onChange={setPatternNoiseSeed}
                   diceTitle={t.randomSeed}
+                  resetTitle={t.resetSeed}
                 />
 
                 <div className="slider-header" style={{ margin: '10px 0 4px' }}>
@@ -1180,15 +1192,19 @@ export default function App() {
             {([
               ['terrainA', textureAlgoA, setTextureAlgoA, textureAmountA, setTextureAmountA,
                 textureShadesA, setTextureShadesA, textureSeedA, setTextureSeedA,
-                cellScaleA, setCellScaleA, rippleScaleA, setRippleScaleA,
-                t.textureAlgoA, t.textureAmountA, t.textureColourA, t.textureSeedA, t.textureCellScaleA, t.textureRippleScaleA],
+                cellScaleA, setCellScaleA, rippleScaleA, setRippleScaleA, geoScaleA, setGeoScaleA,
+                t.textureAlgoA, t.textureAmountA, t.textureColourA, t.textureSeedA, t.textureCellScaleA, t.textureRippleScaleA,
+                t.textureGeoScaleA],
               ['terrainB', textureAlgoB, setTextureAlgoB, textureAmountB, setTextureAmountB,
                 textureShadesB, setTextureShadesB, textureSeedB, setTextureSeedB,
-                cellScaleB, setCellScaleB, rippleScaleB, setRippleScaleB,
-                t.textureAlgoB, t.textureAmountB, t.textureColourB, t.textureSeedB, t.textureCellScaleB, t.textureRippleScaleB],
+                cellScaleB, setCellScaleB, rippleScaleB, setRippleScaleB, geoScaleB, setGeoScaleB,
+                t.textureAlgoB, t.textureAmountB, t.textureColourB, t.textureSeedB, t.textureCellScaleB, t.textureRippleScaleB,
+                t.textureGeoScaleB],
             ] as const).map(([role, algo, setAlgo, val, set, shadeCount, setShadeCount,
               seedValue, setSeed, cellScaleVal, setCellScale, rippleScaleVal, setRippleScale,
-              algoLabel, amountLabel, colourLabel, seedLabel, cellScaleLabel, rippleScaleLabel]) => {
+              geoScaleVal, setGeoScale,
+              algoLabel, amountLabel, colourLabel, seedLabel, cellScaleLabel, rippleScaleLabel,
+              geoScaleLabel]) => {
               const isWater = algo === 'water';
               const effectiveShadeCount = isWater ? 2 : shadeCount;
               const effectiveColourLabel = isWater ? t.textureWaterEdgeColour : colourLabel;
@@ -1229,6 +1245,27 @@ export default function App() {
                       onChange={(e) => setCellScale(parseInt(e.target.value, 10))}
                       onDragStart={(e) => e.preventDefault()}
                     />
+                  </>)}
+
+                  {/* Motif size for the two generated pavings. Named sizes, not
+                      a slider: only three tile the 32px sheet without leaving a
+                      motif on a fractional pixel. */}
+                  {textureUsesGeoScale(algo) && (<>
+                    <div className="slider-header" style={{ margin: '8px 0 4px' }}>
+                      <span className="slider-name" style={{ fontSize: '11px' }}>{geoScaleLabel}</span>
+                    </div>
+                    <div className="type-tabs">
+                      {GEO_SCALES.map((g) => (
+                        <button
+                          key={g.id}
+                          className={`tab-btn ${geoScaleVal === g.id ? 'active' : ''}`}
+                          style={{ fontSize: '11px' }}
+                          onClick={() => setGeoScale(g.id)}
+                        >
+                          {lang === 'zh' ? g.zh : g.en}
+                        </button>
+                      ))}
+                    </div>
                   </>)}
 
                   {(algo === 'ripple' || algo === 'ripple_diag') && (<>
@@ -1272,6 +1309,7 @@ export default function App() {
                     value={seedValue}
                     onChange={setSeed}
                     diceTitle={t.randomSeed}
+                    resetTitle={t.resetSeed}
                   />
 
                   <div className="slider-header" style={{ margin: '8px 0 4px' }}>
@@ -1294,7 +1332,9 @@ export default function App() {
                       // swatch that silently does nothing when clicked.
                       const isDisabled = !reachable[role].has(k);
                       const ramp = textureRamps[role];
-                      const hex = toHexColour(ramp[isDisabled ? effectiveShadeCount : k]);
+                      const targetIdx = isDisabled ? effectiveShadeCount : k;
+                      const rampColour = ramp[targetIdx] ?? ramp[Math.min(targetIdx, ramp.length - 1)] ?? roleColours[role];
+                      const hex = toHexColour(rampColour);
                       const swatchLabel = isWater && k === 2
                         ? t.textureWaterDotColour
                         : effectiveColourLabel;

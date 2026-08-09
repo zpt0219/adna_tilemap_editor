@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   TEXTURE_PRESETS, DEFAULT_TEXTURE, DEFAULT_TEXTURE_SHADES, MAX_TEXTURE_SHADES,
+  DEFAULT_GEO_SCALE, GEO_SCALES, textureUsesGeoScale, octagonalRank,
   textureShadeAt, textureColour, textureRamp, texturePeriod, usedTextureShades,
   type TextureId,
 } from './patternTexture';
@@ -23,6 +24,8 @@ const BAKED = [
   // Not baked art, but the same kind of texture: these name a shade per cell
   // rather than thresholding a field, so the cells dealt shade 0 stay bare.
   'cells',
+  // Generated, and its grout is the bare terrain showing between the tiles.
+  'square',
 ] as const;
 
 /**
@@ -97,7 +100,7 @@ describe('texture presets', () => {
     expect(coverage(algo, 0)).toBe(0);
   });
 
-  it.each(ALGOS.filter((id) => !BAKED.includes(id as typeof BAKED[number])))(
+  it.each(ALGOS.filter((id) => !BAKED.includes(id as typeof BAKED[number]) && id !== 'isometric_grid'))(
     '%s inks every pixel at full amount', (algo) => {
       expect(coverage(algo, 1)).toBe(1);
     });
@@ -115,12 +118,17 @@ describe('texture presets', () => {
     expect(coverage(algo, 1)).toBeCloseTo(want, 6);
   });
 
-  it.each(ALGOS.filter((id) => !['hexagon', 'isometric', 'octagonal'].includes(id)))('%s keeps the strongest shade a minority', (algo) => {
+  it.each(ALGOS.filter((id) => !['hexagon', 'isometric', 'isometric_grid', 'octagonal', 'square'].includes(id)))('%s keeps the strongest shade a minority', (algo) => {
     // The top shade is an accent — a highlight, a joint, a grout line — never
     // the surface itself. This used to be checked as `counts[1] > counts[max]`,
     // which is a fair proxy for a scatter but not for a texture whose top shade
     // is its grout: at 4x4 cells the grout is legitimately the single commonest
     // tone at 28%, and that is the texture working, not failing.
+    //
+    // The four pavings are exempt for the opposite reason: their top shade is the
+    // TILE FACE, which is supposed to be most of the surface. `square` at its
+    // largest is 841 face pixels out of 1024 and that is the texture drawn
+    // correctly — one square filling the tile with a grid line around it.
     const p = texturePeriod(algo);
     const counts = new Array(MAX_TEXTURE_SHADES + 1).fill(0);
     for (let y = 0; y < p; y++) {
@@ -276,7 +284,7 @@ describe('geometric textures', () => {
     ['brick_wall', [184, 200, 96, 536, 8]],
     ['stone_floor', [102, 136, 366, 261, 159]],
     ['hexagon', [110, 10, 241, 221, 442]],
-    ['isometric', [120, 0, 452, 0, 452]],
+    ['isometric', [180, 211, 211, 211, 211]],
     ['octagonal', [62, 181, 0, 40, 741]],
     ['water', [697, 0, 288, 0, 39]],
     ['field', [157, 151, 222, 164, 330]],
@@ -336,6 +344,283 @@ describe('geometric textures', () => {
       }
     }
     expect(shades.size).toBeGreaterThan(2);
+  });
+});
+
+describe('generated geometric pavings', () => {
+  // `isometric` and `octagonal` were 32x32 traced tables until their geometry
+  // was solved. The tables live HERE now, as the oracle: the generator has to
+  // reproduce them pixel for pixel at the original motif size, which is what
+  // makes the size control safe — the default look cannot drift, because a drift
+  // fails this test. Do not "simplify" these fixtures away; they are the only
+  // remaining copy of the traced art.
+
+  const OCTAGONAL_TRACED =
+    '11111111034444444444430111111111' +
+    '11111110344444444444443011111111' +
+    '11111103444444444444444301111111' +
+    '11111034444444444444444430111111' +
+    '11110344444444444444444443011111' +
+    '11103444444444444444444444301111' +
+    '11034444444444444444444444430111' +
+    '10344444444444444444444444443011' +
+    '03444444444444444444444444444301' +
+    '34444444444444444444444444444430' +
+    '44444444444444444444444444444440' +
+    '44444444444444444444444444444440' +
+    '44444444444444444444444444444440' +
+    '44444444444444444444444444444440' +
+    '44444444444444444444444444444440' +
+    '44444444444444444444444444444440' +
+    '44444444444444444444444444444440' +
+    '44444444444444444444444444444440' +
+    '44444444444444444444444444444440' +
+    '44444444444444444444444444444440' +
+    '44444444444444444444444444444440' +
+    '34444444444444444444444444444430' +
+    '03444444444444444444444444444301' +
+    '10344444444444444444444444443011' +
+    '11034444444444444444444444430111' +
+    '11103444444444444444444444301111' +
+    '11110344444444444444444443011111' +
+    '11111034444444444444444430111111' +
+    '11111103444444444444444301111111' +
+    '11111110344444444444443011111111' +
+    '11111111034444444444430111111111' +
+    '11111111100000000000001111111111';
+
+  it.each([
+    ['octagonal', OCTAGONAL_TRACED, octagonalRank],
+  ] as const)('%s reproduces the traced table byte for byte at 32px', (_algo, traced, rank) => {
+    // Against the rank function directly, with no seed in play, so the oracle is
+    // a plain grid comparison. The routing test below covers the path from
+    // textureShadeAt down to here.
+    for (let y = 0; y < 32; y++) {
+      for (let x = 0; x < 32; x++) {
+        expect(rank(x, y, DEFAULT_GEO_SCALE)).toBe(traced.charCodeAt(y * 32 + x) - 48);
+      }
+    }
+  });
+
+  it.each([
+    ['octagonal', octagonalRank],
+  ] as const)('%s routes through its generator, seeded like a baked table', (algo, rank) => {
+    // textureShadeAt salts the seed and offsets the lookup, exactly as it does
+    // for the traced tables, so the dice still moves these two. Recovering the
+    // offset rather than hardcoding it keeps this test off TEXTURE_SALT's value.
+    const shifts = new Set<string>();
+    for (let dy = 0; dy < 32; dy++) {
+      for (let dx = 0; dx < 32; dx++) {
+        let ok = true;
+        for (let y = 0; y < 32 && ok; y++) {
+          for (let x = 0; x < 32 && ok; x++) {
+            if (textureShadeAt(algo, x, y, 0, 1, MAX_TEXTURE_SHADES)
+              !== rank(wrapN(x + dx, 32), wrapN(y + dy, 32), DEFAULT_GEO_SCALE)) ok = false;
+          }
+        }
+        if (ok) shifts.add(`${dx},${dy}`);
+      }
+    }
+    // At least one translation lines up, which is only true if the generator is
+    // what textureShadeAt is calling. More than one is expected for isometric:
+    // its lattice repeats every 16 rows, so two offsets are indistinguishable.
+    expect(shifts.size).toBeGreaterThan(0);
+    expect(shifts.size).toBeLessThan(4);
+    // And the dice still moves it, the same way it moves a traced table.
+    const print = (seed: number) => {
+      let out = '';
+      for (let y = 0; y < 32; y++) {
+        for (let x = 0; x < 32; x++) out += textureShadeAt(algo, x, y, seed, 1, MAX_TEXTURE_SHADES);
+      }
+      return out;
+    };
+    expect(new Set([print(0), print(1), print(9)]).size).toBeGreaterThan(1);
+  });
+
+  it.each(GEO_SCALES.map((g) => g.id))('every paving stays 32-periodic at motif size %i', (n) => {
+    for (const algo of ['isometric', 'octagonal'] as const) {
+      for (let y = 0; y < 32; y++) {
+        for (let x = 0; x < 32; x++) {
+          const base = textureShadeAt(algo, x, y, 3, 1, 4, 3, 4, n);
+          expect(textureShadeAt(algo, x + 32, y, 3, 1, 4, 3, 4, n)).toBe(base);
+          expect(textureShadeAt(algo, x, y - 32, 3, 1, 4, 3, 4, n)).toBe(base);
+        }
+      }
+    }
+  });
+
+  it.each(GEO_SCALES.map((g) => g.id))('isometric keeps its outline one pixel wide at motif size %i', (n) => {
+    // The bug this catches, and it is silent: the metric's gradient grows with
+    // the motif count, so the tolerance has to grow with it too. Left at 1, the
+    // outline came out 1/n pixels wide and vanished completely below the pixel
+    // grid at 16px and 8px — the tiling rendered as two flat tones with no joint
+    // between them at all.
+    let outline = 0;
+    let runs = 0;
+    for (let y = 0; y < 32; y++) {
+      let prev = false;
+      for (let x = 0; x < 32; x++) {
+        const on = textureShadeAt('isometric', x, y, 0, 1, 4, 3, 4, n) === 0;
+        if (on) outline++;
+        if (on && !prev) runs++;
+        prev = on;
+      }
+    }
+    expect(outline).toBeGreaterThan(32);
+    // Mean horizontal run of the joint. Rhombus tips legitimately double it up
+    // where two meet, so this is 1-2 rather than exactly 1.
+    expect(outline / runs).toBeLessThan(3.5);
+  });
+
+  it.each(GEO_SCALES.map((g) => g.id))('isometric draws outline and faces at motif size %i', (n) => {
+    const seen = new Set<number>();
+    for (let y = 0; y < 32; y++) {
+      for (let x = 0; x < 32; x++) seen.add(textureShadeAt('isometric', x, y, 0, 1, 4, 3, 4, n));
+    }
+    expect(Array.from(seen).sort()).toEqual([0, 1, 2, 3, 4]);
+  });
+
+  it('isometric arranges in 2x2 group pattern at seed 0 and randomly at seed > 0', () => {
+    // At seed 0, n=2 (16px), the 2x2 group of diamond cells are ranks 1, 2, 3, 4 deterministically
+    const seenSeed0 = new Set<number>();
+    for (let y = 0; y < 32; y++) {
+      for (let x = 0; x < 32; x++) seenSeed0.add(textureShadeAt('isometric', x, y, 0, 1, 4, 3, 4, 2));
+    }
+    expect(Array.from(seenSeed0).sort()).toEqual([0, 1, 2, 3, 4]);
+
+    // At seed > 0, diamond cells are randomly assigned colors based on seed
+    const seenSeed1 = new Set<number>();
+    for (let y = 0; y < 32; y++) {
+      for (let x = 0; x < 32; x++) seenSeed1.add(textureShadeAt('isometric', x, y, 1, 1, 4, 3, 4, 2));
+    }
+    expect(seenSeed1.size).toBeGreaterThan(1);
+  });
+
+  it.each(GEO_SCALES.map((g) => g.id))('octagonal keeps all four of its tones at motif size %i', (n) => {
+    // Face, corner square and the two chamfer lines. At 8px the chamfer is only
+    // a pixel long each way, and a threshold off by one drops a whole tone.
+    const seen = new Set<number>();
+    for (let y = 0; y < 32; y++) {
+      for (let x = 0; x < 32; x++) seen.add(textureShadeAt('octagonal', x, y, 0, 1, 4, 3, 4, n));
+    }
+    for (const k of [0, 1, 3, 4]) expect(seen).toContain(k);
+  });
+
+it.each(GEO_SCALES.map((g) => g.id))('square draws grout and faces at motif size %i', (n) => {
+    const seen = new Set<number>();
+    for (let y = 0; y < 32; y++) {
+      for (let x = 0; x < 32; x++) seen.add(textureShadeAt('square', x, y, 0, 1, 4, 3, 4, n));
+    }
+    expect(Array.from(seen).sort()).toEqual([0, 1, 2, 3, 4]);
+  });
+
+  it('square arranges in 2x2 group pattern at seed 0 and randomly at seed > 0', () => {
+    // At seed 0, n=2 (16px), the four 16x16 squares are ranks 1, 2, 3, 4 deterministically
+    expect(textureShadeAt('square', 2, 2, 0, 1, 4, 3, 4, 2)).toBe(1);
+    expect(textureShadeAt('square', 18, 2, 0, 1, 4, 3, 4, 2)).toBe(2);
+    expect(textureShadeAt('square', 2, 18, 0, 1, 4, 3, 4, 2)).toBe(3);
+    expect(textureShadeAt('square', 18, 18, 0, 1, 4, 3, 4, 2)).toBe(4);
+
+    // At seed > 0, cells are randomly assigned colors based on seed
+    const shadesSeed1 = [
+      textureShadeAt('square', 2, 2, 1, 1, 4, 3, 4, 2),
+      textureShadeAt('square', 18, 2, 1, 1, 4, 3, 4, 2),
+      textureShadeAt('square', 2, 18, 1, 1, 4, 3, 4, 2),
+      textureShadeAt('square', 18, 18, 1, 1, 4, 3, 4, 2),
+    ];
+    for (const s of shadesSeed1) {
+      expect(s).toBeGreaterThanOrEqual(1);
+      expect(s).toBeLessThanOrEqual(4);
+    }
+  });
+
+  it('square puts its grout on the cell boundary at seed 0', () => {
+    // Phased off the raw seed rather than the salted one, so the default grid is
+    // aligned to the tile instead of cut across the middle of it. The salt's
+    // offset is (17, 29), so a regression here moves the line to x=14 / y=2 —
+    // seamless, but it does not look like "one square per tile" any more.
+    for (let y = 0; y < 32; y++) {
+      for (let x = 0; x < 32; x++) {
+        const grout = x === 31 || y === 31;
+        expect(textureShadeAt('square', x, y, 0, 1, 4, 3, 4, 1) === 0).toBe(grout);
+      }
+    }
+    // And a non-zero seed still moves it, so the dice is not dead.
+    const print = (seed: number) => {
+      let out = '';
+      for (let y = 0; y < 32; y++) {
+        for (let x = 0; x < 32; x++) out += textureShadeAt('square', x, y, seed, 1, 4, 3, 4, 1);
+      }
+      return out;
+    };
+    expect(print(5)).not.toBe(print(0));
+  });
+
+  it('square at its largest size makes one square of the whole tile', () => {
+    // What was asked for: the biggest square IS the tile, so its grout lands on
+    // the sheet's own seams and reads as a single-pixel grid across the map.
+    // One grout line per axis, so exactly one row and one column are bare.
+    let groutRows = 0;
+    let groutCols = 0;
+    for (let y = 0; y < 32; y++) {
+      let all = true;
+      for (let x = 0; x < 32; x++) if (textureShadeAt('square', x, y, 0, 1, 4, 3, 4, 1) !== 0) all = false;
+      if (all) groutRows++;
+    }
+    for (let x = 0; x < 32; x++) {
+      let all = true;
+      for (let y = 0; y < 32; y++) if (textureShadeAt('square', x, y, 0, 1, 4, 3, 4, 1) !== 0) all = false;
+      if (all) groutCols++;
+    }
+    expect(groutRows).toBe(1);
+    expect(groutCols).toBe(1);
+  });
+
+  it('square keeps the grout one pixel wide at every size', () => {
+    // Drawn on two sides of each cell, not four, so neighbours share it. Drawing
+    // all four would double it up between every pair of squares.
+    for (const { id: n } of GEO_SCALES) {
+      const S = 32 / n;
+      let grout = 0;
+      for (let y = 0; y < 32; y++) {
+        for (let x = 0; x < 32; x++) if (textureShadeAt('square', x, y, 0, 1, 4, 3, 4, n) === 0) grout++;
+      }
+      // A one-pixel grid at pitch S over a 32x32 area: 32*n rows + 32*n columns,
+      // less the n*n crossings counted twice.
+      expect(grout).toBe(32 * n + 32 * n - n * n);
+      expect(S * n).toBe(32);
+    }
+  });
+
+  it('square gets smaller as the motif size drops', () => {
+    const face = (n: number) => {
+      let k = 0;
+      for (let y = 0; y < 32; y++) {
+        for (let x = 0; x < 32; x++) if (textureShadeAt('square', x, y, 0, 1, 4, 3, 4, n) > 0) k++;
+      }
+      return k;
+    };
+    const sizes = GEO_SCALES.map((g) => face(g.id));
+    for (let i = 1; i < sizes.length; i++) expect(sizes[i]).toBeLessThan(sizes[i - 1]);
+  });
+
+  it('offers only motif sizes that tile the sheet on whole pixels', () => {
+    for (const { id } of GEO_SCALES) {
+      expect(32 % id).toBe(0);
+      expect((32 / id) % 2).toBe(0);
+    }
+    expect(GEO_SCALES[0].id).toBe(DEFAULT_GEO_SCALE);
+  });
+
+  it('takes the size control on the generated pavings only', () => {
+    expect(textureUsesGeoScale('isometric')).toBe(true);
+    expect(textureUsesGeoScale('octagonal')).toBe(true);
+    expect(textureUsesGeoScale('square')).toBe(true);
+    // hexagon is still a traced table: its slanted-edge tips are placed by hand
+    // and no distance rule reproduces them (best fit left 131 of 1024 pixels
+    // wrong, and it plateaued there), so there is no generator to scale.
+    expect(textureUsesGeoScale('hexagon')).toBe(false);
+    expect(textureUsesGeoScale('paving')).toBe(false);
   });
 });
 

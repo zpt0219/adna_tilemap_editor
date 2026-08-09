@@ -23,7 +23,7 @@ import type { RGB } from './patternPaint';
 export type TextureId =
   | 'none' | NoiseId | 'ripple' | 'ripple_diag' | 'cells'
   | 'breeze_block' | 'brick_wall' | 'cobbles2' | 'brick_floor'
-  | 'hexagon' | 'isometric' | 'octagonal'
+  | 'hexagon' | 'isometric' | 'isometric_grid' | 'octagonal' | 'square'
   | 'weave' | 'paving' | 'paving3' | 'paving5' | 'stone_floor' | 'water'
   | 'field' | 'rubble' | 'nonslip';
 
@@ -51,8 +51,10 @@ export const TEXTURE_GROUPS: readonly {
     zh: '程序与几何', en: 'Procedural & Geometry',
     items: [
       { id: 'cells', zh: '多边形细胞 · Voronoi 细胞网格', en: 'Polygonal Cells — Voronoi cell mesh' },
+      { id: 'square', zh: '正方形铺砖 · 可调尺寸', en: 'Square — plain square paving, sizeable' },
       { id: 'hexagon', zh: '规则六边形 (32px)', en: 'Hexagon — regular hexagonal tiles (32)' },
-      { id: 'isometric', zh: '等距菱形块 (32px)', en: 'Isometric — diamond blocks (32)' },
+      { id: 'isometric', zh: '等距菱形块 · 可调尺寸', en: 'Isometric — diamond blocks, sizeable' },
+      { id: 'isometric_grid', zh: '等距立体方块 · 可调尺寸', en: 'Isometric Grid — 3D cube mesh, sizeable' },
       { id: 'octagonal', zh: '八边切角砖 (32px)', en: 'Octagonal — chamfered square tiles (32)' },
       { id: 'nonslip', zh: '交叉防滑纹', en: 'Non-slip — textured grip' },
     ],
@@ -91,14 +93,14 @@ export const TEXTURE_PRESETS = TEXTURE_GROUPS.flatMap((g) => g.items);
  */
 const PERIOD_32: readonly TextureId[] = [
   'paving', 'paving3', 'paving5', 'stone_floor', 'breeze_block',
-  'hexagon', 'isometric', 'octagonal', 'water',
+  'hexagon', 'isometric', 'isometric_grid', 'octagonal', 'water',
   'field', 'rubble',
   // The geometric fields were widened so their motifs read at the same scale as
   // the pavings: at the old size they repeated four times inside one 32px tile
   // and looked like a finer material sitting next to a coarser one. Widening the
   // Motif scale and output period are independent; all source masonry tiles
   // listed above are genuinely 32-periodic.
-  'ripple', 'ripple_diag', 'cells',
+  'ripple', 'ripple_diag', 'cells', 'square',
 ];
 
 /**
@@ -632,74 +634,6 @@ const HEXAGON =
   '44402444444444442044444444444444' +
   '44440444444444440444444444444444';
 
-const ISOMETRIC =
-  '44444444444444400444444444444444' +
-  '44444444444440022004444444444444' +
-  '44444444444002222220044444444444' +
-  '44444444400222222222200444444444' +
-  '44444440022222222222222004444444' +
-  '44444002222222222222222220044444' +
-  '44400222222222222222222222200444' +
-  '40022222222222222222222222222004' +
-  '02222222222222222222222222222220' +
-  '40022222222222222222222222222004' +
-  '44400222222222222222222222200444' +
-  '44444002222222222222222220044444' +
-  '44444440022222222222222004444444' +
-  '44444444400222222222200444444444' +
-  '44444444444002222220044444444444' +
-  '44444444444440022004444444444444' +
-  '44444444444444400444444444444444' +
-  '44444444444440022004444444444444' +
-  '44444444444002222220044444444444' +
-  '44444444400222222222200444444444' +
-  '44444440022222222222222004444444' +
-  '44444002222222222222222220044444' +
-  '44400222222222222222222222200444' +
-  '40022222222222222222222222222004' +
-  '02222222222222222222222222222220' +
-  '40022222222222222222222222222004' +
-  '44400222222222222222222222200444' +
-  '44444002222222222222222220044444' +
-  '44444440022222222222222004444444' +
-  '44444444400222222222200444444444' +
-  '44444444444002222220044444444444' +
-  '44444444444440022004444444444444';
-
-const OCTAGONAL =
-  '11111111034444444444430111111111' +
-  '11111110344444444444443011111111' +
-  '11111103444444444444444301111111' +
-  '11111034444444444444444430111111' +
-  '11110344444444444444444443011111' +
-  '11103444444444444444444444301111' +
-  '11034444444444444444444444430111' +
-  '10344444444444444444444444443011' +
-  '03444444444444444444444444444301' +
-  '34444444444444444444444444444430' +
-  '44444444444444444444444444444440' +
-  '44444444444444444444444444444440' +
-  '44444444444444444444444444444440' +
-  '44444444444444444444444444444440' +
-  '44444444444444444444444444444440' +
-  '44444444444444444444444444444440' +
-  '44444444444444444444444444444440' +
-  '44444444444444444444444444444440' +
-  '44444444444444444444444444444440' +
-  '44444444444444444444444444444440' +
-  '44444444444444444444444444444440' +
-  '34444444444444444444444444444430' +
-  '03444444444444444444444444444301' +
-  '10344444444444444444444444443011' +
-  '11034444444444444444444444430111' +
-  '11103444444444444444444444301111' +
-  '11110344444444444444444443011111' +
-  '11111034444444444444444430111111' +
-  '11111103444444444444444301111111' +
-  '11111110344444444444443011111111' +
-  '11111111034444444444430111111111' +
-  '11111111100000000000001111111111';
-
 // Water has three source tones: 0 is the blue body, 2 is the bright-blue line,
 // and 4 is the small pale/white dot. The line is the only editable layer; the
 // dot stays a fixed pale accent while the body follows the terrain colour.
@@ -871,9 +805,204 @@ function bakedShade(
   const m = size - 1;
   const px = wrapN(x + (seed & m), size);
   const py = wrapN(y + ((seed >>> 4) & m), size);
-  const rank = table.charCodeAt(py * size + px) - 48;
+  return rankToShade(table.charCodeAt(py * size + px) - 48, amount, shades);
+}
+
+/** The 0..4 rank ladder mapped onto the caller's shade count. */
+function rankToShade(rank: number, amount: number, shades: number): number {
   const k = Math.round((rank * shades * Math.min(1, amount)) / BAKED_RANKS);
   return Math.max(0, Math.min(shades, k));
+}
+
+// --- generated geometric pavings --------------------------------------------
+// `isometric` and `octagonal` were traced 32x32 tables until their geometry was
+// solved: both are now generated from a formula that reproduces those tables
+// BYTE FOR BYTE at the original size, which is what makes a size control safe to
+// add — the default cannot drift, and the test holds the old tables as the
+// oracle. `hexagon` resisted the same treatment; see the note on HEXAGON.
+//
+// Both are 32-periodic at every size offered, because the motif count per axis
+// divides 32.
+
+/**
+ * Motif sizes offered for the generated pavings, as the number of motifs across
+ * the 32px tile. 1 is the traced original.
+ *
+ * Only divisors of 32 that keep the motif an even number of pixels across are
+ * offered: `octagonal` compares integer distances against its cell half-width,
+ * which a fractional cell would never hit, and the shared edge line it draws
+ * once per cell would land between pixels.
+ */
+export const GEO_SCALES: readonly { id: number; zh: string; en: string }[] = [
+  { id: 1, zh: '32px · 原尺寸', en: '32px — original' },
+  { id: 2, zh: '16px', en: '16px' },
+  { id: 4, zh: '8px', en: '8px' },
+  { id: 8, zh: '4px', en: '4px' },
+];
+export const DEFAULT_GEO_SCALE = 1;
+
+/** Whether a texture takes the motif-size control. */
+export function textureUsesGeoScale(texture: TextureId): boolean {
+  return texture === 'isometric' || texture === 'isometric_grid' || texture === 'octagonal' || texture === 'square';
+}
+
+/**
+ * Plain square paving: a grout line, and tile faces.
+ * At rank 0 the grout (border line) takes the bare terrain color.
+ * For motif sizes n>=1 (32px, 16px, 8px, 4px):
+ *   - When seed === 0: the 4 squares in a 2x2 group take ranks 1, 2, 3, 4 deterministically.
+ *   - When seed !== 0: each square cell randomly selects a rank from 1..4 based on its cell position & seed.
+ */
+function squareRank(x: number, y: number, n: number, seed: number = 0): number {
+  const S = 32 / n;
+  // Distance to the nearest grout line, in pixels: 0 on the grout itself.
+  const toGrout = (v: number) => {
+    const u = wrapN(v, S);
+    return Math.min(u + 1, S - 1 - u);
+  };
+  const e = Math.min(toGrout(x), toGrout(y));
+  if (e === 0) return 0;
+
+  const cellSize = n === 1 ? 16 : S;
+  const cellX = Math.floor(x / cellSize);
+  const cellY = Math.floor(y / cellSize);
+
+  if (seed === 0) {
+    const cx = wrapN(cellX, 2);
+    const cy = wrapN(cellY, 2);
+
+    if (cx === 0 && cy === 0) return 1;
+    if (cx === 1 && cy === 0) return 2;
+    if (cx === 0 && cy === 1) return 3;
+    return 4;
+  }
+
+  const h = hash01(cellX, cellY, seed ^ 0x9e3779b9);
+  return 1 + Math.floor(h * 4);
+}
+
+/**
+ * Isometric rhombi: two interleaved sets of diamond centres with shared boundary inked.
+ * At rank 0 the boundary line takes the bare terrain color along outer edges.
+ *   - When seed === 0: the 4 diamonds in a 2x2 group take ranks 1, 2, 3, 4 deterministically.
+ *   - When seed !== 0: each diamond cell randomly selects a rank from 1..4 based on its cell position & seed.
+ */
+export function isometricRank(x: number, y: number, n: number, seed: number = 0): number {
+  const W = 16 / n;
+  const H = 8 / n;
+
+  const u = x / W;
+  const v = y / H;
+
+  const cellX = Math.floor((u + v) / 2);
+  const cellY = Math.floor((u - v) / 2);
+
+  const centerX = (cellX + cellY + 1) * W;
+  const centerY = (cellX - cellY) * H;
+
+  const dx = Math.abs(x - centerX);
+  const dy = Math.abs(y - centerY);
+
+  const distInPixels = dx * H + dy * W;
+  const maxDist = W * H;
+
+  if (distInPixels >= maxDist - Math.max(1, H)) return 0; // Outer diamond border = terrain color
+
+  if (seed === 0) {
+    const cx = wrapN(cellX, 2);
+    const cy = wrapN(cellY, 2);
+
+    if (cx === 0 && cy === 0) return 1;
+    if (cx === 1 && cy === 0) return 2;
+    if (cx === 0 && cy === 1) return 3;
+    return 4;
+  }
+
+  const h = hash01(cellX, cellY, seed ^ 0x9e3779b9);
+  return 1 + Math.floor(h * 4);
+}
+
+/**
+ * 3D Isometric Cube Grid: 3D cube mesh with top, left, right directional facets.
+ * Outer diamond boundaries take rank 0 (terrain color).
+ */
+export function isometricGridRank(x: number, y: number, n: number, seed: number = 0): number {
+  const W = 16 / n;
+  const H = 8 / n;
+
+  const u = x / W;
+  const v = y / H;
+
+  const cellX = Math.floor((u + v) / 2);
+  const cellY = Math.floor((u - v) / 2);
+
+  const centerX = (cellX + cellY + 1) * W;
+  const centerY = (cellX - cellY) * H;
+
+  const dx = Math.abs(x - centerX);
+  const dy = Math.abs(y - centerY);
+
+  const distInPixels = dx * H + dy * W;
+  const maxDist = W * H;
+
+  if (distInPixels >= maxDist - Math.max(1, H)) return 0; // Outer border = terrain color
+
+  const relX = x - centerX;
+  const relY = y - centerY;
+
+  let facetRank: number;
+  if (relY < 0 && Math.abs(relX) < W * (1 - Math.abs(relY) / H)) {
+    facetRank = 4; // Top facet
+  } else if (relX < 0) {
+    facetRank = 3; // Left facet
+  } else {
+    facetRank = 2; // Right facet
+  }
+
+  if (seed === 0) return facetRank;
+
+  const h = hash01(cellX, cellY, seed ^ 0x7f4a2c11);
+  const shift = Math.floor(h * 3) - 1; // -1, 0, or 1
+  return Math.max(1, Math.min(4, facetRank + shift));
+}
+
+/**
+ * Chamfered square tiles: an octagon face, a small square in the gap between
+ * four of them, and a two-tone bevel on the diagonal.
+ *
+ * The cell centre sits at `S/2 - 1` rather than at `S/2 - 0.5`, which is what
+ * puts the straight edge on a whole pixel line at the cell boundary instead of
+ * between two pixels. Adjacent octagons therefore share one inked edge, drawn
+ * once by the cell on its far side — that asymmetry is in the traced art and is
+ * why the edge is tested separately from the chamfer.
+ */
+export function octagonalRank(x: number, y: number, n: number): number {
+  const S = 32 / n;
+  const H = S / 2;
+  const dx = Math.abs(wrapN(x - (H - 1) + H, S) - H);
+  const dy = Math.abs(wrapN(y - (H - 1) + H, S) - H);
+  // Where the chamfer cuts the corner, in the same units as dx + dy. 0.6875 is
+  // 22/32, read off the traced table.
+  const C = Math.round(S * 0.6875);
+  const m = dx + dy;
+  if (dx === H || dy === H) return m <= C ? 0 : 1;
+  if (m > C) return 1;      // the square between the octagons
+  if (m === C) return 0;    // outer chamfer line
+  if (m === C - 1) return 3;  // inner chamfer line
+  return 4;                 // octagon face
+}
+
+/**
+ * A generated paving's shade, seeded the same way a baked one is so the dice
+ * keeps working and the 32px output is identical to the table it replaced.
+ */
+function geoShade(
+  rank: (x: number, y: number, n: number, seed?: number) => number,
+  x: number, y: number, seed: number, amount: number, shades: number, n: number
+): number {
+  const gx = wrapN(x + (seed & 31), 32);
+  const gy = wrapN(y + ((seed >>> 4) & 31), 32);
+  return rankToShade(rank(gx, gy, n, seed), amount, shades);
 }
 
 /**
@@ -893,7 +1022,8 @@ export function textureShadeAt(
   amount: number,
   shades: number = DEFAULT_TEXTURE_SHADES,
   cellScale: number = DEFAULT_CELL_SCALE,
-  rippleScale: number = DEFAULT_RIPPLE_SCALE
+  rippleScale: number = DEFAULT_RIPPLE_SCALE,
+  geoScale: number = DEFAULT_GEO_SCALE
 ): number {
   if (texture === 'none' || amount <= 0 || shades < 1) return 0;
   const s = (seed ^ TEXTURE_SALT) >>> 0;
@@ -908,8 +1038,14 @@ export function textureShadeAt(
   if (texture === 'cobbles2') return bakedShade(COBBLES2, 16, x, y, s, amount, shades);
   if (texture === 'brick_floor') return bakedShade(BRICK_FLOOR, 16, x, y, s, amount, shades);
   if (texture === 'hexagon') return bakedShade(HEXAGON, 32, x, y, s, amount, shades);
-  if (texture === 'isometric') return bakedShade(ISOMETRIC, 32, x, y, s, amount, shades);
-  if (texture === 'octagonal') return bakedShade(OCTAGONAL, 32, x, y, s, amount, shades);
+  // Generated rather than traced, and byte-identical to the tables they replaced
+  // at geoScale 1 — see the oracle test.
+  const geo = Math.max(1, geoScale);
+  if (texture === 'isometric') return geoShade(isometricRank, x, y, seed, amount, shades, geo);
+  if (texture === 'isometric_grid') return geoShade(isometricGridRank, x, y, seed, amount, shades, geo);
+  if (texture === 'octagonal') return geoShade(octagonalRank, x, y, s, amount, shades, geo);
+  // reads as a bug even though every seam still lines up.
+  if (texture === 'square') return geoShade(squareRank, x, y, seed, amount, shades, geo);
   if (texture === 'water') {
     // Water has two visible texture ranks. Density thins both source accents
     // rather than scaling them back to the terrain, which keeps the line and
@@ -951,13 +1087,16 @@ export function usedTextureShades(
   amount: number,
   shades: number = DEFAULT_TEXTURE_SHADES,
   cellScale: number = DEFAULT_CELL_SCALE,
-  rippleScale: number = DEFAULT_RIPPLE_SCALE
+  rippleScale: number = DEFAULT_RIPPLE_SCALE,
+  geoScale: number = DEFAULT_GEO_SCALE
 ): Set<number> {
   const used = new Set<number>();
   if (texture === 'none') return used;
   const p = texturePeriod(texture);
   for (let y = 0; y < p; y++) {
-    for (let x = 0; x < p; x++) used.add(textureShadeAt(texture, x, y, 0, amount, shades, cellScale, rippleScale));
+    for (let x = 0; x < p; x++) {
+      used.add(textureShadeAt(texture, x, y, 0, amount, shades, cellScale, rippleScale, geoScale));
+    }
   }
   return used;
 }

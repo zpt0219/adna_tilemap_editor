@@ -395,7 +395,8 @@ body {
   min-width: 0;
 }
 
-.btn-dice {
+.btn-dice,
+.btn-reset-seed {
   padding: 4px 10px;
   font-size: 14px;
   flex: 0 0 auto;
