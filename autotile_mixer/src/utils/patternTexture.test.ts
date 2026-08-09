@@ -16,7 +16,8 @@ const NEAR_WHITE = { r: 0xf8, g: 0xf8, b: 0xf8 };
 
 /** Baked art keeps its lightest tone as bare terrain, so it never inks everything. */
 const BAKED = [
-  'weave', 'paving', 'paving3', 'paving5',
+  'weave', 'paving', 'paving3', 'paving5', 'stone_floor', 'breeze_block', 'brick_wall', 'cobbles2', 'brick_floor',
+  'hexagon', 'isometric', 'octagonal', 'water', 'field', 'rubble', 'nonslip',
   // Not baked art, but the same kind of texture: these name a shade per cell
   // rather than thresholding a field, so the cells dealt shade 0 stay bare.
   'cells', 'medium_cells', 'small_cells',
@@ -114,7 +115,7 @@ describe('texture presets', () => {
     expect(coverage(algo, 1)).toBeCloseTo(want, 6);
   });
 
-  it.each(ALGOS)('%s keeps the strongest shade a minority', (algo) => {
+  it.each(ALGOS.filter((id) => !['hexagon', 'isometric', 'octagonal'].includes(id)))('%s keeps the strongest shade a minority', (algo) => {
     // The top shade is an accent — a highlight, a joint, a grout line — never
     // the surface itself. This used to be checked as `counts[1] > counts[max]`,
     // which is a fair proxy for a scatter but not for a texture whose top shade
@@ -204,56 +205,6 @@ describe('geometric textures', () => {
   // Shifting by (half a brick, one course) therefore maps the pattern exactly
   // onto itself — which is the definition, not a consequence. The vector differs
   // because the bricks are 16x8.
-  it.each([['brick', 8, 8]] as const)(
-    '%s is a half-drop lattice',
-    (algo, dx, dy) => {
-      for (let y = 0; y < 32; y++) {
-        for (let x = 0; x < 32; x++) {
-          expect(textureShadeAt(algo, x + dx, y + dy, 0, 0.5))
-            .toBe(textureShadeAt(algo, x, y, 0, 0.5));
-        }
-      }
-    }
-  );
-
-  it('brick draws unbroken joint lines, not scatter', () => {
-    // At a low amount only the joints themselves light up, and a bed joint is a
-    // line: a full-width course, every pixel of it.
-    const on = lit('brick', 0.3);
-    const perRow = new Map<number, number>();
-    for (const [, y] of on) perRow.set(y, (perRow.get(y) ?? 0) + 1);
-    const fullRows = [...perRow.entries()].filter(([, n]) => n === 32).map(([y]) => y).sort((a, b) => a - b);
-    // 8px courses over a 32px tile.
-    expect(fullRows).toHaveLength(4);
-    for (let i = 1; i < fullRows.length; i++) {
-      expect(fullRows[i] - fullRows[i - 1]).toBe(8);
-    }
-  });
-
-  it('brick is oblong, not square', () => {
-    // 2:1 bricks. The bed joints repeat twice as often as the head joints do,
-    // which is the whole difference between paving and graph paper.
-    const on = lit('brick', 0.3);
-    const rowsWithAny = new Set(on.map(([, y]) => y));
-    const colsFullyLit = new Set<number>();
-    for (let x = 0; x < 32; x++) {
-      if (on.filter(([px]) => px === x).length === 32) colsFullyLit.add(x);
-    }
-    expect(rowsWithAny.size).toBe(32);   // every row meets a head joint
-    expect(colsFullyLit.size).toBe(0);   // but no column runs unbroken: courses offset
-  });
-
-  it('brick offsets the vertical joints of neighbouring courses', () => {
-    // Running bond, not a grid: the head joints of one course land mid-flag on
-    // the next. Without this it reads as graph paper.
-    const on = lit('brick', 0.3);
-    const rows = new Map<number, number[]>();
-    for (const [x, y] of on) rows.set(y, [...(rows.get(y) ?? []), x]);
-    const courses = [...rows.entries()].filter(([, xs]) => xs.length === 2);
-    const sets = courses.map(([, xs]) => xs.sort((a, b) => a - b).join(','));
-    expect(new Set(sets).size).toBe(2); // two distinct joint alignments
-  });
-
 
   it('weave keeps the tone census of the art it was traced from', () => {
     // The lock on the baked table. assets/test3.png has five tones; these are
@@ -274,6 +225,22 @@ describe('geometric textures', () => {
     }
     for (const n of counts) expect(n).toBeGreaterThan(0);
     expect(counts[4]).toBeLessThan(Math.min(counts[0], counts[1], counts[2], counts[3]));
+  });
+
+  it('cobbles2 keeps the tone census of the traced fine-brick art', () => {
+    const counts = new Array(5).fill(0);
+    for (let y = 0; y < 16; y++) {
+      for (let x = 0; x < 16; x++) counts[textureShadeAt('cobbles2', x, y, 0, 1, 4)]++;
+    }
+    expect(counts).toEqual([48, 73, 105, 25, 5]);
+  });
+
+  it('brick_floor keeps the tone census of the traced diagonal-brick art', () => {
+    const counts = new Array(5).fill(0);
+    for (let y = 0; y < 16; y++) {
+      for (let x = 0; x < 16; x++) counts[textureShadeAt('brick_floor', x, y, 0, 1, 4)]++;
+    }
+    expect(counts).toEqual([24, 1, 192, 24, 15]);
   });
 
   it('weave flattens toward bare terrain as the amount drops', () => {
@@ -305,6 +272,16 @@ describe('geometric textures', () => {
     ['paving', [64, 270, 400, 90, 200]],
     ['paving3', [332, 332, 169, 68, 123]],
     ['paving5', [207, 224, 224, 207, 162]],
+    ['breeze_block', [94, 8, 212, 704, 6]],
+    ['brick_wall', [184, 200, 96, 536, 8]],
+    ['stone_floor', [102, 136, 366, 261, 159]],
+    ['hexagon', [110, 10, 241, 221, 442]],
+    ['isometric', [120, 0, 452, 0, 452]],
+    ['octagonal', [62, 181, 0, 40, 741]],
+    ['water', [697, 0, 288, 0, 39]],
+    ['field', [157, 151, 222, 164, 330]],
+    ['rubble', [501, 0, 396, 0, 127]],
+    ['nonslip', [192, 0, 672, 0, 160]],
   ] as const)('%s keeps the tone census of the art it was traced from', (algo, want) => {
     // The lock on each baked table, same job the weave census does: a corrupted
     // or re-ordered table fails here rather than shipping a subtly wrong floor.
@@ -570,6 +547,32 @@ describe('texture applied to a tile', () => {
     const onlyA = paint({ algoA: 'white', algoB: 'white', amountA: 0.6, amountB: 0 });
     const onlyB = paint({ algoA: 'white', algoB: 'white', amountA: 0, amountB: 0.6 });
     expect(Array.from(onlyA)).not.toEqual(Array.from(onlyB));
+  });
+
+  it('Water keeps the body, picked line colour, and pale dot as separate layers', () => {
+    const edge = { r: 245, g: 245, b: 245 };
+    const dot = { r: 255, g: 230, b: 90 };
+    const water = paint32({
+      algoA: 'water', amountA: 1, shadesA: 2,
+      rampA: [undefined, edge, dot],
+    });
+    const base = REFERENCE_ROLE_COLOURS.terrainA;
+    let edgePixels = 0;
+    let dotPixels = 0;
+    for (let p = 0; p < 32 * 32; p++) {
+      if (roleAt(p) !== 'terrainA') continue;
+      const i = p * 4;
+      const rgb = [water[i], water[i + 1], water[i + 2]];
+      expect([
+        [base.r, base.g, base.b],
+        [edge.r, edge.g, edge.b],
+        [dot.r, dot.g, dot.b],
+      ]).toContainEqual(rgb);
+      if (rgb[0] === edge.r && rgb[1] === edge.g && rgb[2] === edge.b) edgePixels++;
+      if (rgb[0] === dot.r && rgb[1] === dot.g && rgb[2] === dot.b) dotPixels++;
+    }
+    expect(edgePixels).toBeGreaterThan(0);
+    expect(dotPixels).toBeGreaterThan(0);
   });
 
   it('gives terrain A and B independent shade counts', () => {

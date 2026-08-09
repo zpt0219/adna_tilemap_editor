@@ -22,7 +22,7 @@ import {
 } from './utils/patternNoise';
 import {
   TEXTURE_PRESETS, DEFAULT_TEXTURE, DEFAULT_TEXTURE_SHADES, textureRamp, usedTextureShades,
-  MIN_TEXTURE_SHADES, MAX_TEXTURE_SHADES, DEFAULT_TEXTURE_SEED, type TextureId,
+  MIN_TEXTURE_SHADES, MAX_TEXTURE_SHADES, DEFAULT_TEXTURE_SEED, WATER_DOT_COLOUR, type TextureId,
 } from './utils/patternTexture';
 
 /**
@@ -192,23 +192,37 @@ export default function App() {
       terrainA: null,
       terrainB: null,
     });
+  const effectiveTextureShadesA = textureAlgoA === 'water' ? 2 : textureShadesA;
+  const effectiveTextureShadesB = textureAlgoB === 'water' ? 2 : textureShadesB;
   // Memoised, not built inline: the render effects key off object identity, so
   // a fresh object every render would repaint all 48 tiles on every keystroke.
-  const textureOpts = useMemo(() => ({
-    algoA: textureAlgoA,
-    algoB: textureAlgoB,
-    amountA: textureAmountA,
-    amountB: textureAmountB,
-    shadesA: textureShadesA,
-    shadesB: textureShadesB,
-    seedA: textureSeedA,
-    seedB: textureSeedB,
-    colourA: DEFAULT_TEXTURE_COLOURS.terrainA,
-    colourB: DEFAULT_TEXTURE_COLOURS.terrainB,
-    rampA: customTexHex.terrainA?.map((h) => (h ? parseHexColour(h) : undefined)),
-    rampB: customTexHex.terrainB?.map((h) => (h ? parseHexColour(h) : undefined)),
-  }), [textureAlgoA, textureAlgoB, textureAmountA, textureAmountB,
-       textureShadesA, textureShadesB, textureSeedA, textureSeedB, customTexHex]);
+  const textureOpts = useMemo(() => {
+    const textureRampFor = (role: 'terrainA' | 'terrainB', algo: TextureId, shadeCount: number) => {
+      const custom = customTexHex[role]?.length === shadeCount + 1
+        ? customTexHex[role]?.map((h) => (h ? parseHexColour(h) : undefined))
+        : undefined;
+      if (algo !== 'water') return custom;
+      const waterRamp = custom ? [...custom] : new Array(3).fill(undefined);
+      waterRamp[2] ??= WATER_DOT_COLOUR;
+      return waterRamp;
+    };
+    return {
+      algoA: textureAlgoA,
+      algoB: textureAlgoB,
+      amountA: textureAmountA,
+      amountB: textureAmountB,
+      shadesA: effectiveTextureShadesA,
+      shadesB: effectiveTextureShadesB,
+      seedA: textureSeedA,
+      seedB: textureSeedB,
+      colourA: DEFAULT_TEXTURE_COLOURS.terrainA,
+      colourB: DEFAULT_TEXTURE_COLOURS.terrainB,
+      rampA: textureRampFor('terrainA', textureAlgoA, effectiveTextureShadesA),
+      rampB: textureRampFor('terrainB', textureAlgoB, effectiveTextureShadesB),
+    };
+  }, [textureAlgoA, textureAlgoB, textureAmountA, textureAmountB,
+       effectiveTextureShadesA, effectiveTextureShadesB,
+       textureSeedA, textureSeedB, customTexHex]);
 
   const TEXTURE_SHADE_CHOICES = Array.from(
     { length: MAX_TEXTURE_SHADES - MIN_TEXTURE_SHADES + 1 },
@@ -294,22 +308,33 @@ export default function App() {
    * object identity.
    */
   const textureRamps = useMemo(() => {
-    const build = (role: 'terrainA' | 'terrainB') => textureRamp(
-      roleColours[role],
-      DEFAULT_TEXTURE_COLOURS[role],
-      role === 'terrainA' ? textureShadesA : textureShadesB,
-      customTexHex[role]?.length === (role === 'terrainA' ? textureShadesA : textureShadesB) + 1
+    const build = (role: 'terrainA' | 'terrainB') => {
+      const algo = role === 'terrainA' ? textureAlgoA : textureAlgoB;
+      const shadeCount = role === 'terrainA' ? effectiveTextureShadesA : effectiveTextureShadesB;
+      const custom = customTexHex[role]?.length === shadeCount + 1
         ? customTexHex[role]?.map((h) => (h ? parseHexColour(h) : undefined))
-        : undefined
-    );
+        : undefined;
+      if (algo === 'water') {
+        const waterRamp = custom ? [...custom] : new Array(3).fill(undefined);
+        waterRamp[2] ??= WATER_DOT_COLOUR;
+        return textureRamp(roleColours[role], DEFAULT_TEXTURE_COLOURS[role], shadeCount, waterRamp);
+      }
+      return textureRamp(
+        roleColours[role],
+        DEFAULT_TEXTURE_COLOURS[role],
+        shadeCount,
+        custom
+      );
+    };
     return { terrainA: build('terrainA'), terrainB: build('terrainB') };
-  }, [roleColours, textureShadesA, textureShadesB, customTexHex]);
+  }, [roleColours, textureAlgoA, textureAlgoB, effectiveTextureShadesA, effectiveTextureShadesB, customTexHex]);
 
   /** Which texture shades each terrain is actually painting right now. */
   const reachable = useMemo(() => ({
-    terrainA: usedTextureShades(textureAlgoA, textureAmountA, textureShadesA),
-    terrainB: usedTextureShades(textureAlgoB, textureAmountB, textureShadesB),
-  }), [textureAlgoA, textureAmountA, textureAlgoB, textureAmountB, textureShadesA, textureShadesB]);
+    terrainA: usedTextureShades(textureAlgoA, textureAmountA, effectiveTextureShadesA),
+    terrainB: usedTextureShades(textureAlgoB, textureAmountB, effectiveTextureShadesB),
+  }), [textureAlgoA, textureAmountA, textureAlgoB, textureAmountB,
+    effectiveTextureShadesA, effectiveTextureShadesB]);
 
   // Custom noise colors state (null = derived from band ramp)
   const [customNoiseHex, setCustomNoiseHex] = useState<{ b?: string; edge?: string; a?: string } | null>(null);
@@ -936,7 +961,14 @@ export default function App() {
                 textureShadesB, setTextureShadesB, textureSeedB, setTextureSeedB,
                 t.textureAlgoB, t.textureAmountB, t.textureColourB, t.textureSeedB],
             ] as const).map(([role, algo, setAlgo, val, set, shadeCount, setShadeCount,
-              seedValue, setSeed, algoLabel, amountLabel, colourLabel, seedLabel]) => (
+              seedValue, setSeed, algoLabel, amountLabel, colourLabel, seedLabel]) => {
+              const isWater = algo === 'water';
+              const effectiveShadeCount = isWater ? 2 : shadeCount;
+              const effectiveColourLabel = isWater ? t.textureWaterEdgeColour : colourLabel;
+              const shadeSlots = isWater
+                ? [1, 2]
+                : Array.from({ length: MAX_TEXTURE_SHADES }, (_, i) => i + 1);
+              return (
               <div key={role} className={`texture-material-block texture-material-${role}`}>
                 <div className="slider-header" style={{ marginBottom: '4px' }}>
                   <span className="slider-name">{algoLabel}</span>
@@ -979,7 +1011,7 @@ export default function App() {
                   />
 
                   <div className="slider-header" style={{ margin: '8px 0 4px' }}>
-                    <span className="slider-name" style={{ fontSize: '11px' }}>{colourLabel}</span>
+                    <span className="slider-name" style={{ fontSize: '11px' }}>{effectiveColourLabel}</span>
                     {customTexHex[role]?.some(Boolean) && (
                       <ResetLink
                         label={t.reset}
@@ -989,7 +1021,7 @@ export default function App() {
                     )}
                   </div>
                   <div className="swatch-row">
-                    {Array.from({ length: MAX_TEXTURE_SHADES }, (_, i) => i + 1).map((k) => {
+                    {shadeSlots.map((k) => {
                       // Every slot is drawn whatever the settings, so the row
                       // never reflows; the ones the texture cannot currently
                       // reach are crossed out rather than hidden. That covers
@@ -998,7 +1030,10 @@ export default function App() {
                       // swatch that silently does nothing when clicked.
                       const isDisabled = !reachable[role].has(k);
                       const ramp = textureRamps[role];
-                      const hex = toHexColour(ramp[isDisabled ? shadeCount : k]);
+                      const hex = toHexColour(ramp[isDisabled ? effectiveShadeCount : k]);
+                      const swatchLabel = isWater && k === 2
+                        ? t.textureWaterDotColour
+                        : effectiveColourLabel;
                       return (
                         <ColourSwatch
                           key={k}
@@ -1006,15 +1041,15 @@ export default function App() {
                           disabled={isDisabled}
                           isCustom={Boolean(customTexHex[role]?.[k])}
                           title={isDisabled
-                            ? `${colourLabel} ${k} — ${t.textureShadeDisabled}`
-                            : `${colourLabel} ${k} (${hex}) — ${t.clickToCustomize}`}
+                            ? `${swatchLabel} ${k} — ${t.textureShadeDisabled}`
+                            : `${swatchLabel} ${k} (${hex}) — ${t.clickToCustomize}`}
                           onChange={(next) => setCustomTexHex((p) => {
                             // Start from an override of the RIGHT LENGTH; a stale
                             // one from a different step count would mis-index.
                             const prev = p[role];
-                            const base = prev && prev.length === shadeCount + 1
+                            const base = prev && prev.length === effectiveShadeCount + 1
                               ? [...prev]
-                              : new Array<string | undefined>(shadeCount + 1).fill(undefined);
+                              : new Array<string | undefined>(effectiveShadeCount + 1).fill(undefined);
                             base[k] = next;
                             return { ...p, [role]: base };
                           })}
@@ -1022,24 +1057,27 @@ export default function App() {
                       );
                     })}
                   </div>
-                  <div className="slider-header" style={{ margin: '8px 0 4px' }}>
-                    <span className="slider-name" style={{ fontSize: '11px' }}>{t.textureShades}</span>
-                    <span className="slider-val">{shadeCount}</span>
-                  </div>
-                  <div className="type-tabs" style={{ marginBottom: '6px' }}>
-                    {TEXTURE_SHADE_CHOICES.map((n) => (
-                      <button
-                        key={n}
-                        className={`tab-btn ${shadeCount === n ? 'active' : ''}`}
-                        onClick={() => setShadeCount(n)}
-                      >
-                        {n}
-                      </button>
-                    ))}
-                  </div>
+                  {!isWater && <>
+                    <div className="slider-header" style={{ margin: '8px 0 4px' }}>
+                      <span className="slider-name" style={{ fontSize: '11px' }}>{t.textureShades}</span>
+                      <span className="slider-val">{shadeCount}</span>
+                    </div>
+                    <div className="type-tabs" style={{ marginBottom: '6px' }}>
+                      {TEXTURE_SHADE_CHOICES.map((n) => (
+                        <button
+                          key={n}
+                          className={`tab-btn ${shadeCount === n ? 'active' : ''}`}
+                          onClick={() => setShadeCount(n)}
+                        >
+                          {n}
+                        </button>
+                      ))}
+                    </div>
+                  </>}
                 </>)}
               </div>
-            ))}
+              );
+            })}
 
           </section>
 
