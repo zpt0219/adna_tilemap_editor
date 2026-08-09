@@ -19,7 +19,9 @@ import type { RGB } from './patternPaint';
  * with the band grain. The last two are geometric rather than noisy — for those
  * `amount` reads as line weight instead of scatter density.
  */
-export type TextureId = 'none' | NoiseId | 'ripple' | 'cells' | 'medium_cells' | 'small_cells' | 'brick' | 'carpet' | 'weave';
+export type TextureId =
+  | 'none' | NoiseId | 'ripple' | 'cells' | 'medium_cells' | 'small_cells'
+  | 'brick' | 'carpet' | 'weave' | 'paving' | 'paving3' | 'paving5';
 
 export const TEXTURE_PRESETS: readonly { id: TextureId; zh: string; en: string }[] = [
   { id: 'none', zh: '无纹理', en: 'None' },
@@ -30,11 +32,41 @@ export const TEXTURE_PRESETS: readonly { id: TextureId; zh: string; en: string }
   { id: 'brick', zh: '方砖路面 · 错缝铺装', en: 'Paving — square flags, running bond' },
   { id: 'carpet', zh: '地毯花纹 · 菱格团花', en: 'Carpet — diamond lattice medallions' },
   { id: 'weave', zh: '斜铺砖 · 菱格编织', en: 'Weave — diagonal interlocking bricks' },
+  { id: 'paving', zh: '乱砌石板 · 大小板错拼（32）', en: 'Paving — random ashlar flags (32)' },
+  { id: 'paving3', zh: '立方体 · 等距方块（32）', en: 'Paving3 — isometric cubes (32)' },
+  { id: 'paving5', zh: '互锁铺砖 · 曲边咬合（32）', en: 'Paving5 — interlocking curved pavers (32)' },
   { id: 'white', zh: '白噪散点 · 细碎', en: 'White speckle — fine' },
   { id: 'blue', zh: '蓝噪散点 · 均匀', en: 'Blue speckle — even' },
   { id: 'clumped', zh: '云斑 · 成片', en: 'Clumped — patchy' },
   { id: 'ordered', zh: '有序网点 · 规则', en: 'Ordered — regular' },
 ];
+
+/**
+ * The three Stagecast pavings are traced from 32x32 art that is genuinely
+ * 32-periodic — measured, not assumed: shifting any of them by 16 leaves 800+
+ * of 1024 pixels disagreeing, and that holds for the joint mask alone too, so
+ * there is no 16-periodic core hiding under the tint variation.
+ */
+const PERIOD_32: readonly TextureId[] = [
+  'paving', 'paving3', 'paving5',
+  // The geometric fields were widened so their motifs read at the same scale as
+  // the pavings: at the old size they repeated four times inside one 32px tile
+  // and looked like a finer material sitting next to a coarser one. Widening the
+  // motif and widening the period are not the same thing, though — `brick` is
+  // absent because a 16x8 running bond still maps onto itself every 16px in both
+  // axes, measured, even though its flags are now twice the size.
+  'ripple', 'cells', 'medium_cells', 'small_cells', 'carpet',
+];
+
+/**
+ * The output-pixel period of a texture, which must DIVIDE the tile size for the
+ * texture to be seamless — a seam falls every tile, and only lands on a period
+ * boundary when it divides. The sheet is emitted at 32 only, so both 16 and 32
+ * are fine here; a texture with any other period would need this checked again.
+ */
+export function texturePeriod(texture: TextureId): 16 | 32 {
+  return PERIOD_32.includes(texture) ? 32 : 16;
+}
 
 export const DEFAULT_TEXTURE: TextureId = 'none';
 export const MIN_TEXTURE_SHADES = 1;
@@ -63,9 +95,9 @@ const smooth = (t: number) => t * t * (3 - 2 * t);
  * which no isotropic field produces, however it is tuned.
  */
 function rippleField(x: number, y: number, seed: number): number {
-  const perX = 4;   // 4 cells across 16px -> ~4px of horizontal correlation
-  const perY = 16;  // one cell per row -> rows stay independent
-  const fx = (x / 16) * perX;
+  const perX = 4;   // 4 cells across 32px -> ~8px of horizontal correlation
+  const perY = 32;  // one cell per row -> rows stay independent
+  const fx = (x / 32) * perX;
   const iy = ((y % perY) + perY) % perY;
   const x0 = Math.floor(fx);
   const u = smooth(fx - x0);
@@ -78,11 +110,11 @@ function rippleField(x: number, y: number, seed: number): number {
  * nearest cell's identity in the interior, so full strength reads as softly
  * varied polygon tiles with darker shared boundaries rather than as a vein
  * network.
- * `per` defines the number of cells across the 16px tile (2 for 2x2, 3 for 3x3, 4 for 4x4).
+ * `per` defines the number of cells across the 32px tile (2 for 2x2, 3 for 3x3, 4 for 4x4).
  */
 function cellsField(x: number, y: number, seed: number, per = 2): number {
-  const fx = (x / 16) * per;
-  const fy = (y / 16) * per;
+  const fx = (x / 32) * per;
+  const fy = (y / 32) * per;
   const cx = Math.floor(fx);
   const cy = Math.floor(fy);
   let f1 = 9, f2 = 9;
@@ -130,28 +162,29 @@ function cellsField(x: number, y: number, seed: number, per = 2): number {
  * what makes their 16-periodicity structural instead of something to check:
  * negative and out-of-tile coordinates land on the same pixel by construction.
  */
-const wrap16 = (v: number) => ((v % 16) + 16) % 16;
+const wrapN = (v: number, n: number) => ((v % n) + n) % n;
+const wrap32 = (v: number) => wrapN(v, 32);
 
 /**
- * Paving laid in running bond: 8x4 bricks with every other course half-dropped,
+ * Paving laid in running bond: 16x8 bricks with every other course half-dropped,
  * and the field reads as nearness to a joint. `amount` therefore behaves as
  * mortar weight — the joint lines appear first at low amounts and thicken from
  * there, rather than the surface filling with scatter.
  *
- * Both 8 and 4 divide 16 and the half-drop repeats every two courses, so the
+ * Both 16 and 8 divide 32 and the half-drop repeats every two courses, so the
  * pattern closes on the tile in both axes.
  *
- * The 1.5 falloff is load-bearing, not a taste call. A 2:1 brick puts 88 of the
- * 256 pixels on a joint, so a wider falloff would leave the strongest shade
- * more common than the weakest — the opposite of what a highlight is, and what
- * the sparsity test rejects. At 1.5 a joint is a crisp line with one soft pixel
- * beside it: 88 at full strength against 168 below half.
+ * The 1.5 falloff is load-bearing, not a taste call. It keeps a joint one crisp
+ * line wide with a single soft pixel beside it, which is what leaves the
+ * strongest shade rarer than the weakest — the sparsity test rejects the other
+ * way round. Over the 32px period that is 184 pixels at full strength against
+ * 840 below half.
  */
 function brickField(x: number, y: number, seed: number): number {
-  const SX = 8;
-  const SY = 4;
-  const px = wrap16(x + (seed & 15));
-  const py = wrap16(y + ((seed >>> 4) & 15));
+  const SX = 16;
+  const SY = 8;
+  const px = wrap32(x + (seed & 31));
+  const py = wrap32(y + ((seed >>> 4) & 31));
   const ox = (Math.floor(py / SY) % 2) * (SX / 2); // running bond
   const fx = (((px - ox) % SX) + SX) % SX;
   const fy = py % SY;
@@ -160,7 +193,7 @@ function brickField(x: number, y: number, seed: number): number {
 }
 
 /**
- * A half-drop diamond lattice: each 8x8 cell carries a lozenge outline with a
+ * A half-drop diamond lattice: each 16x16 cell carries a lozenge outline with a
  * medallion at its centre, the classic kilim/carpet motif. Manhattan distance
  * from the cell centre gives the diamond for free — the outline is one ring of
  * that distance, the medallion another.
@@ -170,15 +203,15 @@ function brickField(x: number, y: number, seed: number): number {
  * lets the motif reach full strength instead of washing out.
  */
 function carpetField(x: number, y: number, seed: number): number {
-  const S = 8;
-  const px = wrap16(x + (seed & 15));
-  const py = wrap16(y + ((seed >>> 4) & 15));
+  const S = 16;
+  const px = wrap32(x + (seed & 31));
+  const py = wrap32(y + ((seed >>> 4) & 31));
   const ox = (Math.floor(py / S) % 2) * (S / 2);
   const u = ((((px - ox) % S) + S) % S) - (S - 1) / 2;
   const v = (py % S) - (S - 1) / 2;
   const m = Math.abs(u) + Math.abs(v);
-  const medallion = 1 - Math.min(1, Math.abs(m - 1) / 1.5);
-  const lozenge = 1 - Math.min(1, Math.abs(m - 4) / 1.5);
+  const medallion = 1 - Math.min(1, Math.abs(m - 2) / 1.5);
+  const lozenge = 1 - Math.min(1, Math.abs(m - 8) / 1.5);
   return Math.max(0, Math.max(medallion, lozenge));
 }
 
@@ -213,19 +246,151 @@ const WEAVE =
   '3222222231111113' +
   '0322222223111130';
 
-/** The weave's own tone count; `shades` rescales onto the caller's ramp. */
-const WEAVE_RANKS = 4;
+/**
+ * Three pavings traced from Guy Walker's Stagecast seamless-pattern gallery
+ * (mirrored at boristhebrave.com/permanent/24/06/cr31/stagecast/wang/patts.html),
+ * sources `art/patt/paving2.gif`, `art/icons/cu1.gif`, `art/patt/pav5.gif`.
+ *
+ * Same encoding as WEAVE — luminance rank, 0 lightest — but 32x32, because the
+ * art is. See PERIOD_32 for why that is allowed and what it costs.
+ *
+ * The rank is ordinal, so it flattens hue differences the source drew with: in
+ * `paving3` two faces sit 0.8 luminance apart (#f79779 against #e79f64) and are
+ * told apart only by rarity, the 68-pixel tone taking the deeper rank because a
+ * sparse tone in pixel art is shading rather than a face. On a one-dimensional
+ * ramp they land on adjacent steps instead of reading as two colours.
+ */
+const PAVING =
+  '22222222224222222222241111111114' +
+  '22222222224222222222241111111114' +
+  '22222222224222222222241111111114' +
+  '22222222224222222222241111111114' +
+  '22222222224222222222241111111114' +
+  '44444444444222222222241111111114' +
+  '33333400004222222222241111111114' +
+  '33333400004222222222241111111114' +
+  '33333400004222222222241111111114' +
+  '33333400004222222222241111111114' +
+  '33333444444444444444441111111114' +
+  '33333422222222224000041111111114' +
+  '33333422222222224000041111111114' +
+  '33333422222222224000041111111114' +
+  '33333422222222224000041111111114' +
+  '44444422222222224444444444444444' +
+  '22222422222222224333333333422222' +
+  '22222422222222224333333333422222' +
+  '22222422222222224333333333422222' +
+  '22222422222222224333333333422222' +
+  '22222422222222224333333333422222' +
+  '22222444444444444444444444422222' +
+  '22222400004111111111111111422222' +
+  '22222400004111111111111111422222' +
+  '22222400004111111111111111422222' +
+  '22222400004111111111111111422222' +
+  '44444444444111111111111111444444' +
+  '22222222224111111111111111400004' +
+  '22222222224111111111111111400004' +
+  '22222222224111111111111111400004' +
+  '22222222224111111111111111400004' +
+  '22222222224444444444444444444444';
+
+const PAVING3 =
+  '22222240000000000000000042222222' +
+  '22222240000000000000000042222222' +
+  '22222240000000000000000042222222' +
+  '22222240000000000000000042222222' +
+  '22222240000000000000000042222222' +
+  '22222240000000000000000042222222' +
+  '44444443000000000000000344444444' +
+  '11111134300000000000003431111114' +
+  '11111113430000000000034311111114' +
+  '11111111343000000000343111111114' +
+  '11111111134300000003431111111114' +
+  '11111111113430000034311111111114' +
+  '11111111111343000343111111111114' +
+  '11111111111134303431111111111114' +
+  '11111111111113434311111111111114' +
+  '11111111111111343111111111111114' +
+  '11111111111113434311111111111114' +
+  '11111111111134303431111111111114' +
+  '11111111111343000343111111111114' +
+  '11111111113430000034311111111114' +
+  '11111111134300000003431111111114' +
+  '11111111343000000000343111111114' +
+  '11111113430000000000034311111114' +
+  '11111134300000000000003431111114' +
+  '44444443000000000000000344444444' +
+  '22222240000000000000000042222222' +
+  '22222240000000000000000042222222' +
+  '22222240000000000000000042222222' +
+  '22222240000000000000000042222222' +
+  '22222240000000000000000042222222' +
+  '22222240000000000000000042222222' +
+  '22222244444444444444444442222222';
+
+const PAVING5 =
+  '44444444444222222222241111111111' +
+  '43333333334222222222241111111111' +
+  '33333333333422222222241111111114' +
+  '33333333333422222222241111111114' +
+  '33333333333342222222241111111143' +
+  '33333333333342222222444111111143' +
+  '33333333333342222444000444111143' +
+  '33333333333334444000000000444433' +
+  '43333333334444000000000000000444' +
+  '24443334441114000000000000000422' +
+  '22224441111111400000000000004222' +
+  '22222411111111400000000000004222' +
+  '22222411111111140000000000042222' +
+  '22222411111111140000000000042222' +
+  '22222411111111140000000000042222' +
+  '22222411111111114000000000422222' +
+  '22222411111111114444444444422222' +
+  '22222411111111114333333333422222' +
+  '22222411111111143333333333342222' +
+  '22222411111111143333333333342222' +
+  '22222411111111143333333333342222' +
+  '22222411111111433333333333334222' +
+  '22224441111111433333333333334222' +
+  '24440004441114333333333333333422' +
+  '40000000004444333333333333333444' +
+  '00000000000004444333333333444400' +
+  '00000000000042222444333444111140' +
+  '00000000000042222222444111111140' +
+  '00000000000042222222241111111140' +
+  '00000000000422222222241111111114' +
+  '00000000000422222222241111111114' +
+  '40000000004222222222241111111111';
+
+/** Every baked table so far tops out at rank 4; `shades` rescales onto the caller's ramp. */
+const BAKED_RANKS = 4;
 
 /**
- * The weave names its shade outright instead of being thresholded into one:
- * its tones are already a ramp, so `amount` scales the ramp — full weave at 1,
+ * Baked art names its shade outright instead of being thresholded into one: the
+ * tones are already a ramp, so `amount` scales that ramp — full pattern at 1,
  * flattening toward the bare terrain as it drops.
+ *
+ * `size` is the table's own edge length, which is also its output-pixel period,
+ * so the seed offset has to wrap at `size` rather than at 16 — offsetting a
+ * 32-wide table by a 0..15 amount would sample the wrong half of it.
  */
-function weaveShade(x: number, y: number, seed: number, amount: number, shades: number): number {
-  const px = wrap16(x + (seed & 15));
-  const py = wrap16(y + ((seed >>> 4) & 15));
-  const rank = WEAVE.charCodeAt(py * 16 + px) - 48;
-  const k = Math.round((rank * shades * Math.min(1, amount)) / WEAVE_RANKS);
+function bakedShade(
+  table: string,
+  size: number,
+  x: number,
+  y: number,
+  seed: number,
+  amount: number,
+  shades: number
+): number {
+  // The shift stays at 4 rather than widening with `size` so that weave, the
+  // table this generalises, keeps the exact seed-to-offset mapping its locked
+  // sheet hashes were taken with.
+  const m = size - 1;
+  const px = wrapN(x + (seed & m), size);
+  const py = wrapN(y + ((seed >>> 4) & m), size);
+  const rank = table.charCodeAt(py * size + px) - 48;
+  const k = Math.round((rank * shades * Math.min(1, amount)) / BAKED_RANKS);
   return Math.max(0, Math.min(shades, k));
 }
 
@@ -249,7 +414,10 @@ export function textureShadeAt(
   if (texture === 'none' || amount <= 0 || shades < 1) return 0;
   const s = (seed ^ TEXTURE_SALT) >>> 0;
   // Baked art, not a field: it already knows which tone each pixel is.
-  if (texture === 'weave') return weaveShade(x, y, s, amount, shades);
+  if (texture === 'weave') return bakedShade(WEAVE, 16, x, y, s, amount, shades);
+  if (texture === 'paving') return bakedShade(PAVING, 32, x, y, s, amount, shades);
+  if (texture === 'paving3') return bakedShade(PAVING3, 32, x, y, s, amount, shades);
+  if (texture === 'paving5') return bakedShade(PAVING5, 32, x, y, s, amount, shades);
   const n = texture === 'ripple' ? rippleField(x, y, s)
     : texture === 'cells' ? cellsField(x, y, s, 2)
       : texture === 'medium_cells' ? cellsField(x, y, s, 3)

@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   TEXTURE_PRESETS, DEFAULT_TEXTURE, DEFAULT_TEXTURE_SHADES, MAX_TEXTURE_SHADES,
-  textureShadeAt, textureColour, textureRamp, type TextureId,
+  textureShadeAt, textureColour, textureRamp, texturePeriod,
+  type TextureId,
 } from './patternTexture';
 import {
   REFERENCE_ROLE_COLOURS, paintPatternTileRGBA, patternRamp, toHexColour, NO_TEXTURE,
@@ -13,12 +14,21 @@ const ALGOS = TEXTURE_PRESETS.map((p) => p.id).filter((id) => id !== 'none');
 const DEEP_BLUE = { r: 0x00, g: 0x18, b: 0xa0 };
 const NEAR_WHITE = { r: 0xf8, g: 0xf8, b: 0xf8 };
 
+/** Baked art keeps its lightest tone as bare terrain, so it never inks everything. */
+const BAKED = ['weave', 'paving', 'paving3', 'paving5'] as const;
+
+/**
+ * Fraction of textured pixels, counted over one full period of the texture. A
+ * fixed 16x16 window would read only a quarter of a 32-period paving and report
+ * whatever happened to be in that corner.
+ */
 const coverage = (algo: TextureId, amount: number, shades = DEFAULT_TEXTURE_SHADES) => {
+  const p = texturePeriod(algo);
   let n = 0;
-  for (let y = 0; y < 16; y++) {
-    for (let x = 0; x < 16; x++) if (textureShadeAt(algo, x, y, 0, amount, shades) > 0) n++;
+  for (let y = 0; y < p; y++) {
+    for (let x = 0; x < p; x++) if (textureShadeAt(algo, x, y, 0, amount, shades) > 0) n++;
   }
-  return n / 256;
+  return n / (p * p);
 };
 
 describe('texture presets', () => {
@@ -49,14 +59,24 @@ describe('texture presets', () => {
 
   // The property every part of this app lives or dies on: a tile is painted
   // knowing nothing about its neighbours, so the speckle must repeat with the
-  // tile or it contradicts itself at every seam.
-  it.each(ALGOS)('%s repeats with the 16px tile', (algo) => {
-    for (let y = -18; y < 34; y++) {
-      for (let x = -18; x < 34; x++) {
-        const base = textureShadeAt(algo, ((x % 16) + 16) % 16, ((y % 16) + 16) % 16, 5, 0.5);
+  // tile or it contradicts itself at every seam. What makes that true is the
+  // period DIVIDING the tile size, which is why the period is asked for rather
+  // than assumed to be 16 — see `texturesForTileSize`.
+  it.each(ALGOS)('%s repeats with its declared period', (algo) => {
+    const p = texturePeriod(algo);
+    for (let y = -2 * p - 2; y < 2 * p + 2; y++) {
+      for (let x = -2 * p - 2; x < 2 * p + 2; x++) {
+        const base = textureShadeAt(algo, ((x % p) + p) % p, ((y % p) + p) % p, 5, 0.5);
         expect(textureShadeAt(algo, x, y, 5, 0.5)).toBe(base);
       }
     }
+  });
+
+  it.each(ALGOS)('%s has a period that divides the 32px tile', (algo) => {
+    // The whole seam argument in one line: the sheet is emitted at 32, a seam
+    // falls every 32 output pixels, and it only lands on a period boundary when
+    // the period divides 32. A texture that fails this cuts every tile open.
+    expect(32 % texturePeriod(algo)).toBe(0);
   });
 
   it.each(ALGOS)('%s covers more as the amount rises', (algo) => {
@@ -69,22 +89,29 @@ describe('texture presets', () => {
     expect(coverage(algo, 0)).toBe(0);
   });
 
-  it.each(ALGOS.filter((id) => id !== 'weave'))('%s inks every pixel at full amount', (algo) => {
-    expect(coverage(algo, 1)).toBe(1);
-  });
+  it.each(ALGOS.filter((id) => !BAKED.includes(id as typeof BAKED[number])))(
+    '%s inks every pixel at full amount', (algo) => {
+      expect(coverage(algo, 1)).toBe(1);
+    });
 
-  it('weave leaves its lightest facet as bare terrain even at full amount', () => {
-    // Not an exemption for convenience: the reference art's lightest tone IS the
-    // ground, which is what lets two picked colours reproduce it exactly. If this
-    // ever reached 1 the terrain colour would have dropped out of the weave.
-    expect(coverage('weave', 1)).toBeCloseTo(204 / 256, 6);
+  // Not an exemption for convenience: in every one of these the reference art's
+  // lightest tone IS the ground, which is what lets two picked colours reproduce
+  // it. If any of these reached 1 the terrain colour would have dropped out.
+  it.each([
+    ['weave', 204 / 256],
+    ['paving', 960 / 1024],
+    ['paving3', 692 / 1024],
+    ['paving5', 817 / 1024],
+  ] as const)('%s leaves its lightest tone as bare terrain at full amount', (algo, want) => {
+    expect(coverage(algo, 1)).toBeCloseTo(want, 6);
   });
 
   it.each(ALGOS)('%s keeps the strongest shade sparse', (algo) => {
     // Biased low on purpose: the top shade is a highlight, not half the surface.
+    const p = texturePeriod(algo);
     const counts = new Array(MAX_TEXTURE_SHADES + 1).fill(0);
-    for (let y = 0; y < 16; y++) {
-      for (let x = 0; x < 16; x++) counts[textureShadeAt(algo, x, y, 0, 1)]++;
+    for (let y = 0; y < p; y++) {
+      for (let x = 0; x < p; x++) counts[textureShadeAt(algo, x, y, 0, 1)]++;
     }
     expect(counts[1]).toBeGreaterThan(counts[MAX_TEXTURE_SHADES]);
   });
@@ -115,10 +142,16 @@ describe('texture presets', () => {
 });
 
 describe('geometric textures', () => {
+  /**
+   * Scans a whole 32px tile, not one period of the texture. That is what a tile
+   * actually shows, and it is the frame these lattice claims are about — `brick`
+   * repeats every 16, so a period-sized window would only ever see half its
+   * courses and could not tell a running bond from a grid.
+   */
   const lit = (algo: TextureId, amount: number) => {
     const on: [number, number][] = [];
-    for (let y = 0; y < 16; y++) {
-      for (let x = 0; x < 16; x++) if (textureShadeAt(algo, x, y, 0, amount) > 0) on.push([x, y]);
+    for (let y = 0; y < 32; y++) {
+      for (let x = 0; x < 32; x++) if (textureShadeAt(algo, x, y, 0, amount) > 0) on.push([x, y]);
     }
     return on;
   };
@@ -126,12 +159,12 @@ describe('geometric textures', () => {
   // Both lattices are half-drop: every other course is shifted by half a brick.
   // Shifting by (half a brick, one course) therefore maps the pattern exactly
   // onto itself — which is the definition, not a consequence. The vector differs
-  // because the bricks are 8x4 and the carpet cells 8x8.
-  it.each([['brick', 4, 4], ['carpet', 4, 8]] as const)(
+  // because the bricks are 16x8 and the carpet cells 16x16.
+  it.each([['brick', 8, 8], ['carpet', 8, 16]] as const)(
     '%s is a half-drop lattice',
     (algo, dx, dy) => {
-      for (let y = 0; y < 16; y++) {
-        for (let x = 0; x < 16; x++) {
+      for (let y = 0; y < 32; y++) {
+        for (let x = 0; x < 32; x++) {
           expect(textureShadeAt(algo, x + dx, y + dy, 0, 0.5))
             .toBe(textureShadeAt(algo, x, y, 0, 0.5));
         }
@@ -145,11 +178,11 @@ describe('geometric textures', () => {
     const on = lit('brick', 0.3);
     const perRow = new Map<number, number>();
     for (const [, y] of on) perRow.set(y, (perRow.get(y) ?? 0) + 1);
-    const fullRows = [...perRow.entries()].filter(([, n]) => n === 16).map(([y]) => y).sort((a, b) => a - b);
-    // 4px courses over a 16px tile.
+    const fullRows = [...perRow.entries()].filter(([, n]) => n === 32).map(([y]) => y).sort((a, b) => a - b);
+    // 8px courses over a 32px tile.
     expect(fullRows).toHaveLength(4);
     for (let i = 1; i < fullRows.length; i++) {
-      expect(fullRows[i] - fullRows[i - 1]).toBe(4);
+      expect(fullRows[i] - fullRows[i - 1]).toBe(8);
     }
   });
 
@@ -159,10 +192,10 @@ describe('geometric textures', () => {
     const on = lit('brick', 0.3);
     const rowsWithAny = new Set(on.map(([, y]) => y));
     const colsFullyLit = new Set<number>();
-    for (let x = 0; x < 16; x++) {
-      if (on.filter(([px]) => px === x).length === 16) colsFullyLit.add(x);
+    for (let x = 0; x < 32; x++) {
+      if (on.filter(([px]) => px === x).length === 32) colsFullyLit.add(x);
     }
-    expect(rowsWithAny.size).toBe(16);   // every row meets a head joint
+    expect(rowsWithAny.size).toBe(32);   // every row meets a head joint
     expect(colsFullyLit.size).toBe(0);   // but no column runs unbroken: courses offset
   });
 
@@ -177,16 +210,16 @@ describe('geometric textures', () => {
     expect(new Set(sets).size).toBe(2); // two distinct joint alignments
   });
 
-  it('carpet repeats four motifs that reach full strength', () => {
-    // 8x8 cells over a 16px tile. Each carries a medallion (4px) and a closed
-    // lozenge ring (16px); anything weaker means the motif washed out.
+  it('carpet reaches full strength on both rings of a cell', () => {
+    // One 16x16 cell of the 32px lattice. Manhattan rings at m=2 and m=8 hold 8
+    // and 32 lattice points; anything weaker means the motif washed out.
     let top = 0;
     for (let y = 0; y < 16; y++) {
       for (let x = 0; x < 16; x++) {
         if (textureShadeAt('carpet', x, y, 0, 1, MAX_TEXTURE_SHADES) === MAX_TEXTURE_SHADES) top++;
       }
     }
-    expect(top).toBe(4 * (4 + 16));
+    expect(top).toBe(8 + 32);
   });
 
   it('weave keeps the tone census of the art it was traced from', () => {
@@ -225,17 +258,72 @@ describe('geometric textures', () => {
     expect(spread(0.1)).toBeLessThan(spread(0.5));
   });
 
+  // --- the three 32px Stagecast pavings ------------------------------------
+
+  const census32 = (algo: TextureId) => {
+    const counts = new Array(5).fill(0);
+    for (let y = 0; y < 32; y++) {
+      for (let x = 0; x < 32; x++) counts[textureShadeAt(algo, x, y, 0, 1, 4)]++;
+    }
+    return counts;
+  };
+
+  it.each([
+    ['paving', [64, 270, 400, 90, 200]],
+    ['paving3', [332, 332, 169, 68, 123]],
+    ['paving5', [207, 224, 224, 207, 162]],
+  ] as const)('%s keeps the tone census of the art it was traced from', (algo, want) => {
+    // The lock on each baked table, same job the weave census does: a corrupted
+    // or re-ordered table fails here rather than shipping a subtly wrong floor.
+    expect(census32(algo)).toEqual([...want]);
+  });
+
+  it.each(['paving', 'paving3', 'paving5'] as const)(
+    '%s uses every tone of the ramp', (algo) => {
+      // Unlike weave, the darkest tone here is mortar and is not the sparsest —
+      // paving3 draws more black joint than it does shading line.
+      for (const n of census32(algo)) expect(n).toBeGreaterThan(0);
+    });
+
+  it.each(['paving', 'paving3', 'paving5'] as const)(
+    '%s has no 16-periodic core, which is why it costs a 32px tile', (algo) => {
+      // The measurement the 32px period rests on. If someone ever re-bakes one of
+      // these down to 16 to "simplify", this is what catches it: the art really
+      // does disagree with itself half a tile over, in tone and in mortar alike.
+      let differ = 0;
+      for (let y = 0; y < 32; y++) {
+        for (let x = 0; x < 32; x++) {
+          if (textureShadeAt(algo, x, y, 0, 1, 4) !== textureShadeAt(algo, x + 16, y, 0, 1, 4)) differ++;
+        }
+      }
+      expect(differ).toBeGreaterThan(600);
+    });
+
+  it.each(['paving', 'paving3', 'paving5'] as const)(
+    '%s flattens toward bare terrain as the amount drops', (algo) => {
+      const spread = (amount: number) => {
+        const seen = new Set<number>();
+        for (let y = 0; y < 32; y++) {
+          for (let x = 0; x < 32; x++) seen.add(textureShadeAt(algo, x, y, 0, amount, 4));
+        }
+        return seen.size;
+      };
+      expect(spread(1)).toBe(5);
+      expect(spread(0.5)).toBeLessThan(5);
+      expect(spread(0.1)).toBeLessThan(spread(0.5));
+    });
+
   it('carpet leaves the ground between motifs untextured', () => {
     // The field has to come back to zero, or the "pattern" is just a wash.
     const on = lit('carpet', 0.5);
-    expect(on.length).toBeLessThan(256);
+    expect(on.length).toBeLessThan(32 * 32);
     expect(on.length).toBeGreaterThan(0);
   });
 
   it('cells has sparse boundaries at low amount and varied interiors at full amount', () => {
     const sparse = lit('cells', 0.35);
     expect(sparse.length).toBeGreaterThan(0);
-    expect(sparse.length).toBeLessThan(256);
+    expect(sparse.length).toBeLessThan(32 * 32);
 
     const shades = new Set<number>();
     for (let y = 0; y < 16; y++) {
@@ -249,7 +337,7 @@ describe('geometric textures', () => {
   it('medium_cells generates a 3x3 cellular grid', () => {
     const sparse = lit('medium_cells', 0.35);
     expect(sparse.length).toBeGreaterThan(0);
-    expect(sparse.length).toBeLessThan(256);
+    expect(sparse.length).toBeLessThan(32 * 32);
 
     const shades = new Set<number>();
     for (let y = 0; y < 16; y++) {
@@ -263,7 +351,7 @@ describe('geometric textures', () => {
   it('small_cells generates a dense 4x4 cellular grid', () => {
     const sparse = lit('small_cells', 0.35);
     expect(sparse.length).toBeGreaterThan(0);
-    expect(sparse.length).toBeLessThan(256);
+    expect(sparse.length).toBeLessThan(32 * 32);
 
     const shades = new Set<number>();
     for (let y = 0; y < 16; y++) {

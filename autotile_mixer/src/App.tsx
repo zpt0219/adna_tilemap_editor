@@ -14,6 +14,7 @@ import {
   PATTERN_GROUPS, DEFAULT_PATTERN, PATTERN_OFFSET_RANGE, RESEEDABLE_PATTERNS,
   MIN_BAND_STEPS, MAX_BAND_STEPS, DEFAULT_BAND_STEPS, patternLevelsFor, type PatternId,
   DEFAULT_OUTLINE_WIDTH, MIN_OUTLINE_WIDTH, MAX_OUTLINE_WIDTH, OUTLINE_WIDTH_STEP,
+  PATTERN_TILE_SIZE,
 } from './utils/blob47Pattern';
 import {
   NOISE_PRESETS, NOISE_TARGETS, DEFAULT_NOISES, DEFAULT_NOISE_SEED, DEFAULT_NOISE_STRENGTH,
@@ -33,8 +34,13 @@ import {
 const COLS = 16;
 const ROWS = 10;
 
-/** The sheet is 16px art; 32 is resampled from the field, past that is nothing. */
-const TILE_SIZES = [16, 32];
+/**
+ * The one size the sheet is emitted at, and the resolution the art is baked at:
+ * PATTERN_TILE_SIZE is 32 too, so a tile is the stored field thresholded with no
+ * resampling in between. There is nothing to choose here — 16 was removed rather
+ * than kept as a lossy second option.
+ */
+const TILE_SIZE = PATTERN_TILE_SIZE;
 
 /** Seeds are typed as well as rolled, so the bound belongs in one place. */
 const SEED_MAX = 99999;
@@ -232,8 +238,6 @@ export default function App() {
   // actually reads well means being able to take them away.
   const [showCellDots, setShowCellDots] = useState(true);
 
-  const [tileSize, setTileSize] = useState(32);
-
   // Zoom config (integer scale factor for visual canvas sizes)
   const [zoom, setZoom] = useState(2);
 
@@ -337,8 +341,8 @@ export default function App() {
       cleanSheetCanvasRef.current = document.createElement('canvas');
     }
     const cleanCanvas = cleanSheetCanvasRef.current;
-    cleanCanvas.width = BLOB47_COLS * tileSize;
-    cleanCanvas.height = BLOB47_ROWS * tileSize;
+    cleanCanvas.width = BLOB47_COLS * TILE_SIZE;
+    cleanCanvas.height = BLOB47_ROWS * TILE_SIZE;
 
     const cleanCtx = cleanCanvas.getContext('2d');
     if (!cleanCtx) return;
@@ -347,32 +351,32 @@ export default function App() {
     const a = paintArgs;
     const paint = (mask: number) => new ImageData(
       paintPatternTileRGBA(
-        a.patternId, mask, a.roleColours, tileSize, a.patternNoise, a.bandOffsetPx,
+        a.patternId, mask, a.roleColours, TILE_SIZE, a.patternNoise, a.bandOffsetPx,
         a.patternNoiseSeed, a.patternNoiseStrength, a.bandSteps, a.textureOpts,
         a.hardEdgeB, a.edgeSeed, a.ramp, a.customNoiseColours, a.noiseTargets,
         a.outlineWidth
       ),
-      tileSize, tileSize
+      TILE_SIZE, TILE_SIZE
     );
 
     for (let i = 0; i < BLOB47_LAYOUT.length; i++) {
       const col = i % BLOB47_COLS;
       const row = Math.floor(i / BLOB47_COLS);
-      cleanCtx.putImageData(paint(BLOB47_LAYOUT[i]), col * tileSize, row * tileSize);
+      cleanCtx.putImageData(paint(BLOB47_LAYOUT[i]), col * TILE_SIZE, row * TILE_SIZE);
     }
 
     // The plain terrain-B tile lives outside the sheet (see BLOB47_LAYOUT), so
     // render it separately for the playground to use on unpainted cells.
     if (!bgTileCanvasRef.current) bgTileCanvasRef.current = document.createElement('canvas');
     const bg = bgTileCanvasRef.current;
-    bg.width = tileSize;
-    bg.height = tileSize;
+    bg.width = TILE_SIZE;
+    bg.height = TILE_SIZE;
     const bgCtx = bg.getContext('2d');
     if (bgCtx) bgCtx.putImageData(paint(BLOB47_BACKGROUND), 0, 0);
 
     // Render to on-screen preview canvas
-    canvas.width = BLOB47_COLS * tileSize;
-    canvas.height = BLOB47_ROWS * tileSize;
+    canvas.width = BLOB47_COLS * TILE_SIZE;
+    canvas.height = BLOB47_ROWS * TILE_SIZE;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -383,18 +387,18 @@ export default function App() {
       ctx.lineWidth = 1;
       for (let r = 1; r < BLOB47_ROWS; r++) {
         ctx.beginPath();
-        ctx.moveTo(0, r * tileSize);
-        ctx.lineTo(canvas.width, r * tileSize);
+        ctx.moveTo(0, r * TILE_SIZE);
+        ctx.lineTo(canvas.width, r * TILE_SIZE);
         ctx.stroke();
       }
       for (let c = 1; c < BLOB47_COLS; c++) {
         ctx.beginPath();
-        ctx.moveTo(c * tileSize, 0);
-        ctx.lineTo(c * tileSize, canvas.height);
+        ctx.moveTo(c * TILE_SIZE, 0);
+        ctx.lineTo(c * TILE_SIZE, canvas.height);
         ctx.stroke();
       }
     }
-  }, [tileSize, showGrid, paintArgs]);
+  }, [showGrid, paintArgs]);
 
   // Re-draw playground
   useEffect(() => {
@@ -404,8 +408,8 @@ export default function App() {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    canvas.width = COLS * tileSize;
-    canvas.height = ROWS * tileSize;
+    canvas.width = COLS * TILE_SIZE;
+    canvas.height = ROWS * TILE_SIZE;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     const drawSheetSlot = (sheetIndex: number, destCol: number, destRow: number) => {
@@ -415,8 +419,8 @@ export default function App() {
       if (sourceCanvas) {
         ctx.drawImage(
           sourceCanvas,
-          srcCol * tileSize, srcRow * tileSize, tileSize, tileSize,
-          destCol * tileSize, destRow * tileSize, tileSize, tileSize
+          srcCol * TILE_SIZE, srcRow * TILE_SIZE, TILE_SIZE, TILE_SIZE,
+          destCol * TILE_SIZE, destRow * TILE_SIZE, TILE_SIZE, TILE_SIZE
         );
       }
     };
@@ -430,7 +434,7 @@ export default function App() {
     for (let r = 0; r < ROWS; r++) {
       for (let c = 0; c < COLS; c++) {
         if (!cellAt(r, c)) {
-          if (bg) ctx.drawImage(bg, c * tileSize, r * tileSize);
+          if (bg) ctx.drawImage(bg, c * TILE_SIZE, r * TILE_SIZE);
           continue;
         }
         let mask = 0;
@@ -452,7 +456,7 @@ export default function App() {
       for (let c = 0; c < COLS; c++) {
         const val = blobCells[r]?.[c] ?? 0;
         ctx.beginPath();
-        ctx.arc((c + 0.5) * tileSize, (r + 0.5) * tileSize, 3.5, 0, Math.PI * 2);
+        ctx.arc((c + 0.5) * TILE_SIZE, (r + 0.5) * TILE_SIZE, 3.5, 0, Math.PI * 2);
         ctx.fillStyle = val === 1 ? '#22c55e' : '#78350f';
         ctx.strokeStyle = '#fff';
         ctx.lineWidth = 1;
@@ -463,7 +467,7 @@ export default function App() {
   // `paintArgs` is here for its side effect on the sheet: the playground blits
   // out of cleanSheetCanvasRef, so it has to redraw after the sheet effect has
   // refilled it. Depending on the same object is what orders the two.
-  }, [blobCells, tileSize, showCellDots, paintArgs]);
+  }, [blobCells, showCellDots, paintArgs]);
 
   // Painting interaction logic
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -538,8 +542,8 @@ export default function App() {
 
   /** A click toggles the cell it lands in. */
   const paintPixel = (px: number, py: number, val: number) => {
-    const cx = Math.floor(px / tileSize);
-    const cy = Math.floor(py / tileSize);
+    const cx = Math.floor(px / TILE_SIZE);
+    const cy = Math.floor(py / TILE_SIZE);
     if (cx < 0 || cx >= COLS || cy < 0 || cy >= ROWS) return;
     setBlobCells(prev => {
       if (prev[cy][cx] === val) return prev;
@@ -561,7 +565,7 @@ export default function App() {
     const cleanCanvas = cleanSheetCanvasRef.current || tilesetCanvasRef.current;
     if (!cleanCanvas) return;
     const link = document.createElement('a');
-    link.download = `tileset_blob47_${patternId}_${tileSize}px.png`;
+    link.download = `tileset_blob47_${patternId}_${TILE_SIZE}px.png`;
     link.href = cleanCanvas.toDataURL();
     link.click();
   };
@@ -887,6 +891,7 @@ export default function App() {
               <span className="slider-name">{t.terrainTexture}<InfoTip text={t.textureHint} /></span>
             </div>
 
+
             {([
               ['terrainA', textureAlgoA, setTextureAlgoA, textureAmountA, setTextureAmountA,
                 t.textureAlgoA, t.textureAmountA, t.textureColourA],
@@ -956,26 +961,6 @@ export default function App() {
             </>)}
           </section>
 
-          {/* 4 — Output */}
-          <section className="panel-card">
-            <h2 className="panel-title">{t.sectionOutput}</h2>
-
-            <div className="slider-header" style={{ marginBottom: '6px' }}>
-              <span className="slider-name">{t.tileSize}<InfoTip text={t.tileSizeHint} /></span>
-              <span className="slider-val">{tileSize} px</span>
-            </div>
-            <div className="type-tabs">
-              {TILE_SIZES.map((s) => (
-                <button
-                  key={s}
-                  className={`tab-btn ${tileSize === s ? 'active' : ''}`}
-                  onClick={() => setTileSize(s)}
-                >
-                  {s} x {s}
-                </button>
-              ))}
-            </div>
-          </section>
         </aside>
 
         {/* Previews and Painter Playground */}
@@ -1018,8 +1003,8 @@ export default function App() {
                 ref={tilesetCanvasRef}
                 className="tileset-canvas"
                 style={{
-                  width: `${BLOB47_COLS * tileSize * zoom}px`,
-                  height: `${BLOB47_ROWS * tileSize * zoom}px`
+                  width: `${BLOB47_COLS * TILE_SIZE * zoom}px`,
+                  height: `${BLOB47_ROWS * TILE_SIZE * zoom}px`
                 }}
               />
             </div>
@@ -1076,8 +1061,8 @@ export default function App() {
                 onTouchMove={handleTouchMove}
                 onTouchEnd={handleTouchEnd}
                 style={{
-                  width: `${COLS * tileSize * playgroundZoom}px`,
-                  height: `${ROWS * tileSize * playgroundZoom}px`,
+                  width: `${COLS * TILE_SIZE * playgroundZoom}px`,
+                  height: `${ROWS * TILE_SIZE * playgroundZoom}px`,
                   touchAction: 'none',
                 }}
               />

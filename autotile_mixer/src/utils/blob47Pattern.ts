@@ -1,4 +1,4 @@
-// blob47Pattern.ts — the built-in boundary patterns, one 16x16 grid per
+// blob47Pattern.ts — the built-in boundary patterns, one 32x32 grid per
 // canonical blob47 mask (docs/AUTOTILE_SCHEMES.md §5).
 //
 // A pattern is ART DATA, baked once; nothing here is derived at runtime. Each
@@ -17,11 +17,11 @@ export type PatternId =
   | 'square' | 'sharp' | 'rounded'
   | 'jagged' | 'gravel' | 'boulder' | 'thorn' | 'coast' | 'moss' | 'billow';
 
-/** Outline width limits in pixels. */
-export const MIN_OUTLINE_WIDTH = 0.5;
-export const MAX_OUTLINE_WIDTH = 3;
-export const OUTLINE_WIDTH_STEP = 0.25;
-export const DEFAULT_OUTLINE_WIDTH = 1.0;
+/** Outline width limits, in pixels of the 32px tile. */
+export const MIN_OUTLINE_WIDTH = 1;
+export const MAX_OUTLINE_WIDTH = 6;
+export const OUTLINE_WIDTH_STEP = 0.5;
+export const DEFAULT_OUTLINE_WIDTH = 2.0;
 
 /**
  * Menu contents, grouped. The "clean" group thresholds the distance field
@@ -65,8 +65,8 @@ export const MIN_BAND_STEPS = 3;
 export const MAX_BAND_STEPS = 5;
 export const DEFAULT_BAND_STEPS = 3;
 
-/** Width of each added step, in pixels of the 16-space field. */
-export const BAND_STEP_PX = 1;
+/** Width of each added step, in pixels of the 32-space field. */
+export const BAND_STEP_PX = 2;
 
 /**
  * What each level takes its colour from: a role, and how strongly that role's
@@ -118,17 +118,32 @@ export const SHADE_RECIPES: Record<
   edge: { hue: 0, greyHue: 0, sat: 0, val: 1 }, // the outline has no shaded level
 };
 
-export const PATTERN_TILE_SIZE = 16;
+export const PATTERN_TILE_SIZE = 32;
 
 /** Background: every pixel is unshaded terrain B (drawn where no tile applies). */
 export const PATTERN_BACKGROUND = '0'.repeat(PATTERN_TILE_SIZE * PATTERN_TILE_SIZE);
 
 // --- stored field ---------------------------------------------------------
-/** Quantisation of the stored distance field, in pixels. */
+/** Quantisation of the stored distance field, in pixels of the 32px tile. */
 export const FIELD_STEP = 0.25;
-/** Base-62 digits, least distance first. */
-export const FIELD_CHARS =
-  '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
+/**
+ * Digits of the stored field, least distance first: printable ASCII 35..126
+ * less `'` and `\`, which would need escaping inside the generated string
+ * literals. 90 digits at FIELD_STEP covers 22.25px.
+ *
+ * Base-62 was enough while a tile was 16px, where it reached 15.25. At 32 a
+ * pixel is half as wide, so every distance doubles: boulder's outermost band is
+ * 14 and the offset slider adds up to 2.5 on top, which base-62 could not have
+ * represented — the field would have saturated inside the band and flattened it.
+ */
+export const FIELD_CHARS = (() => {
+  let s = '';
+  for (let c = 35; c <= 126; c++) {
+    if (c === 39 || c === 92) continue;
+    s += String.fromCharCode(c);
+  }
+  return s;
+})();
 
 const CHAR_VALUE: number[] = (() => {
   const t = new Array<number>(128).fill(0);
@@ -142,16 +157,16 @@ const CHAR_VALUE: number[] = (() => {
  * field's floor-quantisation cannot straddle one.
  */
 export const PATTERN_BANDS: Record<PatternId, readonly [number, number, number, number]> = {
-  square: [3.5, 4.5, 5.5, 6.5],
-  sharp: [3.5, 4.5, 5.5, 6.5],
-  rounded: [3.5, 4.5, 5.5, 6.5],
-  jagged: [3.5, 4.5, 5.5, 6.5],
-  gravel: [3.5, 4.5, 5.5, 6.5],
-  boulder: [4, 5, 6, 7],
-  thorn: [3.75, 4.5, 5, 6],
-  coast: [3.75, 4.75, 5.75, 6.75],
-  moss: [3.5, 4.5, 5.5, 6.5],
-  billow: [3.5, 4.5, 5.5, 6.5],
+  square: [7, 9, 11, 13],
+  sharp: [7, 9, 11, 13],
+  rounded: [7, 9, 11, 13],
+  jagged: [7, 9, 11, 13],
+  gravel: [7, 9, 11, 13],
+  boulder: [8, 10, 12, 14],
+  thorn: [7.5, 9, 10, 12],
+  coast: [7.5, 9.5, 11.5, 13.5],
+  moss: [7, 9, 11, 13],
+  billow: [7, 9, 11, 13],
 };
 
 /**
@@ -164,18 +179,22 @@ export const PATTERN_BANDS: Record<PatternId, readonly [number, number, number, 
  *     the way there is a legitimate look, so only vanishing is a hard stop.
  * Patterns with big noise amplitude or heavy corner rounding have little room,
  * which is why the range is per pattern rather than global.
+ *
+ * Re-derived when the field moved to 32px rather than doubled: the positive end
+ * carries a fixed FIELD_STEP of slack, which is half as wide relative to a
+ * 32-space pixel, so square gains 6.25 where doubling would have said 5.5.
  */
 export const PATTERN_OFFSET_RANGE: Record<PatternId, readonly [number, number]> = {
-  square: [-4, 2.75],
-  sharp: [-4, 2.75],
-  rounded: [-1.75, 2.75],
-  jagged: [-5, 1],
-  gravel: [-5, 1.5],
-  boulder: [-2.25, 1.25],
-  thorn: [-4.5, 1.25],
-  coast: [-2.75, 2.25],
-  moss: [-4.5, 1],
-  billow: [-1.5, 1],
+  square: [-8.5, 6.25],
+  sharp: [-8.5, 6.25],
+  rounded: [-3.5, 5.75],
+  jagged: [-9.75, 2.5],
+  gravel: [-9.5, 3.25],
+  boulder: [-4.25, 2.75],
+  thorn: [-8.5, 2.75],
+  coast: [-5, 4.75],
+  moss: [-9, 2.25],
+  billow: [-2.75, 2.5],
 };
 
 const FIELDS: Record<PatternId, Record<number, string>> = {
@@ -315,7 +334,7 @@ export const RESEEDABLE_PATTERNS: ReadonlySet<PatternId> = new Set<PatternId>([
 ]);
 
 /**
- * How far a re-roll may push the boundary, in pixels of the 16-space field.
+ * How far a re-roll may push the boundary, in pixels of the field.
  *
  * This is the one number that keeps runtime field displacement safe, so the
  * derivation matters. The inset invariant is that a pixel on an OPEN cell edge
@@ -343,12 +362,10 @@ export function edgeJitterAmplitude(pattern: PatternId, offsetPx = 0): number {
 }
 
 /**
- * Tile-periodic value noise over the 16-space field, in [-1, 1].
+ * Tile-periodic value noise over the field, in [-1, 1].
  *
- * Sampled in FIELD space rather than output space, so 32px output resolves the
- * same displaced silhouette more finely instead of drawing a different one —
- * exactly how the field itself is resampled. The lattice divides 16, so it
- * repeats with the tile and every seam stays continuous.
+ * The lattice is expressed as cells per tile, so it repeats with the tile and
+ * every seam stays continuous whatever PATTERN_TILE_SIZE is.
  */
 function edgeNoise(u: number, v: number, seed: number): number {
   const per = 4;
@@ -372,7 +389,7 @@ function edgeNoise(u: number, v: number, seed: number): number {
 }
 
 /**
- * Bilinear sample of a stored field, in 16-space pixel-centre coordinates
+ * Bilinear sample of a stored field, in field pixel-centre coordinates
  * (sample `i` sits at u = i). Out-of-range reads clamp to the edge; the
  * boundary is always inset well away from the tile border, so the replicated
  * half-pixel never lands anywhere the transition band can reach.
@@ -396,15 +413,12 @@ function sampleField(field: string, u: number, v: number): number {
  * the transition band slid by `offsetPx` — positive toward the cell border,
  * negative toward its centre. `mask < 0` is the background tile.
  *
- * Above 16px the stored field is resampled and thresholded at the output
- * resolution rather than the level grid being scaled up. That is the point of
- * storing a field: distance is smooth and interpolates, so the boundary is
- * genuinely resolved at the finer grid instead of turning into 2x2 blocks.
- * Bands stay in 16-space units, so an outline drawn 1px wide at 16 comes out
- * 2px wide at 32 — the same art, larger.
- *
- * At tileSize 16 the sample points land exactly on the stored ones and the
- * interpolation degenerates to a plain lookup, so nothing changes there.
+ * `tileSize` defaults to PATTERN_TILE_SIZE, where the sample points land exactly
+ * on the stored ones and the interpolation degenerates to a plain lookup. Asking
+ * for anything else resamples and thresholds at that resolution rather than
+ * scaling the level grid — the point of storing a field is that distance is
+ * smooth and interpolates, so a boundary stays genuinely resolved instead of
+ * turning into blocks. Bands are in field units, so the art scales with it.
  */
 export function patternLevelsForMask(
   pattern: PatternId,
