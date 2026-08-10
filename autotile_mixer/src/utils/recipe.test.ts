@@ -27,7 +27,7 @@ describe('sanitizeRecipe', () => {
       bandSteps: 1,       // min 3
       bandBias: 5,        // max 1
       patternNoiseStrength: -2, // min 0
-      cellScaleA: 0.1,    // min 0.5
+      cellScaleA: 0.1,    // min 2
     };
     const sanitized = sanitizeRecipe(raw);
     expect(sanitized.edgeSeed).toBe(99999);
@@ -35,7 +35,21 @@ describe('sanitizeRecipe', () => {
     expect(sanitized.bandSteps).toBe(3);
     expect(sanitized.bandBias).toBe(1);
     expect(sanitized.patternNoiseStrength).toBe(0);
-    expect(sanitized.cellScaleA).toBe(0.5);
+    expect(sanitized.cellScaleA).toBe(2);
+  });
+
+  it('preserves cellScaleA = 6 and other fine scales without down-clamping', () => {
+    const raw = {
+      cellScaleA: 6,
+      cellScaleB: 5,
+      rippleScaleA: 8,
+      geoScaleA: 4,
+    };
+    const sanitized = sanitizeRecipe(raw);
+    expect(sanitized.cellScaleA).toBe(6);
+    expect(sanitized.cellScaleB).toBe(5);
+    expect(sanitized.rippleScaleA).toBe(8);
+    expect(sanitized.geoScaleA).toBe(4);
   });
 
   it('falls back to default enum values if unknown string is provided', () => {

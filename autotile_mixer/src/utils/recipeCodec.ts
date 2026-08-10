@@ -160,7 +160,7 @@ export function encodeRecipe(recipe: Recipe): string {
   writeRGB(view, 35, '#ffffff'); // reserved placeholder
 
   // Fine Scales (Bytes 38..43)
-  const encScale = (v: number) => Math.max(0, Math.min(255, Math.round((v - 0.5) * 100)));
+  const encScale = (v: number) => Math.max(1, Math.min(255, Math.round(v)));
   view.setUint8(38, encScale(clean.cellScaleA));
   view.setUint8(39, encScale(clean.cellScaleB));
   view.setUint8(40, encScale(clean.rippleScaleA));
@@ -323,7 +323,7 @@ export function decodeRecipe(hash: string): Recipe | null {
     const textureSeedB = read24Bit(view, 32);
 
     // Fine Scales (Bytes 38..43)
-    const decScale = (v: number) => Math.round((v / 100 + 0.5) * 100) / 100;
+    const decScale = (v: number) => (v <= 16 ? v : Math.round((v / 100 + 0.5) * 100) / 100);
     const cellScaleA = decScale(view.getUint8(38));
     const cellScaleB = decScale(view.getUint8(39));
     const rippleScaleA = decScale(view.getUint8(40));

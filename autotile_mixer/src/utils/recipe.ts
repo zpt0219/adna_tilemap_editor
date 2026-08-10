@@ -1,7 +1,11 @@
 import { type PatternId } from './blob47Pattern';
 import { type NoiseId } from './patternNoise';
 import { type RibbonId } from './patternRibbon';
-import { type TextureId } from './patternTexture';
+import {
+  DEFAULT_CELL_SCALE, MIN_CELL_SCALE, MAX_CELL_SCALE,
+  DEFAULT_RIPPLE_SCALE, MIN_RIPPLE_SCALE, MAX_RIPPLE_SCALE,
+  DEFAULT_GEO_SCALE, type TextureId
+} from './patternTexture';
 
 export interface Recipe {
   roleHex: {
@@ -93,12 +97,12 @@ export const DEFAULT_RECIPE: Recipe = {
   textureShadesB: 2,
   textureSeedA: 1,
   textureSeedB: 1,
-  cellScaleA: 1,
-  cellScaleB: 1,
-  rippleScaleA: 1,
-  rippleScaleB: 1,
-  geoScaleA: 1,
-  geoScaleB: 1,
+  cellScaleA: DEFAULT_CELL_SCALE,
+  cellScaleB: DEFAULT_CELL_SCALE,
+  rippleScaleA: DEFAULT_RIPPLE_SCALE,
+  rippleScaleB: DEFAULT_RIPPLE_SCALE,
+  geoScaleA: DEFAULT_GEO_SCALE,
+  geoScaleB: DEFAULT_GEO_SCALE,
   customTexHex: {
     terrainA: null,
     terrainB: null,
@@ -261,12 +265,12 @@ export function sanitizeRecipe(raw: unknown): Recipe {
   const textureSeedA = clampInt(obj.textureSeedA, 0, 99999, DEFAULT_RECIPE.textureSeedA);
   const textureSeedB = clampInt(obj.textureSeedB, 0, 99999, DEFAULT_RECIPE.textureSeedB);
 
-  const cellScaleA = clamp(obj.cellScaleA, 0.5, 2, DEFAULT_RECIPE.cellScaleA);
-  const cellScaleB = clamp(obj.cellScaleB, 0.5, 2, DEFAULT_RECIPE.cellScaleB);
-  const rippleScaleA = clamp(obj.rippleScaleA, 0.5, 2, DEFAULT_RECIPE.rippleScaleA);
-  const rippleScaleB = clamp(obj.rippleScaleB, 0.5, 2, DEFAULT_RECIPE.rippleScaleB);
-  const geoScaleA = clamp(obj.geoScaleA, 0.5, 2, DEFAULT_RECIPE.geoScaleA);
-  const geoScaleB = clamp(obj.geoScaleB, 0.5, 2, DEFAULT_RECIPE.geoScaleB);
+  const cellScaleA = clampInt(obj.cellScaleA, MIN_CELL_SCALE, MAX_CELL_SCALE, DEFAULT_RECIPE.cellScaleA);
+  const cellScaleB = clampInt(obj.cellScaleB, MIN_CELL_SCALE, MAX_CELL_SCALE, DEFAULT_RECIPE.cellScaleB);
+  const rippleScaleA = clampInt(obj.rippleScaleA, MIN_RIPPLE_SCALE, MAX_RIPPLE_SCALE, DEFAULT_RECIPE.rippleScaleA);
+  const rippleScaleB = clampInt(obj.rippleScaleB, MIN_RIPPLE_SCALE, MAX_RIPPLE_SCALE, DEFAULT_RECIPE.rippleScaleB);
+  const geoScaleA = clampInt(obj.geoScaleA, 1, 8, DEFAULT_RECIPE.geoScaleA);
+  const geoScaleB = clampInt(obj.geoScaleB, 1, 8, DEFAULT_RECIPE.geoScaleB);
 
   const customTexRaw = (obj.customTexHex && typeof obj.customTexHex === 'object')
     ? (obj.customTexHex as Record<string, unknown>)

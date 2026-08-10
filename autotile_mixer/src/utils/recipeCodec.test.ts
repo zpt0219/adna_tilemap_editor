@@ -37,6 +37,10 @@ describe('recipeCodec (V1 Binary Bit-Packing)', () => {
       customRibbonHex: [undefined, '#ff0000', '#00ff00'],
       textureAlgoA: 'water',
       textureShadesA: 2,
+      cellScaleA: 6,
+      cellScaleB: 5,
+      rippleScaleA: 8,
+      geoScaleA: 4,
       customTexHex: {
         terrainA: ['#000011', undefined, '#000033'],
         terrainB: null,
