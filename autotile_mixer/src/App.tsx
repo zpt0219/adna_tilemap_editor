@@ -35,6 +35,9 @@ import {
   type TextureId,
 } from './utils/patternTexture';
 import { cellsAlongSegment, type GridCell } from './utils/playgroundPaint';
+import { type Recipe, BUILTIN_PRESETS, type PresetItem, sanitizeRecipe } from './utils/recipe';
+import { encodeRecipe, decodeRecipe } from './utils/recipeCodec';
+import { buildSheetExportData, downloadJsonFile } from './utils/exportSheet';
 
 /**
  * One tileset model: blob47, painted on cells, coloured from baked pattern art.
@@ -419,6 +422,209 @@ export default function App() {
     );
   };
 
+  const currentRecipe: Recipe = useMemo(() => ({
+    roleHex,
+    patternId,
+    edgeSeed,
+    outlineWidth,
+    bandSteps,
+    hardEdgeB,
+    transparentB,
+    bandBias,
+    customShadesHex,
+    patternNoise,
+    patternNoiseSeed,
+    patternNoiseStrength,
+    ribbonAlgo,
+    ribbonAmount,
+    ribbonPeriod,
+    ribbonShades,
+    ribbonInvert,
+    customRibbonHex,
+    textureAlgoA,
+    textureAlgoB,
+    textureAmountA,
+    textureAmountB,
+    textureShadesA,
+    textureShadesB,
+    textureSeedA,
+    textureSeedB,
+    cellScaleA,
+    cellScaleB,
+    rippleScaleA,
+    rippleScaleB,
+    geoScaleA,
+    geoScaleB,
+    customTexHex,
+    tileSize: TILE_SIZE,
+  }), [
+    roleHex, patternId, edgeSeed, outlineWidth, bandSteps, hardEdgeB, transparentB, bandBias, customShadesHex,
+    patternNoise, patternNoiseSeed, patternNoiseStrength, ribbonAlgo, ribbonAmount, ribbonPeriod, ribbonShades, ribbonInvert, customRibbonHex,
+    textureAlgoA, textureAlgoB, textureAmountA, textureAmountB, textureShadesA, textureShadesB, textureSeedA, textureSeedB,
+    cellScaleA, cellScaleB, rippleScaleA, rippleScaleB, geoScaleA, geoScaleB, customTexHex,
+  ]);
+
+  const applyRecipe = (r: Recipe) => {
+    const clean = sanitizeRecipe(r);
+    setRoleHex(clean.roleHex);
+    setPatternId(clean.patternId);
+    setEdgeSeed(clean.edgeSeed);
+    setOutlineWidth(clean.outlineWidth);
+    setBandSteps(clean.bandSteps);
+    setHardEdgeB(clean.hardEdgeB);
+    setTransparentB(clean.transparentB);
+    setBandBias(clean.bandBias);
+    setCustomShadesHex(clean.customShadesHex);
+    setPatternNoise(clean.patternNoise);
+    setPatternNoiseSeed(clean.patternNoiseSeed);
+    setPatternNoiseStrength(clean.patternNoiseStrength);
+    setRibbonAlgo(clean.ribbonAlgo);
+    setRibbonAmount(clean.ribbonAmount);
+    setRibbonPeriod(clean.ribbonPeriod);
+    setRibbonShades(clean.ribbonShades);
+    setRibbonInvert(clean.ribbonInvert);
+    setCustomRibbonHex(clean.customRibbonHex);
+    setTextureAlgoA(clean.textureAlgoA);
+    setTextureAlgoB(clean.textureAlgoB);
+    setTextureAmountA(clean.textureAmountA);
+    setTextureAmountB(clean.textureAmountB);
+    setTextureShadesA(clean.textureShadesA);
+    setTextureShadesB(clean.textureShadesB);
+    setTextureSeedA(clean.textureSeedA);
+    setTextureSeedB(clean.textureSeedB);
+    setCellScaleA(clean.cellScaleA);
+    setCellScaleB(clean.cellScaleB);
+    setRippleScaleA(clean.rippleScaleA);
+    setRippleScaleB(clean.rippleScaleB);
+    setGeoScaleA(clean.geoScaleA);
+    setGeoScaleB(clean.geoScaleB);
+    setCustomTexHex(clean.customTexHex);
+  };
+
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const showToast = (msg: string) => {
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg(null), 2500);
+  };
+
+  const [userPresets, setUserPresets] = useState<PresetItem[]>(() => {
+    try {
+      const raw = localStorage.getItem('adna_blob47_presets');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch {}
+    return [];
+  });
+
+  const [selectedPresetId, setSelectedPresetId] = useState<string>('builtin_waterfront');
+
+  useEffect(() => {
+    if (window.location.hash.startsWith('#r=')) {
+      const hashStr = window.location.hash.slice(3);
+      const decoded = decodeRecipe(hashStr);
+      if (decoded) {
+        applyRecipe(decoded);
+        setSelectedPresetId('custom');
+        return;
+      }
+    }
+
+    try {
+      const rawSaved = localStorage.getItem('adna_blob47_recipe');
+      if (rawSaved) {
+        const parsed = JSON.parse(rawSaved);
+        if (parsed && parsed.recipe) {
+          applyRecipe(parsed.recipe);
+        }
+      }
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      try {
+        localStorage.setItem('adna_blob47_recipe', JSON.stringify({ v: 1, recipe: currentRecipe }));
+      } catch {}
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [currentRecipe]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('adna_blob47_presets', JSON.stringify(userPresets));
+    } catch {}
+  }, [userPresets]);
+
+  const allPresets = useMemo(() => [...BUILTIN_PRESETS, ...userPresets], [userPresets]);
+
+  const activePreset = useMemo(
+    () => allPresets.find((p) => p.id === selectedPresetId),
+    [allPresets, selectedPresetId]
+  );
+
+  const isDirty = useMemo(() => {
+    if (!activePreset) return true;
+    return JSON.stringify(activePreset.recipe) !== JSON.stringify(currentRecipe);
+  }, [activePreset, currentRecipe]);
+
+  const handleSelectPreset = (id: string) => {
+    setSelectedPresetId(id);
+    const target = allPresets.find((p) => p.id === id);
+    if (target) {
+      applyRecipe(target.recipe);
+    }
+  };
+
+  const handleSaveAsPreset = () => {
+    const name = window.prompt(t.presetSavePrompt, '我的预设');
+    if (!name || !name.trim()) return;
+    const newId = `user_${Date.now()}`;
+    const newItem: PresetItem = {
+      id: newId,
+      name: name.trim(),
+      recipe: currentRecipe,
+      savedAt: new Date().toISOString(),
+    };
+    setUserPresets((prev) => [...prev, newItem]);
+    setSelectedPresetId(newId);
+  };
+
+  const handleRenamePreset = () => {
+    if (!activePreset || activePreset.isBuiltin) return;
+    const newName = window.prompt(t.presetRenamePrompt, activePreset.name);
+    if (!newName || !newName.trim()) return;
+    setUserPresets((prev) =>
+      prev.map((item) => (item.id === activePreset.id ? { ...item, name: newName.trim() } : item))
+    );
+  };
+
+  const handleDeletePreset = () => {
+    if (!activePreset || activePreset.isBuiltin) return;
+    if (window.confirm(t.presetDeleteConfirm.replace('{name}', activePreset.name))) {
+      setUserPresets((prev) => prev.filter((item) => item.id !== activePreset.id));
+      setSelectedPresetId('builtin_waterfront');
+      const defaultTarget = BUILTIN_PRESETS[0];
+      if (defaultTarget) applyRecipe(defaultTarget.recipe);
+    }
+  };
+
+  const handleCopyShareLink = () => {
+    const code = encodeRecipe(currentRecipe);
+    const url = `${window.location.origin}${window.location.pathname}#r=${code}`;
+    navigator.clipboard.writeText(url).then(() => {
+      showToast(t.presetLinkCopied);
+    }).catch(() => {
+      showToast(url);
+    });
+  };
+
+  const downloadSheetDataJson = () => {
+    const data = buildSheetExportData(currentRecipe);
+    downloadJsonFile(`tileset_blob47_${patternId}_${TILE_SIZE}px.json`, data);
+  };
+
   /** The outline is the ribbon's canvas, so its width decides what fits on it. */
   const ribbonWidthPx = useMemo(
     () => outlineWidthPx(patternId, bandSteps, hardEdgeB, outlineWidth, TILE_SIZE),
@@ -779,6 +985,67 @@ export default function App() {
             LEFT is what the terrains are and how their boundary is shaped,
             RIGHT is surface detail and output size. */}
         <aside className="sidebar sidebar-left">
+
+          {/* 0 — Presets */}
+          <section className="panel-card">
+            <h2 className="panel-title">{t.presetTitle}</h2>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+              <select
+                className="select-input"
+                style={{ flex: 1 }}
+                value={selectedPresetId}
+                onChange={(e) => handleSelectPreset(e.target.value)}
+              >
+                <optgroup label={t.presetBuiltinGroup}>
+                  {BUILTIN_PRESETS.map((p) => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </optgroup>
+                {userPresets.length > 0 && (
+                  <optgroup label={t.presetUserGroup}>
+                    {userPresets.map((p) => (
+                      <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
+                  </optgroup>
+                )}
+                {isDirty && <option value="custom" disabled>● {t.presetDirtyMark}</option>}
+              </select>
+              {isDirty && (
+                <span style={{ color: '#eab308', fontSize: '16px', fontWeight: 'bold' }} title={t.presetDirtyMark}>
+                  ●
+                </span>
+              )}
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px', marginBottom: '8px' }}>
+              <button className="btn-action btn-secondary" onClick={handleSaveAsPreset}>
+                {t.presetSaveAs}
+              </button>
+              <button
+                className="btn-action btn-secondary"
+                disabled={!activePreset || activePreset.isBuiltin}
+                onClick={handleRenamePreset}
+              >
+                {t.presetRename}
+              </button>
+              <button
+                className="btn-action btn-secondary"
+                disabled={!activePreset || activePreset.isBuiltin}
+                onClick={handleDeletePreset}
+              >
+                {t.presetDelete}
+              </button>
+            </div>
+
+            <button
+              className="btn-action btn-primary"
+              style={{ width: '100%', background: '#2563eb', fontWeight: 600, padding: '6px 12px' }}
+              onClick={handleCopyShareLink}
+            >
+              {t.presetCopyLink}
+            </button>
+          </section>
 
           {/* 1 — Terrain colours */}
           <section className="panel-card">
@@ -1534,6 +1801,9 @@ export default function App() {
               <button className="btn-action" onClick={downloadTileset}>
                 💾 {t.downloadPng}
               </button>
+              <button className="btn-action btn-secondary" onClick={downloadSheetDataJson}>
+                📄 {t.exportDataJson}
+              </button>
             </div>
           </section>
 
@@ -1600,6 +1870,7 @@ export default function App() {
           </section>
         </div>
       </main>
+      {toastMsg && <div className="toast-popup">{toastMsg}</div>}
     </div>
   );
 }
