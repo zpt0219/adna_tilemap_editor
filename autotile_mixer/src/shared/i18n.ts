@@ -1,3 +1,11 @@
+export type Lang = "zh" | "en";
+
+/** A value persisted by an older version (or edited outside the app) is not
+ * trustworthy at runtime, even though callers use the Lang type. */
+export function languageOrDefault(value: string | null | undefined): Lang {
+  return value === 'en' || value === 'zh' ? value : 'zh';
+}
+
 export const TRANSLATIONS = {
   zh: {
     title: "Terrain Autotile Previewer",
@@ -196,5 +204,3 @@ export const TRANSLATIONS = {
     langBtn: "🌐 简体中文"
   }
 };
-
-export type Lang = "zh" | "en";

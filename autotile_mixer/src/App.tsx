@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import './App.css';
-import { TRANSLATIONS, type Lang } from './shared/i18n';
+import { TRANSLATIONS, languageOrDefault, type Lang } from './shared/i18n';
 import {
   BLOB47_LAYOUT, BLOB47_COLS, BLOB47_ROWS, BLOB47_BACKGROUND, blobSlotForMask,
   N as BIT_N, E as BIT_E, S as BIT_S, W as BIT_W,
@@ -34,6 +34,7 @@ import {
   naturalTextureAmount, DEFAULT_TEXTURE_AMOUNT,
   type TextureId,
 } from './utils/patternTexture';
+import { cellsAlongSegment, type GridCell } from './utils/playgroundPaint';
 
 /**
  * One tileset model: blob47, painted on cells, coloured from baked pattern art.
@@ -153,7 +154,12 @@ function ResetLink({ label, title, onClick }: {
 
 export default function App() {
   const [lang, setLang] = useState<Lang>(() => {
-    return (localStorage.getItem('adna_lang') as Lang) || 'zh';
+    try {
+      return languageOrDefault(localStorage.getItem('adna_lang'));
+    } catch {
+      // Storage can be unavailable in privacy-restricted browser contexts.
+      return 'zh';
+    }
   });
 
   const t = TRANSLATIONS[lang];
@@ -489,6 +495,7 @@ export default function App() {
   const tilesetCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const playgroundCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const cleanSheetCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const lastPaintCellRef = useRef<GridCell | null>(null);
   /** The plain terrain-B tile. The blob47 sheet has no background slot, so the
    *  playground keeps it aside instead of blitting it out of the sheet. */
   const bgTileCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -497,7 +504,11 @@ export default function App() {
   const toggleLang = () => {
     const next = lang === 'zh' ? 'en' : 'zh';
     setLang(next);
-    localStorage.setItem('adna_lang', next);
+    try {
+      localStorage.setItem('adna_lang', next);
+    } catch {
+      // Keep the selected language for this session if persistence is blocked.
+    }
   };
 
   // Re-generate tileset sheet on state changes
@@ -651,7 +662,7 @@ export default function App() {
     setDrawVal(val);
     setIsDrawing(true);
 
-    paintPixel(x * scaleX, y * scaleY, val);
+    paintStrokeTo(x * scaleX, y * scaleY, val, true);
   };
 
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -666,11 +677,12 @@ export default function App() {
     const scaleX = canvas.width / rect.width;
     const scaleY = canvas.height / rect.height;
 
-    paintPixel(x * scaleX, y * scaleY, drawVal);
+    paintStrokeTo(x * scaleX, y * scaleY, drawVal);
   };
 
   const handleMouseUp = () => {
     setIsDrawing(false);
+    lastPaintCellRef.current = null;
   };
 
   const getCanvasPoint = (canvas: HTMLCanvasElement, clientX: number, clientY: number) => {
@@ -689,7 +701,7 @@ export default function App() {
     const val = 1;
     setDrawVal(val);
     setIsDrawing(true);
-    paintPixel(x, y, val);
+    paintStrokeTo(x, y, val, true);
   };
 
   const handleTouchMove = (e: React.TouchEvent<HTMLCanvasElement>) => {
@@ -697,22 +709,27 @@ export default function App() {
     const canvas = playgroundCanvasRef.current;
     if (!canvas) return;
     const { x, y } = getCanvasPoint(canvas, e.touches[0].clientX, e.touches[0].clientY);
-    paintPixel(x, y, drawVal);
+    paintStrokeTo(x, y, drawVal);
   };
 
   const handleTouchEnd = () => {
     setIsDrawing(false);
+    lastPaintCellRef.current = null;
   };
 
-  /** A click toggles the cell it lands in. */
-  const paintPixel = (px: number, py: number, val: number) => {
+  /** Paint the current cell and every cell crossed since the previous move. */
+  const paintStrokeTo = (px: number, py: number, val: number, start = false) => {
     const cx = Math.floor(px / TILE_SIZE);
     const cy = Math.floor(py / TILE_SIZE);
     if (cx < 0 || cx >= COLS || cy < 0 || cy >= ROWS) return;
+    const current = { col: cx, row: cy };
+    const previous = start ? null : lastPaintCellRef.current;
+    lastPaintCellRef.current = current;
+    const cells = previous ? cellsAlongSegment(previous, current) : [current];
     setBlobCells(prev => {
-      if (prev[cy][cx] === val) return prev;
+      if (cells.every(({ col, row }) => prev[row][col] === val)) return prev;
       const next = prev.map(row => [...row]);
-      next[cy][cx] = val;
+      for (const { col, row } of cells) next[row][col] = val;
       return next;
     });
   };

@@ -158,4 +158,10 @@ describe('distance field', () => {
       }
     }
   });
+
+  it('rejects non-positive or oversized radii instead of returning invalid coverage', () => {
+    for (const radius of [0, -0.1, 1, 1.1, Number.NaN, Number.POSITIVE_INFINITY]) {
+      expect(() => blobWeightAt(0.5, 0, 0, { radius })).toThrow(RangeError);
+    }
+  });
 });

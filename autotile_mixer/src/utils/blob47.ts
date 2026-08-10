@@ -106,7 +106,7 @@ export function blobSlotForMask(mask: number): number {
 // ---------------------------------------------------------------------------
 
 export interface BlobFieldParams {
-  /** Transition band width in cell units. Must stay < 1 or the field would
+  /** Transition band width in cell units. Must stay between 0 and 1 or the field would
    *  depend on cells outside the 3x3 that blob47 encodes (§6.2). */
   radius: number;
   /** Smooth-min k for convex (outer) corners. 0 = sharp 90° corners (§6.3). */
@@ -166,6 +166,9 @@ export function blobWeightAt(
   params: BlobFieldParams
 ): number {
   const { radius, cornerRounding = 0 } = params;
+  if (!Number.isFinite(radius) || radius <= 0 || radius >= 1) {
+    throw new RangeError('blobWeightAt: radius must be greater than 0 and less than 1');
+  }
 
   // Distance to each open orthogonal neighbour (Infinity when it is terrain A).
   const orthoDist = [Infinity, Infinity, Infinity, Infinity];
