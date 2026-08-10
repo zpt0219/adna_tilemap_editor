@@ -621,6 +621,12 @@ body {
   box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
   margin: auto;
   flex-shrink: 0;
+  /* Transparency checker, matching the playground's. Invisible while the sheet
+     is opaque, and the only thing that tells a transparent terrain B apart from
+     one painted the panel's own background colour. It is CSS on the ON-SCREEN
+     canvas only — the sheet that gets exported is a separate offscreen canvas,
+     so this can never bake itself into the PNG. */
+  background: repeating-conic-gradient(#151821 0% 25%, #0a0b0e 0% 50%) 50% / 24px 24px;
 }
 
 .action-bar {

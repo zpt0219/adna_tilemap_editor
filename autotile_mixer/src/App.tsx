@@ -284,6 +284,12 @@ export default function App() {
   // Collapse the terrain-B shade so open terrain meets the outline hard.
   const [hardEdgeB, setHardEdgeB] = useState(false);
 
+  // Paint nothing where terrain B would go, so the sheet can be laid over
+  // another tile layer. Everything terrain B drives goes inert with it — its
+  // colour, its texture, and the grain that targets its side of the band — so
+  // each of those controls is disabled rather than left silently doing nothing.
+  const [transparentB, setTransparentB] = useState(false);
+
   // Where the transition band sits, as -1 (toward the cell centre) .. +1
   // (toward its border). Kept normalised because each pattern has its own
   // usable range — a fixed pixel slider would be mostly dead travel on the
@@ -473,10 +479,11 @@ export default function App() {
       ribbon,
       texture: textureOpts,
       ramp: currentRampRGB,
+      transparentB,
     },
   }), [patternId, roleColours, bandOffsetPx, bandSteps, textureOpts, hardEdgeB,
        edgeSeed, currentRampRGB, outlineWidth, patternNoise, patternNoiseSeed,
-       patternNoiseStrength, noiseTargets, customNoiseColours, ribbon]);
+       patternNoiseStrength, noiseTargets, customNoiseColours, ribbon, transparentB]);
 
   // Canvas refs
   const tilesetCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -763,19 +770,38 @@ export default function App() {
               ['terrainA', t.colourTerrainA],
               ['terrainB', t.colourTerrainB],
               ['edge', t.colourEdge],
-            ] as const).map(([role, label]) => (
-              <div key={role} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+            ] as const).map(([role, label]) => {
+              // Terrain B's colour drives nothing once it is transparent: it owns
+              // exactly two levels and both are discarded.
+              const inert = role === 'terrainB' && transparentB;
+              return (
+              <div key={role} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', opacity: inert ? 0.4 : 1 }}>
                 <input
                   type="color"
                   value={roleHex[role]}
+                  disabled={inert}
                   onChange={(e) => setRoleHex((p) => ({ ...p, [role]: e.target.value }))}
-                  style={{ width: '38px', height: '28px', padding: 0, border: 'none', background: 'none', cursor: 'pointer' }}
+                  style={{ width: '38px', height: '28px', padding: 0, border: 'none', background: 'none', cursor: inert ? 'default' : 'pointer' }}
                   aria-label={label}
                 />
                 <span style={{ fontSize: '12px', flex: 1 }}>{label}</span>
-                <code style={{ fontSize: '11px', color: 'var(--muted)' }}>{roleHex[role]}</code>
+                <code style={{ fontSize: '11px', color: 'var(--muted)' }}>
+                  {inert ? t.transparent : roleHex[role]}
+                </code>
               </div>
-            ))}
+              );
+            })}
+
+            <label className="checkbox-group" style={{ margin: '2px 0 4px' }}>
+              <input
+                type="checkbox"
+                checked={transparentB}
+                onChange={(e) => setTransparentB(e.target.checked)}
+              />
+              <span className="checkbox-label">
+                {t.transparentB}<InfoTip text={t.transparentBHint} />
+              </span>
+            </label>
 
             <button
               className="btn-preset"
@@ -850,9 +876,12 @@ export default function App() {
             <div className="swatch-row" style={{ marginBottom: '10px' }}>
               {bandShadeIndices.map((idx: number) => {
                 const hex = toHexColour(currentRampRGB[idx]);
-                // hardEdgeB collapses the terrain-B shade, so its swatch has
-                // nothing left to colour.
-                const isDisabled = hardEdgeB && idx === 1;
+                // hardEdgeB collapses the terrain-B shade, and transparency
+                // discards it outright — either way its swatch has nothing left
+                // to colour. Same swatch, two reasons, so the reason is in the
+                // tooltip.
+                const isTransparent = transparentB && levels[idx].role === 'terrainB';
+                const isDisabled = isTransparent || (hardEdgeB && idx === 1);
                 const roleLabel = levels[idx].role === 'terrainA' ? t.shadeSideA : t.shadeSideB;
                 return (
                   <ColourSwatch
@@ -861,7 +890,7 @@ export default function App() {
                     disabled={isDisabled}
                     isCustom={Boolean(customShadesHex && customShadesHex[idx])}
                     title={isDisabled
-                      ? `${roleLabel} — ${t.shadeDisabled}`
+                      ? `${roleLabel} — ${isTransparent ? t.transparentB : t.shadeDisabled}`
                       : `${roleLabel} (${hex}) — ${t.clickToCustomize}`}
                     onChange={(next) => {
                       // Start from the derived ramp unless an override of the
@@ -1138,13 +1167,19 @@ export default function App() {
                 <div className="noise-preset-tabs" style={{ marginBottom: '10px' }}>
                   {NOISE_TARGETS.map((tTarget) => {
                     const isActive = noiseTargets.includes(tTarget.id);
+                    // With terrain B transparent there is no terrain-B side of the
+                    // band to move a pixel out of, so this target cannot do
+                    // anything but erode the outline into the hole.
+                    const inert = tTarget.id === 'terrainB' && transparentB;
                     return (
                       <button
                         key={tTarget.id}
                         type="button"
-                        className={`noise-preset-btn compact ${isActive ? 'active' : ''}`}
+                        disabled={inert}
+                        className={`noise-preset-btn compact ${isActive && !inert ? 'active' : ''}`}
+                        style={inert ? { opacity: 0.4 } : undefined}
                         onClick={() => toggleNoiseTarget(tTarget.id)}
-                        title={lang === 'zh' ? tTarget.zh : tTarget.en}
+                        title={inert ? t.transparentBInert : (lang === 'zh' ? tTarget.zh : tTarget.en)}
                       >
                         {lang === 'zh' ? tTarget.shortZh : tTarget.shortEn}
                       </button>
@@ -1218,10 +1253,21 @@ export default function App() {
               const shadeSlots = isWater
                 ? [1, 2]
                 : Array.from({ length: MAX_TEXTURE_SHADES }, (_, i) => i + 1);
+              // A transparent terrain B has no surface to texture. The block is
+              // dimmed and shut off rather than hidden, so the row does not reflow
+              // out from under the cursor and the picked settings survive the
+              // round trip when transparency is switched back off.
+              const inert = role === 'terrainB' && transparentB;
               return (
-              <div key={role} className={`texture-material-block texture-material-${role}`}>
+              <div
+                key={role}
+                className={`texture-material-block texture-material-${role}`}
+                style={inert ? { opacity: 0.4, pointerEvents: 'none' } : undefined}
+                aria-disabled={inert || undefined}
+              >
                 <div className="slider-header" style={{ marginBottom: '4px' }}>
                   <span className="slider-name">{algoLabel}</span>
+                  {inert && <span className="slider-val">{t.transparent}</span>}
                 </div>
                 <select
                   className="text-input"

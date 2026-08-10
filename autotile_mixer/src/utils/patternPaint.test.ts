@@ -17,6 +17,7 @@ import {
   type RGB,
 } from './patternPaint';
 import { NO_RIBBON, RIBBONS } from './patternRibbon';
+import { NO_TEXTURE } from './patternPaint';
 
 // The pattern is art, so these tests are a lock, not a specification: they fail
 // when the baked grids or the shade recipes drift, which would silently change
@@ -1027,5 +1028,124 @@ describe('level-grid cache', () => {
       patternLevelsForMask('jagged', 0, 0, PATTERN_TILE_SIZE, 3, false, seed);
     }
     expect(patternLevelsForMask(...args)).toBe(first);
+  });
+});
+
+/**
+ * Terrain B as a hole rather than a colour, so a sheet can be laid over another
+ * tile layer. Added 2026-08-09.
+ *
+ * The rule is per ROLE, not per level: terrain B owns the open field AND the
+ * one-pixel shaded rim outside the outline, and both go. These tests pin that,
+ * pin that a grained pixel is judged by where it lands, and pin that the whole
+ * thing is inert when off — which is what keeps every locked sheet hash valid.
+ */
+describe('transparent terrain B', () => {
+  const SIZE = PATTERN_TILE_SIZE;
+  const paint = (transparentB: boolean, extra = {}) =>
+    paintPatternTileRGBA(DEFAULT_PATTERN, 110, REFERENCE_ROLE_COLOURS, {
+      tileSize: SIZE, transparentB, ...extra,
+    });
+
+  /** The role each pixel's level belongs to, straight from the level ladder. */
+  const roles = (bandSteps = DEFAULT_BAND_STEPS) => {
+    const defs = patternLevelsFor(bandSteps);
+    const grid = patternLevelsForMask(DEFAULT_PATTERN, 110, 0, SIZE, bandSteps);
+    return [...grid].map((ch) => defs[ch.charCodeAt(0) - 48].role);
+  };
+
+  it('is byte-for-byte inert when off', () => {
+    // The guarantee the locked sheet hashes rest on. Every sheet ever measured
+    // was measured without this option, so switching it off has to reproduce
+    // them exactly — including the alpha byte, which is why this compares the
+    // full RGBA rather than the colours.
+    for (const mask of BLOB47_MASKS) {
+      const off = paintPatternTileRGBA(DEFAULT_PATTERN, mask, REFERENCE_ROLE_COLOURS, { tileSize: SIZE });
+      const explicit = paintPatternTileRGBA(DEFAULT_PATTERN, mask, REFERENCE_ROLE_COLOURS, {
+        tileSize: SIZE, transparentB: false,
+      });
+      expect(Array.from(explicit)).toEqual(Array.from(off));
+      for (let i = 3; i < off.length; i += 4) expect(off[i]).toBe(255);
+    }
+  });
+
+  it('clears exactly the pixels terrain B owns, rim included', () => {
+    const px = paint(true);
+    const role = roles();
+    let cleared = 0;
+    for (let p = 0; p < role.length; p++) {
+      const want = role[p] === 'terrainB' ? 0 : 255;
+      expect(`${p} ${role[p]} alpha=${px[p * 4 + 3]}`).toBe(`${p} ${role[p]} alpha=${want}`);
+      if (want === 0) cleared++;
+    }
+    // Both terrain-B levels are in there, not just the open field: the rim is a
+    // real level with real pixels, and forgetting it would leave a halo.
+    const rim = role.filter((_, p) =>
+      patternLevelsForMask(DEFAULT_PATTERN, 110, 0, SIZE).charCodeAt(p) - 48 === 1).length;
+    expect(rim).toBeGreaterThan(0);
+    expect(cleared).toBeGreaterThan(rim);
+  });
+
+  it('leaves the outline and terrain A fully opaque', () => {
+    // The half that matters for stacking: the tile's silhouette has to survive,
+    // or the sheet is a hole with a fringe.
+    const px = paint(true);
+    const role = roles();
+    let opaque = 0;
+    for (let p = 0; p < role.length; p++) if (px[p * 4 + 3] === 255) opaque++;
+    expect(opaque).toBe(role.filter((r) => r !== 'terrainB').length);
+    expect(opaque).toBeGreaterThan(0);
+  });
+
+  it('never writes a partial alpha', () => {
+    // Hard alpha only. A blended edge picks up whatever was underneath at export
+    // time, which is exactly what a stacked tileset must not carry.
+    for (const bandSteps of [MIN_BAND_STEPS, DEFAULT_BAND_STEPS, MAX_BAND_STEPS]) {
+      const px = paint(true, { bandSteps });
+      for (let i = 3; i < px.length; i += 4) expect(px[i] === 0 || px[i] === 255).toBe(true);
+    }
+  });
+
+  it('judges a grained pixel by where it lands, not where it came from', () => {
+    // Grain moves a pixel between levels, so alpha has to follow the destination.
+    // Reading the source level instead leaves opaque specks floating in the hole
+    // wherever the grain pushed a band pixel out into terrain B.
+    const noises = ['blue'] as const;
+    const grained = paint(true, { noises, noiseSeed: 7, noiseStrength: 1 });
+    const flat = paint(true, { noises: [], noiseSeed: 7 });
+    let moved = 0;
+    for (let p = 0; p < SIZE * SIZE; p++) if (grained[p * 4 + 3] !== flat[p * 4 + 3]) moved++;
+    // The grain does reach the boundary, otherwise this test proves nothing.
+    expect(moved).toBeGreaterThan(0);
+    // And every alpha it wrote is still hard.
+    for (let i = 3; i < grained.length; i += 4) {
+      expect(grained[i] === 0 || grained[i] === 255).toBe(true);
+    }
+  });
+
+  it('drops the terrain-B texture instead of painting it into the hole', () => {
+    // Texturing a surface that is not drawn cannot show, but it could still have
+    // changed the colour bytes under a zero alpha — which shows up the moment
+    // someone composites with a filter that ignores alpha.
+    const withTex = paint(true, {
+      texture: { ...NO_TEXTURE, algoB: 'square' as const, amountB: 1, shadesB: 4 },
+    });
+    expect(Array.from(withTex)).toEqual(Array.from(paint(true)));
+    // And with terrain B opaque the same texture very much does change the tile,
+    // so the comparison above is not passing for want of an effect.
+    const opaque = paintPatternTileRGBA(DEFAULT_PATTERN, 110, REFERENCE_ROLE_COLOURS, {
+      tileSize: SIZE, texture: { ...NO_TEXTURE, algoB: 'square' as const, amountB: 1, shadesB: 4 },
+    });
+    expect(Array.from(opaque)).not.toEqual(Array.from(paint(false)));
+  });
+
+  it('makes the background tile a fully empty tile', () => {
+    // What the playground lays on unpainted cells, and what a map editor gets
+    // where nothing is drawn: it must be entirely gone, not a flat colour.
+    const bgPx = paintPatternTileRGBA(DEFAULT_PATTERN, -1, REFERENCE_ROLE_COLOURS, {
+      tileSize: SIZE, transparentB: true,
+    });
+    expect(patternLevelsForMask(DEFAULT_PATTERN, -1, 0, SIZE)).toBe('0'.repeat(SIZE * SIZE));
+    for (let i = 3; i < bgPx.length; i += 4) expect(bgPx[i]).toBe(0);
   });
 });

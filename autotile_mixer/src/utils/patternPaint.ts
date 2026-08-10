@@ -245,6 +245,24 @@ export interface PaintOptions {
   texture?: TextureOptions;
   /** Overrides the whole derived level ramp; ignored unless it matches length. */
   ramp?: readonly RGB[];
+  /**
+   * Paint nothing where terrain B would go, so the sheet can be stacked over
+   * another tile layer.
+   *
+   * It is the ROLE that goes transparent, not the level: terrain B owns two
+   * levels — the open field and the one-pixel shaded rim hugging the outline —
+   * and both vanish. Keeping the rim would mean painting a shaded variant of a
+   * colour that is not being drawn, i.e. a coloured halo round every tile with
+   * nothing to explain it, and it would put opaque pixels outside the outline
+   * where a layer beneath is supposed to show through.
+   *
+   * Grain follows the same rule, decided by where a pixel LANDS rather than
+   * where it came from: an outline pixel the grain pushes out into terrain B
+   * becomes a hole, which is what "dissolving the edge outward" has to mean once
+   * there is nothing behind it. That also makes the picked terrain-B grain
+   * colour inert, and the panel greys it out.
+   */
+  transparentB?: boolean;
 }
 
 /**
@@ -275,6 +293,7 @@ export function paintPatternTileRGBA(
     ribbon = NO_RIBBON,
     texture = NO_TEXTURE,
     ramp: customRamp,
+    transparentB = false,
   } = opts;
 
   const derived = patternRamp(colours, bandSteps);
@@ -293,7 +312,9 @@ export function paintPatternTileRGBA(
   const texA = texture.algoA !== 'none' && texture.amountA > 0
     ? textureRamp(colours.terrainA, texture.colourA, shadesA, fitRamp(texture.rampA, shadesA))
     : null;
-  const texB = texture.algoB !== 'none' && texture.amountB > 0
+  // Not built at all when terrain B is transparent — there is no surface to
+  // texture, and every pixel it would touch is about to be discarded anyway.
+  const texB = !transparentB && texture.algoB !== 'none' && texture.amountB > 0
     ? textureRamp(colours.terrainB, texture.colourB, shadesB, fitRamp(texture.rampB, shadesB))
     : null;
 
@@ -326,6 +347,9 @@ export function paintPatternTileRGBA(
       const p = y * tileSize + x;
       const level = grid.charCodeAt(p) - 48;
       let rgb = ramp[level];
+      // Where the pixel ends up, which is what decides its alpha. Only grain
+      // moves it: the ribbon and the textures repaint within a level.
+      let finalLevel = level;
       // Grain lives on the transition band only, and is sampled in OUTPUT
       // space so it gets finer along with the art instead of blocking up.
       let grained = false;
@@ -360,6 +384,7 @@ export function paintPatternTileRGBA(
 
           if (keepNoise) {
             grained = true;
+            finalLevel = nextLvl;
             if (nextRole === 'edge' && noiseColours?.edge) {
               rgb = noiseColours.edge;
             } else if (step < 0 && noiseColours?.b) {
@@ -401,7 +426,11 @@ export function paintPatternTileRGBA(
       out[i] = r;
       out[i + 1] = g;
       out[i + 2] = b;
-      out[i + 3] = 255;
+      // Hard alpha, never a blend. A tileset is stacked and re-sampled, and a
+      // half-transparent pixel picks up whatever happened to be underneath at
+      // export time; pixel art keeps its silhouette in the alpha channel exactly
+      // the way it keeps its colours in the palette.
+      out[i + 3] = transparentB && levelDefs[finalLevel]?.role === 'terrainB' ? 0 : 255;
     }
   }
   return out;
