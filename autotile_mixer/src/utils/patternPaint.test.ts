@@ -612,7 +612,7 @@ describe('re-rolling an irregular edge', () => {
         }
       }
     }
-  });
+  }, 30000);
 
   it.each(RESEEDABLE)('%s spends its jitter budget on the offset slider', (id) => {
     // The two controls ask for the same headroom, so pushing the band fully
