@@ -2,7 +2,9 @@ import { describe, it, expect } from 'vitest';
 import {
   TEXTURE_PRESETS, DEFAULT_TEXTURE, DEFAULT_TEXTURE_SHADES, MAX_TEXTURE_SHADES,
   DEFAULT_GEO_SCALE, GEO_SCALES, textureUsesGeoScale, octagonalRank,
+  nonslipRank, hexagonRank, brickBondRank, naturalGeoScale, geoScalesFor,
   textureShadeAt, textureColour, textureRamp, texturePeriod, usedTextureShades,
+  textureUsesAmount, naturalTextureAmount, DEFAULT_TEXTURE_AMOUNT,
   type TextureId,
 } from './patternTexture';
 import {
@@ -26,6 +28,9 @@ const BAKED = [
   'cells',
   // Generated, and its grout is the bare terrain showing between the tiles.
   'square',
+  // Inverted: its brick FACE is the bare terrain, and the ramp paints the
+  // joints and bevel on top, so most of the sheet is deliberately rank 0.
+  'brick_bond',
 ] as const;
 
 /**
@@ -41,6 +46,194 @@ const coverage = (algo: TextureId, amount: number, shades = DEFAULT_TEXTURE_SHAD
   }
   return n / (p * p);
 };
+
+/**
+ * The shape every generated geometry has to have, settled 2026-08-09:
+ *
+ *   - the joint between tiles is the TOP shade, fixed;
+ *   - one face is left as the bare terrain colour;
+ *   - the remaining faces take the shades between, one flat block each.
+ *
+ * These are the tests that make it a rule instead of six coincidences. Before
+ * them: `octagonal` gave every octagon the same tone and spent a shade on a bevel
+ * ring; `square` dealt four tints inside a single 32px tile with no joint between
+ * them; `hexagon` and `isometric_grid` left a swatch unreachable; `isometric`
+ * coloured one diamond two different ways either side of a seam.
+ *
+ * The joint and the terrain face were briefly the other way round. `cells` had the
+ * arrangement above from the start and the rest were brought onto it, not the
+ * other way about.
+ */
+describe('the paving standard', () => {
+  // isometric_grid is deliberately absent: its three facets are the three sides of
+  // one solid and meet each other at the cube's centre with no joint between them.
+  // Inking that junction would turn every cube back into three loose rhombi. Its
+  // outline-plus-three-flat-faces claim is covered by the shade-census test.
+  const PAVINGS = ['square', 'isometric', 'octagonal', 'hexagon'] as const;
+  const JOINT = MAX_TEXTURE_SHADES;
+  /**
+   * The traced masonry that draws a joint at all, as opposed to the organic
+   * tables. Measured rather than read off the encoding: for each of these the
+   * joint rank is a pure one-pixel line and every other rank is a region.
+   *
+   * Which of them needed the ladder ROTATED is a different question and a smaller
+   * list — see JOINT_AT_RANK_0. The first five were traced with the mortar on rank
+   * 0; the three Stagecast pavings and `weave` already had it on the top rank, and
+   * `weave` in particular looks like it belongs in the rotation list and does not,
+   * because its rank 0 is 63% solid, i.e. a face.
+   */
+  const JOINTED_MASONRY = [
+    'brick_wall', 'cobbles2', 'brick_floor', 'breeze_block', 'stone_floor',
+    'paving', 'paving3', 'paving5', 'weave',
+  ] as const;
+  const grid = (algo: TextureId, n: number, seed = 0) => {
+    const p = texturePeriod(algo);
+    const m: number[][] = [];
+    for (let y = 0; y < p; y++) {
+      const row: number[] = [];
+      for (let x = 0; x < p; x++) row.push(textureShadeAt(algo, x, y, seed, 1, 4, 3, 4, n));
+      m.push(row);
+    }
+    return m;
+  };
+
+  it.each(PAVINGS.flatMap((a) => geoScalesFor(a).map((g) => [a, g.id] as const)))(
+    '%s at motif size %i draws its joint on the top shade and its faces flat', (algo, n) => {
+      const m = grid(algo, n);
+      const p = m.length;
+      const at = (x: number, y: number) => m[wrapN(y, p)][wrapN(x, p)];
+
+      // 1. There IS a joint, and it is a LINE rather than a region: no 2x2 block
+      //    is entirely joint, which is exactly "one pixel wide everywhere". A
+      //    four-neighbour test would be wrong here — a grid crossing legitimately
+      //    has all four of its neighbours on the joint.
+      let joint = 0;
+      for (let y = 0; y < p; y++) {
+        for (let x = 0; x < p; x++) {
+          if (at(x, y) !== JOINT) continue;
+          joint++;
+          const block = at(x + 1, y) === JOINT && at(x, y + 1) === JOINT
+            && at(x + 1, y + 1) === JOINT;
+          expect(`${algo}@${n} 2x2 joint block at ${x},${y}: ${block}`)
+            .toBe(`${algo}@${n} 2x2 joint block at ${x},${y}: false`);
+        }
+      }
+      expect(joint).toBeGreaterThan(0);
+
+      // 2. Every face the joint encloses is a single shade, the bare-terrain one
+      //    included. Four-connected, which is what a one-pixel joint actually
+      //    separates — two tiles meeting at a corner touch diagonally and are
+      //    still visually distinct.
+      const seen = Array.from({ length: p }, () => new Array<boolean>(p).fill(false));
+      for (let y0 = 0; y0 < p; y0++) {
+        for (let x0 = 0; x0 < p; x0++) {
+          if (m[y0][x0] === JOINT || seen[y0][x0]) continue;
+          const stack = [[x0, y0]];
+          seen[y0][x0] = true;
+          const shade = m[y0][x0];
+          while (stack.length) {
+            const [x, y] = stack.pop()!;
+            const where = `${algo}@${n} face(${x0},${y0}) px(${x},${y})`;
+            expect(`${where}=${at(x, y)}`).toBe(`${where}=${shade}`);
+            for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+              const nx = wrapN(x + dx, p);
+              const ny = wrapN(y + dy, p);
+              if (m[ny][nx] !== JOINT && !seen[ny][nx]) { seen[ny][nx] = true; stack.push([nx, ny]); }
+            }
+          }
+        }
+      }
+
+      // 3. One face is left as the bare terrain. That is the half of the rule the
+      //    joint used to occupy, and nothing else here would notice its loss.
+      expect(`${algo}@${n} has a terrain face: ${m.some((r) => r.includes(0))}`)
+        .toBe(`${algo}@${n} has a terrain face: true`);
+    });
+
+  it.each(PAVINGS.flatMap((a) => geoScalesFor(a).map((g) => [a, g.id] as const)))(
+    '%s at motif size %i only ever paints shades 1..4', (algo, n) => {
+      for (const seed of [0, 1, 7]) {
+        for (const row of grid(algo, n, seed)) {
+          for (const v of row) {
+            expect(v).toBeGreaterThanOrEqual(0);
+            expect(v).toBeLessThanOrEqual(MAX_TEXTURE_SHADES);
+          }
+        }
+      }
+    });
+
+  it('cells inks its grout with the top shade and deals its cells from the terrain up', () => {
+    // The arrangement the rest were brought onto, and it holds at every cell
+    // count, which is what makes it the reference.
+    for (const scale of [2, 3, 4, 5, 6]) {
+      const counts = new Map<number, number>();
+      for (let y = 0; y < 32; y++) {
+        for (let x = 0; x < 32; x++) {
+          const k = textureShadeAt('cells', x, y, 0, 1, 4, scale);
+          counts.set(k, (counts.get(k) ?? 0) + 1);
+        }
+      }
+      // Grout exists and is the minority. The bound is loose because grout is a
+      // perimeter and cells are an area: measured, a one-pixel line round 4 cells
+      // is 13% of the tile and round 36 of them is 43%. That is the lattice, not a
+      // fat line — the thick-core fraction stays under a tenth at every scale.
+      expect(counts.get(JOINT)!).toBeGreaterThan(0);
+      expect(counts.get(JOINT)!).toBeLessThan(0.5 * 1024);
+      // And every face slot is drawn, the bare-terrain one included.
+      for (const k of [0, 1, 2, 3]) expect(counts.get(k) ?? 0).toBeGreaterThan(0);
+    }
+  });
+
+  it('keeps the joint on a shade of its own however few shades there are', () => {
+    // The bug: `rankToShade` mapped the whole 0..4 ladder proportionally, so at two
+    // shades rank 3 and rank 4 both landed on shade 2 — a face came out the same
+    // colour as the line separating it from its neighbour, and nothing in the
+    // panel said so because both counted as "used". The top rank is mapped apart
+    // from the rest now.
+    //
+    // Measured as the joint's pixel count: it must not lose a single pixel to a
+    // face, at any shade count, for anything that draws a joint.
+    const jointPixels = (algo: TextureId, shades: number, n: number) => {
+      const p = texturePeriod(algo);
+      let k = 0;
+      for (let y = 0; y < p; y++) {
+        for (let x = 0; x < p; x++) {
+          if (textureShadeAt(algo, x, y, 0, 1, shades, 3, 4, n) === shades) k++;
+        }
+      }
+      return k;
+    };
+    for (const algo of [...PAVINGS, 'cells', ...JOINTED_MASONRY] as const) {
+      const n = textureUsesGeoScale(algo) ? naturalGeoScale(algo) : DEFAULT_GEO_SCALE;
+      const at4 = jointPixels(algo, 4, n);
+      expect(`${algo} joint at 4 shades: ${at4 > 0}`).toBe(`${algo} joint at 4 shades: true`);
+      for (const shades of [3, 2, 1]) {
+        expect(`${algo} joint at ${shades} shades: ${jointPixels(algo, shades, n)}`)
+          .toBe(`${algo} joint at ${shades} shades: ${at4}`);
+      }
+    }
+  });
+
+  it('hides the density control exactly where it would quantise the ramp', () => {
+    // The rule behind textureUsesAmount, measured rather than declared. A texture
+    // that names its shade outright has that shade ROUNDED by `amount`, so the
+    // slider merges levels instead of thinning coverage — at the 0.4 the app used
+    // to open on, every one of them lost the top two shades outright.
+    for (const algo of ALGOS) {
+      const full = usedTextureShades(algo, 1, 4);
+      const dimmed = usedTextureShades(algo, 0.4, 4);
+      const quantises = [3, 4].every((k) => full.has(k) && !dimmed.has(k));
+      if (!quantises) continue;
+      expect(`${algo}: density ${textureUsesAmount(algo) ? 'shown' : 'hidden'}`)
+        .toBe(`${algo}: density hidden`);
+    }
+    // And the ones that keep it are the ones it thins, which is what it claims.
+    for (const algo of ALGOS) {
+      if (!textureUsesAmount(algo)) continue;
+      expect(coverage(algo, 0.3)).toBeLessThan(coverage(algo, 0.9));
+    }
+  });
+});
 
 describe('texture presets', () => {
   it('offers a unique list that is off by default', () => {
@@ -240,7 +433,10 @@ describe('geometric textures', () => {
     for (let y = 0; y < 16; y++) {
       for (let x = 0; x < 16; x++) counts[textureShadeAt('cobbles2', x, y, 0, 1, 4)]++;
     }
-    expect(counts).toEqual([48, 73, 105, 25, 5]);
+    // ROTATED 2026-08-09 so the mortar lands on the top rank like every other
+    // geometry here: rank 0 moved to the end and every face stepped down one, in
+    // that order, so the art's own light-to-dark ordering is untouched.
+    expect(counts).toEqual([73, 105, 25, 5, 48]);
   });
 
   it('brick_floor keeps the tone census of the traced diagonal-brick art', () => {
@@ -248,7 +444,12 @@ describe('geometric textures', () => {
     for (let y = 0; y < 16; y++) {
       for (let x = 0; x < 16; x++) counts[textureShadeAt('brick_floor', x, y, 0, 1, 4)]++;
     }
-    expect(counts).toEqual([24, 1, 192, 24, 15]);
+    // ROTATED 2026-08-09 so the mortar lands on the top rank like every other
+    // geometry here: rank 0 moved to the end and every face stepped down one, in
+    // that order, so the art's own light-to-dark ordering is untouched.
+    // Its second-lightest tone is a single pixel, so the bare-terrain face here is
+    // one pixel. That is the traced art's tone census, not a mapping error.
+    expect(counts).toEqual([1, 192, 24, 15, 24]);
   });
 
   it('weave flattens toward bare terrain as the amount drops', () => {
@@ -270,8 +471,13 @@ describe('geometric textures', () => {
 
   const census32 = (algo: TextureId) => {
     const counts = new Array(5).fill(0);
+    // At the size the art was DRAWN at, which is no longer the size the texture
+    // opens on: square and octagonal are 32px art that the panel now opens one
+    // size down, because a 32px period holds one motif and their deal needs four.
+    // Measuring a census against a different size compares two pictures.
+    const n = algo === 'nonslip' ? 4 : DEFAULT_GEO_SCALE;
     for (let y = 0; y < 32; y++) {
-      for (let x = 0; x < 32; x++) counts[textureShadeAt(algo, x, y, 0, 1, 4)]++;
+      for (let x = 0; x < 32; x++) counts[textureShadeAt(algo, x, y, 0, 1, 4, 3, 4, n)]++;
     }
     return counts;
   };
@@ -280,16 +486,35 @@ describe('geometric textures', () => {
     ['paving', [64, 270, 400, 90, 200]],
     ['paving3', [332, 332, 169, 68, 123]],
     ['paving5', [207, 224, 224, 207, 162]],
-    ['breeze_block', [94, 8, 212, 704, 6]],
-    ['brick_wall', [184, 200, 96, 536, 8]],
-    ['stone_floor', [102, 136, 366, 261, 159]],
-    ['hexagon', [110, 10, 241, 221, 442]],
-    ['isometric', [180, 211, 211, 211, 211]],
-    ['octagonal', [62, 181, 0, 40, 741]],
+    // Rotated: mortar 94 to the top, faces down one. Its second-lightest tone is
+    // 8 pixels, so the bare-terrain face is nearly absent — the art's census, not
+    // a mapping error.
+    ['breeze_block', [8, 212, 704, 6, 94]],
+    // Rotated: mortar 184 to the top, faces down one.
+    ['brick_wall', [200, 96, 536, 8, 184]],
+    // Rotated: joint 102 to the top, faces down one.
+    ['stone_floor', [136, 366, 261, 159, 102]],
+    // Tips merged into the outline (2026-08-09), which moved 30 pixels from
+    // the two tip shades into rank 0. Was [110, 10, 241, 221, 442].
+    // Then four-toned: the traced art gave one tone two of the four face slots,
+    // so the census went from [140, 0, 221, 221, 442] to an even quarter each,
+    // and the outline moved from rank 0 to the top rank.
+    ['hexagon', [221, 221, 221, 221, 140]],
+    ['isometric', [211, 211, 211, 211, 180]],
+    // Was [62, 181, 0, 40, 741]: one tone for every octagon, one for the corner
+    // square, one for a bevel ring, and shade 2 unreachable. The outline is the
+    // same 62 pixels, now on the top rank; the bevel's 40 went into the face. At
+    // this size the period holds one octagon, so it takes the first of the three
+    // face ranks — the bare terrain — and two swatches correctly grey out.
+    ['octagonal', [781, 0, 0, 181, 62]],
     ['water', [697, 0, 288, 0, 39]],
     ['field', [157, 151, 222, 164, 330]],
     ['rubble', [501, 0, 396, 0, 127]],
-    ['nonslip', [192, 0, 672, 0, 160]],
+    // Was [192, 0, 672, 0, 160] — core 192, plate 672, shadow 160 — when the
+    // plate was a shade and the core was the bare terrain. The REGIONS are
+    // untouched: 96 + 96 is the same 192 pixels of core, 80 + 80 the same 160 of
+    // shadow, and the plate is the same 672. Only which tone each takes moved.
+    ['nonslip', [672, 80, 80, 96, 96]],
   ] as const)('%s keeps the tone census of the art it was traced from', (algo, want) => {
     // The lock on each baked table, same job the weave census does: a corrupted
     // or re-ordered table fails here rather than shipping a subtly wrong floor.
@@ -389,15 +614,26 @@ describe('generated geometric pavings', () => {
     '11111111034444444444430111111111' +
     '11111111100000000000001111111111';
 
-  it.each([
-    ['octagonal', OCTAGONAL_TRACED, octagonalRank],
-  ] as const)('%s reproduces the traced table byte for byte at 32px', (_algo, traced, rank) => {
-    // Against the rank function directly, with no seed in play, so the oracle is
-    // a plain grid comparison. The routing test below covers the path from
-    // textureShadeAt down to here.
+  it('octagonal keeps the traced silhouette pixel for pixel at 32px', () => {
+    // The oracle survives the 2026-08-09 reshading as a SILHOUETTE oracle. Which
+    // pixels are outline, which are octagon and which are corner square is still
+    // the traced art's, exactly; only the tone each region takes has moved.
+    //
+    // The traced art's own tones map onto the regions like this:
+    //   0        the outline
+    //   3, 4     the octagon face — 4 is the face, 3 a bevel ring just inside it
+    //   1        the corner square
+    // A one-pixel ring is not a face, so 3 folds into 4; that is the only regional
+    // change, and it is why this compares against a merged copy rather than the
+    // raw table.
+    const region = (t: number) => (t === 0 ? 'line' : t === 1 ? 'square' : 'face');
     for (let y = 0; y < 32; y++) {
       for (let x = 0; x < 32; x++) {
-        expect(rank(x, y, DEFAULT_GEO_SCALE)).toBe(traced.charCodeAt(y * 32 + x) - 48);
+        const got = octagonalRank(x, y, DEFAULT_GEO_SCALE);
+        const want = OCTAGONAL_TRACED.charCodeAt(y * 32 + x) - 48;
+        const gotRegion = got === MAX_TEXTURE_SHADES ? 'line'
+          : got === MAX_TEXTURE_SHADES - 1 ? 'square' : 'face';
+        expect(`${x},${y} ${gotRegion}`).toBe(`${x},${y} ${region(want)}`);
       }
     }
   });
@@ -460,7 +696,7 @@ describe('generated geometric pavings', () => {
     for (let y = 0; y < 32; y++) {
       let prev = false;
       for (let x = 0; x < 32; x++) {
-        const on = textureShadeAt('isometric', x, y, 0, 1, 4, 3, 4, n) === 0;
+        const on = textureShadeAt('isometric', x, y, 0, 1, 4, 3, 4, n) === MAX_TEXTURE_SHADES;
         if (on) outline++;
         if (on && !prev) runs++;
         prev = on;
@@ -496,14 +732,19 @@ describe('generated geometric pavings', () => {
     expect(seenSeed1.size).toBeGreaterThan(1);
   });
 
-  it.each(GEO_SCALES.map((g) => g.id))('octagonal keeps all four of its tones at motif size %i', (n) => {
-    // Face, corner square and the two chamfer lines. At 8px the chamfer is only
-    // a pixel long each way, and a threshold off by one drops a whole tone.
+  it.each(GEO_SCALES.map((g) => g.id))('octagonal draws outline, octagons and corner squares at motif size %i', (n) => {
     const seen = new Set<number>();
     for (let y = 0; y < 32; y++) {
       for (let x = 0; x < 32; x++) seen.add(textureShadeAt('octagonal', x, y, 0, 1, 4, 3, 4, n));
     }
-    for (const k of [0, 1, 3, 4]) expect(seen).toContain(k);
+    // Outline on the top shade, the corner square one below it, and at least one
+    // octagon face — which at the coarsest size is the bare terrain.
+    expect(seen).toContain(MAX_TEXTURE_SHADES);
+    expect(seen).toContain(MAX_TEXTURE_SHADES - 1);
+    expect([0, 1, 2].some((k) => seen.has(k))).toBe(true);
+    // A 32px period holds exactly one octagon, so it reaches one face rank and no
+    // more; every smaller size holds a 2x2 block of them and reaches all three.
+    expect(Array.from(seen).sort()).toEqual(n === 1 ? [0, 3, 4] : [0, 1, 2, 3, 4]);
   });
 
 it.each(GEO_SCALES.map((g) => g.id))('square draws grout and faces at motif size %i', (n) => {
@@ -511,15 +752,21 @@ it.each(GEO_SCALES.map((g) => g.id))('square draws grout and faces at motif size
     for (let y = 0; y < 32; y++) {
       for (let x = 0; x < 32; x++) seen.add(textureShadeAt('square', x, y, 0, 1, 4, 3, 4, n));
     }
-    expect(Array.from(seen).sort()).toEqual([0, 1, 2, 3, 4]);
+    // The 32px square IS the period, so it can only be one tile and one tone —
+    // the first of the face ranks, which is the bare terrain, plus its joint. The
+    // four tints it used to show there were dealt on a 16px lattice while the
+    // grout stayed on the 32px one, i.e. four colours inside a single square with
+    // no joint between them.
+    expect(Array.from(seen).sort()).toEqual(n === 1 ? [0, 4] : [0, 1, 2, 3, 4]);
   });
 
   it('square arranges in 2x2 group pattern at seed 0 and randomly at seed > 0', () => {
-    // At seed 0, n=2 (16px), the four 16x16 squares are ranks 1, 2, 3, 4 deterministically
-    expect(textureShadeAt('square', 2, 2, 0, 1, 4, 3, 4, 2)).toBe(1);
-    expect(textureShadeAt('square', 18, 2, 0, 1, 4, 3, 4, 2)).toBe(2);
-    expect(textureShadeAt('square', 2, 18, 0, 1, 4, 3, 4, 2)).toBe(3);
-    expect(textureShadeAt('square', 18, 18, 0, 1, 4, 3, 4, 2)).toBe(4);
+    // At seed 0, n=2 (16px), the four 16x16 squares take the four face ranks in
+    // reading order, starting from the bare terrain.
+    expect(textureShadeAt('square', 2, 2, 0, 1, 4, 3, 4, 2)).toBe(0);
+    expect(textureShadeAt('square', 18, 2, 0, 1, 4, 3, 4, 2)).toBe(1);
+    expect(textureShadeAt('square', 2, 18, 0, 1, 4, 3, 4, 2)).toBe(2);
+    expect(textureShadeAt('square', 18, 18, 0, 1, 4, 3, 4, 2)).toBe(3);
 
     // At seed > 0, cells are randomly assigned colors based on seed
     const shadesSeed1 = [
@@ -529,8 +776,8 @@ it.each(GEO_SCALES.map((g) => g.id))('square draws grout and faces at motif size
       textureShadeAt('square', 18, 18, 1, 1, 4, 3, 4, 2),
     ];
     for (const s of shadesSeed1) {
-      expect(s).toBeGreaterThanOrEqual(1);
-      expect(s).toBeLessThanOrEqual(4);
+      expect(s).toBeGreaterThanOrEqual(0);
+      expect(s).toBeLessThan(MAX_TEXTURE_SHADES);
     }
   });
 
@@ -542,7 +789,7 @@ it.each(GEO_SCALES.map((g) => g.id))('square draws grout and faces at motif size
     for (let y = 0; y < 32; y++) {
       for (let x = 0; x < 32; x++) {
         const grout = x === 31 || y === 31;
-        expect(textureShadeAt('square', x, y, 0, 1, 4, 3, 4, 1) === 0).toBe(grout);
+        expect(textureShadeAt('square', x, y, 0, 1, 4, 3, 4, 1) === MAX_TEXTURE_SHADES).toBe(grout);
       }
     }
     // And a non-zero seed still moves it, so the dice is not dead.
@@ -564,12 +811,16 @@ it.each(GEO_SCALES.map((g) => g.id))('square draws grout and faces at motif size
     let groutCols = 0;
     for (let y = 0; y < 32; y++) {
       let all = true;
-      for (let x = 0; x < 32; x++) if (textureShadeAt('square', x, y, 0, 1, 4, 3, 4, 1) !== 0) all = false;
+      for (let x = 0; x < 32; x++) {
+        if (textureShadeAt('square', x, y, 0, 1, 4, 3, 4, 1) !== MAX_TEXTURE_SHADES) all = false;
+      }
       if (all) groutRows++;
     }
     for (let x = 0; x < 32; x++) {
       let all = true;
-      for (let y = 0; y < 32; y++) if (textureShadeAt('square', x, y, 0, 1, 4, 3, 4, 1) !== 0) all = false;
+      for (let y = 0; y < 32; y++) {
+        if (textureShadeAt('square', x, y, 0, 1, 4, 3, 4, 1) !== MAX_TEXTURE_SHADES) all = false;
+      }
       if (all) groutCols++;
     }
     expect(groutRows).toBe(1);
@@ -583,7 +834,9 @@ it.each(GEO_SCALES.map((g) => g.id))('square draws grout and faces at motif size
       const S = 32 / n;
       let grout = 0;
       for (let y = 0; y < 32; y++) {
-        for (let x = 0; x < 32; x++) if (textureShadeAt('square', x, y, 0, 1, 4, 3, 4, n) === 0) grout++;
+        for (let x = 0; x < 32; x++) {
+          if (textureShadeAt('square', x, y, 0, 1, 4, 3, 4, n) === MAX_TEXTURE_SHADES) grout++;
+        }
       }
       // A one-pixel grid at pitch S over a 32x32 area: 32*n rows + 32*n columns,
       // less the n*n crossings counted twice.
@@ -593,15 +846,508 @@ it.each(GEO_SCALES.map((g) => g.id))('square draws grout and faces at motif size
   });
 
   it('square gets smaller as the motif size drops', () => {
+    // Counted as face area, i.e. everything that is not the joint. More motifs
+    // means more joint, so less of the tile is face.
     const face = (n: number) => {
       let k = 0;
       for (let y = 0; y < 32; y++) {
-        for (let x = 0; x < 32; x++) if (textureShadeAt('square', x, y, 0, 1, 4, 3, 4, n) > 0) k++;
+        for (let x = 0; x < 32; x++) {
+          if (textureShadeAt('square', x, y, 0, 1, 4, 3, 4, n) !== MAX_TEXTURE_SHADES) k++;
+        }
       }
       return k;
     };
     const sizes = GEO_SCALES.map((g) => face(g.id));
     for (let i = 1; i < sizes.length; i++) expect(sizes[i]).toBeLessThan(sizes[i - 1]);
+  });
+
+  // Non-slip was a traced 32x32 table whose content is really an 8x8 motif. It
+  // lives here now, same as the other two: the generator must reproduce it pixel
+  // for pixel at its natural size. Only remaining copy of the traced art.
+  const NONSLIP_TRACED =
+    '22042244220422442204224422042244' +
+    '20042222200422222004222220042222' +
+    '00422222004222220042222200422222' +
+    '04222222042222220422222204222222' +
+    '42220222422202224222022242220222' +
+    '22220022222200222222002222220022' +
+    '22224002222240022222400222224002' +
+    '22222404222224042222240422222404' +
+    '22042244220422442204224422042244' +
+    '20042222200422222004222220042222' +
+    '00422222004222220042222200422222' +
+    '04222222042222220422222204222222' +
+    '42220222422202224222022242220222' +
+    '22220022222200222222002222220022' +
+    '22224002222240022222400222224002' +
+    '22222404222224042222240422222404' +
+    '22042244220422442204224422042244' +
+    '20042222200422222004222220042222' +
+    '00422222004222220042222200422222' +
+    '04222222042222220422222204222222' +
+    '42220222422202224222022242220222' +
+    '22220022222200222222002222220022' +
+    '22224002222240022222400222224002' +
+    '22222404222224042222240422222404' +
+    '22042244220422442204224422042244' +
+    '20042222200422222004222220042222' +
+    '00422222004222220042222200422222' +
+    '04222222042222220422222204222222' +
+    '42220222422202224222022242220222' +
+    '22220022222200222222002222220022' +
+    '22224002222240022222400222224002' +
+    '22222404222224042222240422222404';
+
+  it('nonslip keeps the traced plate pixel for pixel at its natural size', () => {
+    // A silhouette oracle since the 2026-08-09 reshading, same as octagonal's.
+    // Which pixels are plate, dash core and dash shadow is still the traced art's
+    // exactly; what moved is that the plate became the bare terrain and the four
+    // shades were split between the two dash directions.
+    //
+    // The traced art's tones: 2 is the plate, 0 the dash core, 4 its shadow. It
+    // does not distinguish the two dash directions — the generator does, which is
+    // why this compares regions rather than tones.
+    const region = (r: number) => (r === 0 ? 'plate' : r >= 3 ? 'core' : 'shadow');
+    for (let y = 0; y < 32; y++) {
+      for (let x = 0; x < 32; x++) {
+        const traced = NONSLIP_TRACED.charCodeAt(y * 32 + x) - 48;
+        const want = traced === 2 ? 'plate' : traced === 0 ? 'core' : 'shadow';
+        expect(`${x},${y} ${region(nonslipRank(x, y, naturalGeoScale('nonslip')))}`)
+          .toBe(`${x},${y} ${want}`);
+      }
+    }
+  });
+
+  it('nonslip gives each dash direction its own core and shadow shade', () => {
+    // What the four pickers mean, and the reason none of them is dead: shadows on
+    // 1 and 2, cores on 3 and 4, the down-left dash taking the odd one of each
+    // pair. Setting 1 = 2 and 3 = 4 gives back the plain two-tone plate.
+    for (const n of geoScalesFor('nonslip').map((g) => g.id)) {
+      const seen = new Set<number>();
+      for (let y = 0; y < 32; y++) {
+        for (let x = 0; x < 32; x++) seen.add(nonslipRank(x, y, n));
+      }
+      expect(Array.from(seen).sort()).toEqual([0, 1, 2, 3, 4]);
+    }
+    // The down-left dash runs along x + y and the down-right one along x - y, so
+    // a pixel's shade has to agree with which of the two it sits on.
+    const downLeft = new Set<number>();
+    const downRight = new Set<number>();
+    for (let y = 0; y < 32; y++) {
+      for (let x = 0; x < 32; x++) {
+        const r = nonslipRank(x, y, 4);
+        if (r === 1 || r === 3) downLeft.add(wrapN(x + y, 8));
+        if (r === 2 || r === 4) downRight.add(wrapN(x - y, 8));
+      }
+    }
+    // Each direction occupies a handful of adjacent diagonals and no more — the
+    // core, its shadow, and the cap that bridges them.
+    expect(downLeft.size).toBe(3);
+    expect(downRight.size).toBe(3);
+  });
+
+  it('nonslip caps its dashes with one constant pixel at every size', () => {
+    // The bug: the tail cap and the shadow's overhang were `4u` and `7u`, so they
+    // grew with the motif. At 32px that put a four-pixel wedge on the end of a
+    // stroke drawn with the same 2px nib as the 8px one. They are the rounding on
+    // a stroke end, so they are one pixel whatever the size.
+    //
+    // Measured as the shadow's length minus the core's, along each dash: a
+    // constant overhang means a constant difference.
+    for (const n of geoScalesFor('nonslip').map((g) => g.id)) {
+      const len = (want: readonly number[]) => {
+        let k = 0;
+        for (let y = 0; y < 32; y++) {
+          for (let x = 0; x < 32; x++) if (want.includes(nonslipRank(x, y, n))) k++;
+        }
+        return k;
+      };
+      // Core is 2 rows deep, shadow 1, so per unit of length the core lays down
+      // two pixels and the shadow one. The cap adds its single pixel to both rows
+      // of the shadow, which is what rounds the tip.
+      const cells = (32 / (8 * Math.max(1, Math.round(4 / n)))) ** 2;
+      const u = Math.max(1, Math.round(4 / n));
+      const core = 3 * u;
+      // Per cell, per direction: 2 * core core-pixels, and core + 1 + 1 shadow.
+      expect(len([3, 4])).toBe(2 * core * 2 * cells);
+      expect(len([1, 2])).toBe((core + 2) * 2 * cells);
+    }
+  });
+
+  it('nonslip reads the density slider as dash length, not as a ramp scale', () => {
+    // The one texture the control still shows, and the reason it does: it changes
+    // the geometry rather than rounding the shade ladder, so no shade ever goes
+    // dead however low it is set. Its cell size cannot do this job — that has to
+    // divide 32, so it only offers 8, 16 and 32.
+    expect(textureUsesAmount('nonslip')).toBe(true);
+    const shades = (amount: number) => {
+      const seen = new Set<number>();
+      for (let y = 0; y < 32; y++) {
+        for (let x = 0; x < 32; x++) seen.add(textureShadeAt('nonslip', x, y, 0, amount, 4, 3, 4, 4));
+      }
+      return seen;
+    };
+    for (const a of [1, 0.6, 0.3, 0.1]) {
+      expect(`${a}: ${Array.from(shades(a)).sort().join('')}`).toBe(`${a}: 01234`);
+    }
+    // And it does shorten the dash, which is the whole point.
+    expect(coverage('nonslip', 0.3)).toBeLessThan(coverage('nonslip', 1));
+    // It opens on the full-length dash, the traced art, rather than inheriting
+    // whatever a scatter field left the slider on.
+    expect(naturalTextureAmount('nonslip')).toBe(1);
+    expect(naturalTextureAmount('white')).toBe(DEFAULT_TEXTURE_AMOUNT);
+  });
+
+  it('nonslip is the 8px one of the family, and scales up only', () => {
+    expect(naturalGeoScale('nonslip')).toBe(4);
+    expect(32 / naturalGeoScale('nonslip')).toBe(8);
+    expect(naturalGeoScale('isometric')).toBe(DEFAULT_GEO_SCALE);
+    // square and octagonal are 32px art but open at 16: a 32px period holds one
+    // motif each, so the four-shade deal has nothing to deal and two or three
+    // swatches grey out the moment the texture is picked. The 32px size is still
+    // in the list, it is just not where they start.
+    for (const t of ['square', 'octagonal'] as const) {
+      expect(naturalGeoScale(t)).toBe(2);
+      expect(geoScalesFor(t).map((g) => g.id)).toContain(DEFAULT_GEO_SCALE);
+    }
+    // Its motif is built on an 8px cell in whole eighths, so 4px would put the
+    // dash length and both dash offsets on half pixels. The list drops it rather
+    // than clamping, which would leave a button that silently does nothing.
+    expect(geoScalesFor('nonslip').map((g) => g.id)).not.toContain(8);
+    expect(geoScalesFor('nonslip').map((g) => 32 / g.id)).toEqual([32, 16, 8]);
+    expect(geoScalesFor('square')).toEqual(GEO_SCALES);
+  });
+
+  it.each(geoScalesFor('nonslip').map((g) => g.id))('nonslip repeats every 32 pixels at size %i', (n) => {
+    for (let y = 0; y < 32; y++) {
+      for (let x = 0; x < 32; x++) {
+        const base = nonslipRank(x, y, n);
+        expect(nonslipRank(x + 32, y, n)).toBe(base);
+        expect(nonslipRank(x, y - 32, n)).toBe(base);
+      }
+    }
+  });
+
+  it.each(geoScalesFor('nonslip').map((g) => g.id))('nonslip keeps its lines 2px thin at size %i', (n) => {
+    // The decision this locks: the line WEIGHT does not scale, only the dash
+    // length and the spacing. Scaling the weight too was rendered and rejected —
+    // it turns 32px into coarse wedges. A core run across the band is 2 pixels
+    // whatever the size, so the widest horizontal run of core stays 2.
+    let widest = 0;
+    for (let y = 0; y < 32; y++) {
+      let run = 0;
+      for (let x = 0; x < 64; x++) {
+        run = nonslipRank(wrapN(x, 32), y, n) >= 3 ? run + 1 : 0;
+        widest = Math.max(widest, run);
+      }
+    }
+    expect(widest).toBe(2);
+  });
+
+  it.each(geoScalesFor('nonslip').map((g) => g.id))('nonslip draws both dash directions at size %i', (n) => {
+    // Two dashes crossing, not one. Every dark pixel sits on a diagonal run, and
+    // both diagonal directions have to be present or it is a single hatch.
+    let down = 0;
+    let up = 0;
+    for (let y = 0; y < 32; y++) {
+      for (let x = 0; x < 32; x++) {
+        if (nonslipRank(x, y, n) !== 0) continue;
+        if (nonslipRank(wrapN(x + 1, 32), wrapN(y + 1, 32), n) === 0) down++;
+        if (nonslipRank(wrapN(x - 1, 32), wrapN(y + 1, 32), n) === 0) up++;
+      }
+    }
+    expect(down).toBeGreaterThan(0);
+    expect(up).toBeGreaterThan(0);
+  });
+
+
+
+  // Hexagon's traced table, kept as the reference rather than an oracle: the
+  // generator is deliberately NOT byte-exact against it. The art ran a ring of
+  // hand-placed "tip" pixels along each hexagon's slanted edges, one shade off
+  // the face; merging them into the outline is what put hexagon on the same model
+  // as the rest, and it is what these tests measure against. Only remaining copy
+  // of the traced art.
+  const HEXAGON_TRACED =
+    '44442000000000002444444444444444' +
+    '44440333333333330444444444444444' +
+    '44401333333333331044444444444444' +
+    '44203333333333333024444444444444' +
+    '44033333333333333304444444444444' +
+    '40133333333333333310444444444444' +
+    '20333333333333333330244444444444' +
+    '03333333333333333333044444444444' +
+    '13333333333333333333100000000000' +
+    '03333333333333333333022222222222' +
+    '00333333333333333330022222222222' +
+    '20133333333333333310222222222222' +
+    '22033333333333333302222222222222' +
+    '22003333333333333002222222222222' +
+    '22201333333333331022222222222222' +
+    '22220333333333330222222222222222' +
+    '22220000000000000222222222222222' +
+    '22220444444444440222222222222222' +
+    '22202444444444442022222222222222' +
+    '22004444444444444002222222222222' +
+    '22044444444444444402222222222222' +
+    '20244444444444444420222222222222' +
+    '00444444444444444440022222222222' +
+    '04444444444444444444022222222222' +
+    '24444444444444444444200000000000' +
+    '04444444444444444444044444444444' +
+    '20444444444444444440244444444444' +
+    '40244444444444444420444444444444' +
+    '44044444444444444404444444444444' +
+    '44204444444444444024444444444444' +
+    '44402444444444442044444444444444' +
+    '44440444444444440444444444444444';
+
+  /**
+   * The traced art with each face's tip pixels folded into the outline: inside a
+   * face, any pixel whose rank is not the face's majority rank was a tip.
+   */
+  const hexMerged = () => {
+    const at = (x: number, y: number) =>
+      HEXAGON_TRACED.charCodeAt(wrapN(y, 32) * 32 + wrapN(x, 32)) - 48;
+    const out = new Array(1024).fill(0);
+    const seen = new Set<number>();
+    for (let sy = 0; sy < 32; sy++) {
+      for (let sx = 0; sx < 32; sx++) {
+        const k0 = sy * 32 + sx;
+        if (at(sx, sy) === 0 || seen.has(k0)) continue;
+        const q = [[sx, sy]];
+        seen.add(k0);
+        const tally = new Map<number, number>();
+        for (let i = 0; i < q.length; i++) {
+          const [cx, cy] = q[i];
+          tally.set(at(cx, cy), (tally.get(at(cx, cy)) ?? 0) + 1);
+          for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+            const nx = wrapN(cx + dx, 32);
+            const ny = wrapN(cy + dy, 32);
+            const k = ny * 32 + nx;
+            if (seen.has(k) || at(nx, ny) === 0) continue;
+            seen.add(k);
+            q.push([nx, ny]);
+          }
+        }
+        let major = 0;
+        let best = -1;
+        for (const [rank, count] of tally) if (count > best) { best = count; major = rank; }
+        for (const [cx, cy] of q) out[cy * 32 + cx] = at(cx, cy) === major ? major : 0;
+      }
+    }
+    return out;
+  };
+
+  it('hexagon differs from the traced art only in where a diagonal step lands', () => {
+    // The whole justification for hexagon not being byte-exact. Two things have
+    // to hold, and they are what make the deviation harmless:
+    //   1. every disagreement is outline-versus-face, never face-versus-face, so
+    //      no region is ever the wrong colour;
+    //   2. the tone census is identical, i.e. the pixels are swapped, not lost.
+    // The count is locked exactly so any change to the model shows up here.
+    // Compared as a PARTITION rather than tone for tone: the traced art coloured
+    // the four face slots with three tones, giving one of them two slots, and all
+    // four are distinct now. So what has to hold is that the faces are cut in the
+    // same places — every got-tone maps to exactly one traced tone, i.e. the new
+    // colouring only ever splits a traced region, never merges two.
+    const want = hexMerged();
+    let diff = 0;
+    const gotCensus = new Array(5).fill(0);
+    const toTraced = new Map<number, number>();
+    for (let y = 0; y < 32; y++) {
+      for (let x = 0; x < 32; x++) {
+        // The traced art inks its outline as tone 0; the generator inks it as the
+        // top rank, so the two are compared as "is this pixel outline" rather than
+        // by tone.
+        const got = hexagonRank(x, y, naturalGeoScale('hexagon'));
+        const gotLine = got === MAX_TEXTURE_SHADES;
+        const w = want[y * 32 + x];
+        gotCensus[got]++;
+        if (gotLine === (w === 0)) {
+          if (!gotLine) {
+            expect(toTraced.get(got) ?? w).toBe(w);
+            toTraced.set(got, w);
+          }
+          continue;
+        }
+        // The only disagreements left are outline-versus-face, which is the
+        // diagonal-step story: 16 pixels swapped each way, none lost.
+        diff++;
+      }
+    }
+    expect(diff).toBe(32);
+    // Four faces, three traced tones behind them — the art used one of them twice.
+    expect(new Set(toTraced.values()).size).toBe(3);
+    expect(gotCensus).toEqual([221, 221, 221, 221, 140]);
+  });
+
+  it('hexagon gives each of its four faces a tone of its own', () => {
+    // The traced art tinted the four face slots with three tones, so one covered
+    // twice the area of the others and one swatch was dead. A hex grid needs three
+    // colours to avoid a collision and this lattice offers four slots, so the
+    // fourth is free — see HEX_FACES for the adjacency argument. The outline sits
+    // on the top rank and the first face is the bare terrain.
+    const counts = new Array(5).fill(0);
+    for (let y = 0; y < 32; y++) {
+      for (let x = 0; x < 32; x++) counts[hexagonRank(x, y, 1)]++;
+    }
+    expect(counts).toEqual([221, 221, 221, 221, 140]);
+  });
+
+  it.each(geoScalesFor('hexagon').map((g) => g.id))(
+    'hexagon colours a face the same on both sides of a seam at size %i', (n) => {
+      // The bug this exists for: going 32px right is (column, row) -> (c+2, r-1),
+      // so indexing the face tone by the row parity alone flips it across every
+      // seam and one hexagon comes out two colours. 52 pixels were wrong before
+      // the floor(c/2) term went in.
+      for (let y = 0; y < 32; y++) {
+        for (let x = 0; x < 32; x++) {
+          const base = hexagonRank(x, y, n);
+          expect(hexagonRank(x + 32, y, n)).toBe(base);
+          expect(hexagonRank(x, y + 32, n)).toBe(base);
+          expect(hexagonRank(x - 32, y - 32, n)).toBe(base);
+        }
+      }
+    });
+
+  it.each(geoScalesFor('hexagon').map((g) => g.id))(
+    'hexagon draws every face tone at size %i', (n) => {
+      const counts = new Map<number, number>();
+      for (let y = 0; y < 32; y++) {
+        for (let x = 0; x < 32; x++) {
+          const k = hexagonRank(x, y, n);
+          counts.set(k, (counts.get(k) ?? 0) + 1);
+        }
+      }
+      // Outline plus all four faces, and the outline never swallows them — which
+      // is what the smallest offered size is bounded to avoid.
+      for (const k of [0, 1, 2, 3, MAX_TEXTURE_SHADES]) {
+        expect(counts.get(k) ?? 0).toBeGreaterThan(0);
+      }
+      expect(counts.get(MAX_TEXTURE_SHADES)!).toBeLessThan(0.75 * 1024);
+    });
+
+  it('hexagon keeps its flat edges one pixel wide', () => {
+    // The horizontal walls are axis-aligned, so a half-pixel threshold has to
+    // rasterise them to exactly one row. The slanted walls come out two wide
+    // where the step falls, which is a rasterised diagonal, not a fat line.
+    let flatRuns = 0;
+    for (let y = 0; y < 32; y++) {
+      let run = 0;
+      for (let x = 0; x < 32; x++) {
+        run = hexagonRank(x, y, 1) === MAX_TEXTURE_SHADES ? run + 1 : 0;
+      }
+      if (run >= 10) flatRuns++;      // a full flat edge spans the hexagon's top
+    }
+    expect(flatRuns).toBeGreaterThan(0);
+    for (let x = 0; x < 32; x++) {
+      let run = 0;
+      let widest = 0;
+      for (let y = 0; y < 64; y++) {
+        run = hexagonRank(x, wrapN(y, 32), 1) === MAX_TEXTURE_SHADES ? run + 1 : 0;
+        widest = Math.max(widest, run);
+      }
+      expect(widest).toBeLessThan(5);  // no column is a thick vertical bar
+    }
+  });
+
+  it.each(geoScalesFor('brick_bond').map((g) => g.id))(
+    'brick_bond uses the terrain for the face and all four shades on top at size %i', (n) => {
+      // The point of this texture: the brick is the ground. Rank 0 is the face,
+      // and every one of the four shades has a job — highlight, shadow, bed
+      // joint, head joint. A shade that never appears is a wasted colour picker.
+      const counts = new Map<number, number>();
+      for (let y = 0; y < 32; y++) {
+        for (let x = 0; x < 32; x++) {
+          const k = brickBondRank(x, y, n);
+          counts.set(k, (counts.get(k) ?? 0) + 1);
+        }
+      }
+      // Bed joint, head joint, bottom shadow and the face are always there. The
+      // top highlight is the one that gives way on the smallest brick, where four
+      // rows cannot hold a joint, two bevels and any face at all.
+      for (const k of [0, 2, 3, 4]) expect(counts.get(k) ?? 0).toBeGreaterThan(0);
+      expect(counts.get(1) ?? 0).toBeGreaterThan(n === 4 ? -1 : 0);
+      if (n === 4) expect(counts.get(1) ?? 0).toBe(0);
+      // The face has to stay the majority of the brick, or it is all bevel.
+      expect(counts.get(0)!).toBeGreaterThan(1024 / 5);
+    });
+
+  it.each(geoScalesFor('brick_bond').map((g) => g.id))(
+    'brick_bond offsets every other course by half a brick at size %i', (n) => {
+      // What makes it a running bond rather than a stack bond. Read the head
+      // joints off each course and check the shift, rather than trusting the
+      // formula that produced them.
+      const bw = 32 / n;
+      const bh = 16 / n;
+      const headsOf = (course: number) => {
+        const y = course * bh + 1;          // a row inside the brick, below the bed
+        const at: number[] = [];
+        for (let x = 0; x < 32; x++) if (brickBondRank(x, wrapN(y, 32), n) === 4) at.push(x);
+        return at;
+      };
+      const courses = 32 / bh;
+      for (let c = 0; c + 1 < courses; c++) {
+        const a = headsOf(c);
+        const b = headsOf(c + 1);
+        expect(a.length).toBe(32 / bw);
+        expect(b.length).toBe(32 / bw);
+        // Every head joint moved by half a brick, modulo the brick width.
+        expect(b.map((v) => wrapN(v - bw / 2, bw)).sort()).toEqual(a.map((v) => wrapN(v, bw)).sort());
+      }
+    });
+
+  it.each(geoScalesFor('brick_bond').map((g) => g.id))(
+    'brick_bond keeps both joints one pixel wide at size %i', (n) => {
+      const bh = 16 / n;
+      // The bed joint is one unbroken row per course, and nothing else is a full row.
+      let fullRows = 0;
+      for (let y = 0; y < 32; y++) {
+        let all = true;
+        for (let x = 0; x < 32; x++) if (brickBondRank(x, y, n) !== 3) all = false;
+        if (all) fullRows++;
+      }
+      expect(fullRows).toBe(32 / bh);
+      // And no head joint is wider than a pixel.
+      for (let y = 0; y < 32; y++) {
+        let run = 0;
+        for (let x = 0; x < 64; x++) {
+          run = brickBondRank(wrapN(x, 32), y, n) === 4 ? run + 1 : 0;
+          expect(run).toBeLessThan(2);
+        }
+      }
+    });
+
+  it('brick_bond lets the bed joint win where the two joints cross', () => {
+    // A T-junction takes the bed joint's shade, which is what the traced
+    // BRICK_WALL does — its horizontal mortar rows run unbroken. Drawing the head
+    // joint through instead chops every course line into dashes.
+    const n = naturalGeoScale('brick_bond');
+    const bh = 16 / n;
+    for (let y = 0; y < 32; y += bh) {
+      for (let x = 0; x < 32; x++) expect(brickBondRank(x, y, n)).toBe(3);
+    }
+  });
+
+  it.each(geoScalesFor('brick_bond').map((g) => g.id))(
+    'brick_bond repeats every 32 pixels at size %i', (n) => {
+      for (let y = 0; y < 32; y++) {
+        for (let x = 0; x < 32; x++) {
+          const base = brickBondRank(x, y, n);
+          expect(brickBondRank(x + 32, y, n)).toBe(base);
+          expect(brickBondRank(x, y - 32, n)).toBe(base);
+        }
+      }
+    });
+
+  it('brick_bond opens on the proportions of the traced art, and scales from there', () => {
+    // 16x8 bricks, which is what BRICK_WALL was drawn at.
+    expect(naturalGeoScale('brick_bond')).toBe(2);
+    expect(32 / naturalGeoScale('brick_bond')).toBe(16);
+    // 4x2 is not offered: one bed-joint row plus the two bevel rows is three of
+    // the four, so there would be no face left.
+    expect(geoScalesFor('brick_bond').map((g) => 32 / g.id)).toEqual([32, 16, 8]);
   });
 
   it('offers only motif sizes that tile the sheet on whole pixels', () => {
@@ -616,10 +1362,10 @@ it.each(GEO_SCALES.map((g) => g.id))('square draws grout and faces at motif size
     expect(textureUsesGeoScale('isometric')).toBe(true);
     expect(textureUsesGeoScale('octagonal')).toBe(true);
     expect(textureUsesGeoScale('square')).toBe(true);
-    // hexagon is still a traced table: its slanted-edge tips are placed by hand
-    // and no distance rule reproduces them (best fit left 131 of 1024 pixels
-    // wrong, and it plateaued there), so there is no generator to scale.
-    expect(textureUsesGeoScale('hexagon')).toBe(false);
+    // hexagon joined them once its hand-placed edge tips were merged into the
+    // outline; before that no distance rule could reproduce it (best fit left
+    // 131 of 1024 pixels wrong and plateaued there).
+    expect(textureUsesGeoScale('hexagon')).toBe(true);
     expect(textureUsesGeoScale('paving')).toBe(false);
   });
 });

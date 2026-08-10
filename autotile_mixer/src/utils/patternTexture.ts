@@ -24,7 +24,7 @@ export type TextureId =
   | 'none' | NoiseId | 'ripple' | 'ripple_diag' | 'cells'
   | 'breeze_block' | 'brick_wall' | 'cobbles2' | 'brick_floor'
   | 'hexagon' | 'isometric' | 'isometric_grid' | 'octagonal' | 'square'
-  | 'weave' | 'paving' | 'paving3' | 'paving5' | 'stone_floor' | 'water'
+  | 'weave' | 'paving' | 'paving3' | 'paving5' | 'stone_floor' | 'water' | 'brick_bond'
   | 'field' | 'rubble' | 'nonslip';
 
 export const TEXTURE_GROUPS: readonly {
@@ -52,17 +52,18 @@ export const TEXTURE_GROUPS: readonly {
     items: [
       { id: 'cells', zh: '多边形细胞 · Voronoi 细胞网格', en: 'Polygonal Cells — Voronoi cell mesh' },
       { id: 'square', zh: '正方形铺砖 · 可调尺寸', en: 'Square — plain square paving, sizeable' },
-      { id: 'hexagon', zh: '规则六边形 (32px)', en: 'Hexagon — regular hexagonal tiles (32)' },
+      { id: 'hexagon', zh: '规则六边形 · 可调尺寸', en: 'Hexagon — regular hexagonal tiles, sizeable' },
       { id: 'isometric', zh: '等距菱形块 · 可调尺寸', en: 'Isometric — diamond blocks, sizeable' },
       { id: 'isometric_grid', zh: '等距立体方块 · 可调尺寸', en: 'Isometric Grid — 3D cube mesh, sizeable' },
       { id: 'octagonal', zh: '八边切角砖 (32px)', en: 'Octagonal — chamfered square tiles (32)' },
-      { id: 'nonslip', zh: '交叉防滑纹', en: 'Non-slip — textured grip' },
+      { id: 'nonslip', zh: '交叉防滑纹 · 可调尺寸', en: 'Non-slip — textured grip, sizeable' },
     ],
   },
   {
     zh: '砖石与石板铺装', en: 'Masonry & Paving',
     items: [
       { id: 'brick_wall', zh: '错缝砖墙 (32px)', en: 'Brick Wall — running-bond masonry (32)' },
+      { id: 'brick_bond', zh: '程序化错缝砖 · 可调尺寸', en: 'Running Bond — procedural offset bricks, sizeable' },
       { id: 'cobbles2', zh: '细密错缝砖 (16px)', en: 'Cobbles2 — fine running-bond bricks' },
       { id: 'brick_floor', zh: '45° 斜铺砖 (16px)', en: 'Brick Floor — diagonal 45° bond' },
       { id: 'weave', zh: '菱格编织砖 (16px)', en: 'Weave — diagonal interlocking bricks' },
@@ -101,7 +102,72 @@ const PERIOD_32: readonly TextureId[] = [
   // Motif scale and output period are independent; all source masonry tiles
   // listed above are genuinely 32-periodic.
   'ripple', 'ripple_diag', 'cells', 'square',
+  // nonslip's motif is 8px at its natural size but 32px at the coarsest one
+  // it offers, and 32 is a multiple of both, so declaring 32 is right for all.
+  'nonslip',
+  // brick_bond's period is the brick width by twice the course height, which is
+  // 32 at the coarsest size it offers and a divisor of it at the others.
+  'brick_bond',
 ];
+
+/**
+ * The textures the density control is MEANINGLESS for, and therefore hidden on:
+ * every paving, every generated geometry, every traced masonry table.
+ *
+ * `amount` has never meant one thing. On a scatter field it is the fraction of
+ * pixels that get any texture at all, which is a density and behaves like one. On
+ * anything that names its shade outright it instead scales the rank ladder and
+ * ROUNDS — `round(rank * shades * amount / BAKED_RANKS)` — so it merges levels
+ * rather than fading them. Measured at the 0.4 the app used to open on, every
+ * texture in this list painted ZERO pixels at ranks 3 and 4: two of the four
+ * swatches were dead on arrival, and `square` was worse than that, its grout and
+ * a quarter of its tiles both collapsing onto the bare terrain colour so the
+ * joint disappeared between them.
+ *
+ * Fading a paving toward the terrain made some sense when its ramp was derived
+ * from the terrain colour. It stopped making sense once the four shades became
+ * things the user picks by hand: quantising them away overrides a deliberate
+ * choice. The motif-size control is the real density knob for these.
+ */
+const NO_AMOUNT: readonly TextureId[] = [
+  // `nonslip` is deliberately NOT here: it is the one generated texture that
+  // reads the slider as geometry — the dash length, i.e. the gap between one
+  // dash and the next — instead of as a scale on the shade ladder. Nothing is
+  // quantised, so nothing goes dead.
+  'cells', 'square', 'hexagon', 'isometric', 'isometric_grid', 'octagonal',
+  'brick_wall', 'brick_bond', 'cobbles2', 'brick_floor', 'weave', 'breeze_block',
+  'paving', 'paving3', 'paving5', 'stone_floor',
+  // The two organic tables are not pavings, but they are baked art on the same
+  // rank path and they measure the same: at 0.4 both lose ranks 3 and 4 outright.
+  // The rule is about how the control behaves, not which menu group a texture is
+  // filed under, so they follow it.
+  'field', 'rubble',
+];
+
+/**
+ * Whether the density control does anything worth showing for this texture.
+ *
+ * The scatter fields (`white`, `blue`, `ordered`, both ripples), the two organic
+ * tables and `water` keep it: on those it thins coverage, which is what the
+ * control claims to do.
+ */
+export function textureUsesAmount(texture: TextureId): boolean {
+  return texture !== 'none' && !NO_AMOUNT.includes(texture);
+}
+
+/**
+ * The density a texture opens on, the same way `naturalGeoScale` gives the size
+ * it opens on.
+ *
+ * Only `nonslip` differs, and it has to: there `amount` is the dash length, and
+ * the traced art is the full-length dash. Inheriting the 0.4 a scatter field was
+ * left on would show it as stubs and look nothing like the plate it is. Everything
+ * else keeps the shared default, so switching between two speckles does not
+ * silently move the slider.
+ */
+export function naturalTextureAmount(texture: TextureId): number {
+  return texture === 'nonslip' ? 1 : DEFAULT_TEXTURE_AMOUNT;
+}
 
 /**
  * The output-pixel period of a texture, which must DIVIDE the tile size for the
@@ -118,6 +184,7 @@ export const MIN_TEXTURE_SHADES = 1;
 export const MAX_TEXTURE_SHADES = 4;
 export const DEFAULT_TEXTURE_SHADES = 4;
 export const DEFAULT_TEXTURE_SEED = 0;
+export const DEFAULT_TEXTURE_AMOUNT = 0.4;
 export const DEFAULT_CELL_SCALE = 3;
 export const MIN_CELL_SCALE = 2;
 export const MAX_CELL_SCALE = 6;
@@ -224,11 +291,17 @@ function cellsAt(x: number, y: number, seed: number, per: number) {
  * `1 + floor(4 * 0.24^2)` is 1 for *every* cell however the hash fell. Every
  * interior landed on the same shade and only the boundary ever climbed, so the
  * texture read as a wireframe. Here the cell's own hash picks a flat block from
- * the ramp and the shared boundary takes the strongest shade, so a filled region
- * reads as tiles of differing tone with grout between them.
+ * the ramp, so a filled region reads as tiles of differing tone with grout
+ * between them.
  *
- * `amount` scales the ramp rather than thinning a scatter, matching weave and
- * the pavings: the blocks converge on the bare terrain colour as it drops.
+ * The boundary takes the top shade and the interiors are dealt across
+ * 0..shades-1, so one cell in every deal is the bare terrain. That is the layout
+ * every generated geometry here follows — see JOINT_RANK. It was briefly inverted
+ * to put the grout on the terrain colour and the cells on 1..shades, and reversed
+ * back: cells was the texture that had it right first.
+ *
+ * This one names its own shade rather than going through `rankToShade`, because
+ * its deal is sized by the cell count rather than by a fixed rank ladder.
  */
 function cellsShade(
   x: number, y: number, seed: number, per: number, amount: number, shades: number
@@ -242,10 +315,7 @@ function cellsShade(
   // tiles with a net between them.
   const cellPx = per / 32;
   const onBoundary = (f2 - f1) < cellPx * LINE_WIDTH_PX;
-  // Interiors span every shade below the boundary's, so the flattest-looking
-  // cell is bare terrain and the rest step up toward the texture colour.
-  //
-  // Dealt out evenly rather than hashed. A plain hash has to be *lucky* to cover
+  // Interiors are dealt out evenly rather than hashed. A plain hash has to be *lucky* to cover
   // the ramp when there are only per^2 cells to draw from, and at 2x2 it draws
   // four times — measured, it produced nothing but shades 1 and 2, so half the
   // ramp went unused and the texture read as two-tone.
@@ -256,7 +326,7 @@ function cellsShade(
   // take four distinct shades, nine split 3/2/2/2, sixteen split 4/4/4/4 — exact
   // at every size rather than near-uniform. The seed rotates where the deal
   // starts, so the dice still reshuffles which cell is which tone.
-  const n = per * per;
+  const nCells = per * per;
   // Rank the current cell by its pseudo-random 2D hash score relative to all other cells.
   // This guarantees exact even split across shades while completely scattering colors
   // in 2D space without any vertical/horizontal/diagonal striping at any scale.
@@ -268,7 +338,7 @@ function cellsShade(
       if (hash01(cx, cy, hashSalt) < myScore) dealt++;
     }
   }
-  const rank = onBoundary ? shades : Math.floor((dealt * shades) / n);
+  const rank = onBoundary ? shades : Math.floor((dealt * shades) / nCells);
   return Math.max(0, Math.min(shades, Math.round(rank * Math.min(1, amount))));
 }
 
@@ -599,41 +669,6 @@ const BRICK_WALL =
   '12033113123113311203311312311331' +
   '11011111111111111101111111111111';
 
-/** Rule-based geometric patterns from the same Stagecast gallery. */
-const HEXAGON =
-  '44442000000000002444444444444444' +
-  '44440333333333330444444444444444' +
-  '44401333333333331044444444444444' +
-  '44203333333333333024444444444444' +
-  '44033333333333333304444444444444' +
-  '40133333333333333310444444444444' +
-  '20333333333333333330244444444444' +
-  '03333333333333333333044444444444' +
-  '13333333333333333333100000000000' +
-  '03333333333333333333022222222222' +
-  '00333333333333333330022222222222' +
-  '20133333333333333310222222222222' +
-  '22033333333333333302222222222222' +
-  '22003333333333333002222222222222' +
-  '22201333333333331022222222222222' +
-  '22220333333333330222222222222222' +
-  '22220000000000000222222222222222' +
-  '22220444444444440222222222222222' +
-  '22202444444444442022222222222222' +
-  '22004444444444444002222222222222' +
-  '22044444444444444402222222222222' +
-  '20244444444444444420222222222222' +
-  '00444444444444444440022222222222' +
-  '04444444444444444444022222222222' +
-  '24444444444444444444200000000000' +
-  '04444444444444444444044444444444' +
-  '20444444444444444440244444444444' +
-  '40244444444444444420444444444444' +
-  '44044444444444444404444444444444' +
-  '44204444444444444024444444444444' +
-  '44402444444444442044444444444444' +
-  '44440444444444440444444444444444';
-
 // Water has three source tones: 0 is the blue body, 2 is the bright-blue line,
 // and 4 is the small pale/white dot. The line is the only editable layer; the
 // dot stays a fixed pale accent while the body follows the terrain colour.
@@ -743,41 +778,6 @@ const RUBBLE =
   '22222200022224424220000000022422' +
   '22222222244442242220000000222244';
 
-/** Non-slip, traced from `wang_tiles/art/icons/nonslip.gif`. */
-const NONSLIP =
-  '22042244220422442204224422042244' +
-  '20042222200422222004222220042222' +
-  '00422222004222220042222200422222' +
-  '04222222042222220422222204222222' +
-  '42220222422202224222022242220222' +
-  '22220022222200222222002222220022' +
-  '22224002222240022222400222224002' +
-  '22222404222224042222240422222404' +
-  '22042244220422442204224422042244' +
-  '20042222200422222004222220042222' +
-  '00422222004222220042222200422222' +
-  '04222222042222220422222204222222' +
-  '42220222422202224222022242220222' +
-  '22220022222200222222002222220022' +
-  '22224002222240022222400222224002' +
-  '22222404222224042222240422222404' +
-  '22042244220422442204224422042244' +
-  '20042222200422222004222220042222' +
-  '00422222004222220042222200422222' +
-  '04222222042222220422222204222222' +
-  '42220222422202224222022242220222' +
-  '22220022222200222222002222220022' +
-  '22224002222240022222400222224002' +
-  '22222404222224042222240422222404' +
-  '22042244220422442204224422042244' +
-  '20042222200422222004222220042222' +
-  '00422222004222220042222200422222' +
-  '04222222042222220422222204222222' +
-  '42220222422202224222022242220222' +
-  '22220022222200222222002222220022' +
-  '22224002222240022222400222224002' +
-  '22222404222224042222240422222404';
-
 /** Every baked table so far tops out at rank 4; `shades` rescales onto the caller's ramp. */
 const BAKED_RANKS = 4;
 
@@ -789,6 +789,9 @@ const BAKED_RANKS = 4;
  * `size` is the table's own edge length, which is also its output-pixel period,
  * so the seed offset has to wrap at `size` rather than at 16 — offsetting a
  * 32-wide table by a 0..15 amount would sample the wrong half of it.
+ *
+ * `jointAtZero` rotates the ladder for the tables whose mortar was traced onto
+ * rank 0 — see JOINT_AT_RANK_0.
  */
 function bakedShade(
   table: string,
@@ -797,7 +800,8 @@ function bakedShade(
   y: number,
   seed: number,
   amount: number,
-  shades: number
+  shades: number,
+  jointAtZero: boolean = false
 ): number {
   // The shift stays at 4 rather than widening with `size` so that weave, the
   // table this generalises, keeps the exact seed-to-offset mapping its locked
@@ -805,13 +809,47 @@ function bakedShade(
   const m = size - 1;
   const px = wrapN(x + (seed & m), size);
   const py = wrapN(y + ((seed >>> 4) & m), size);
-  return rankToShade(table.charCodeAt(py * size + px) - 48, amount, shades);
+  const raw = table.charCodeAt(py * size + px) - 48;
+  return rankToShade(jointAtZero ? wrapN(raw - 1, BAKED_RANKS + 1) : raw, amount, shades);
 }
 
-/** The 0..4 rank ladder mapped onto the caller's shade count. */
+/**
+ * The traced tables whose MORTAR sits on rank 0 rather than on rank 4, and which
+ * therefore need the ladder rotated one step to meet the shared rule: joint on the
+ * top shade, one face left as the bare terrain, the rest between.
+ *
+ * Rotation rather than reversal, `rank -> (rank - 1) mod 5`, so 0 wraps to the top
+ * and every face steps DOWN one. That is what preserves the art's own light-to-dark
+ * ordering — a reversal would put each brick's highlight where its shadow was.
+ *
+ * Which tables belong here was measured, not read off the encoding: for each of
+ * these five, rank 0 is a pure one-pixel line (no 2x2 block of it anywhere) while
+ * every other rank is a region. `weave` looks like it belongs and does not — its
+ * rank 0 is 63% solid, i.e. a face, and its outline is already on rank 4. The
+ * three Stagecast pavings are already the right way up too.
+ */
+const JOINT_AT_RANK_0: readonly TextureId[] = [
+  'brick_wall', 'cobbles2', 'brick_floor', 'breeze_block', 'stone_floor',
+];
+
+/**
+ * The 0..4 rank ladder mapped onto the caller's shade count.
+ *
+ * The top rank is handled apart from the rest, and that is the whole point: it is
+ * the joint, and the joint has to stay on the top shade at every shade count. The
+ * plain proportional map put rank 3 and rank 4 both on shade 2 when there were
+ * only two shades, so a face came out the same colour as the line separating it
+ * from its neighbour. Ranks 0..3 are therefore squeezed into 0..shades-1 and the
+ * top shade is left for rank 4 alone.
+ *
+ * At 4 shades this is arithmetically identical to the proportional map it
+ * replaces, at every `amount` — which is why no locked sheet hash moves.
+ */
 function rankToShade(rank: number, amount: number, shades: number): number {
-  const k = Math.round((rank * shades * Math.min(1, amount)) / BAKED_RANKS);
-  return Math.max(0, Math.min(shades, k));
+  const a = Math.min(1, amount);
+  const clamp = (k: number) => Math.max(0, Math.min(shades, k));
+  if (rank >= BAKED_RANKS) return clamp(Math.round(shades * a));
+  return Math.min(shades - 1, clamp(Math.round((rank * (shades - 1) * a) / (BAKED_RANKS - 1))));
 }
 
 // --- generated geometric pavings --------------------------------------------
@@ -843,15 +881,184 @@ export const DEFAULT_GEO_SCALE = 1;
 
 /** Whether a texture takes the motif-size control. */
 export function textureUsesGeoScale(texture: TextureId): boolean {
-  return texture === 'isometric' || texture === 'isometric_grid' || texture === 'octagonal' || texture === 'square';
+  return texture === 'isometric' || texture === 'isometric_grid' || texture === 'octagonal'
+    || texture === 'square' || texture === 'nonslip' || texture === 'hexagon'
+    || texture === 'brick_bond';
 }
 
 /**
- * Plain square paving: a grout line, and tile faces.
- * At rank 0 the grout (border line) takes the bare terrain color.
- * For motif sizes n>=1 (32px, 16px, 8px, 4px):
- *   - When seed === 0: the 4 squares in a 2x2 group take ranks 1, 2, 3, 4 deterministically.
- *   - When seed !== 0: each square cell randomly selects a rank from 1..4 based on its cell position & seed.
+ * The size a texture was authored at, which is the one it opens on.
+ *
+ * The control is shared between the generated pavings, but they were not all
+ * drawn at the same size: `nonslip` is an 8px grip plate and the rest are 32px
+ * pavings. Without this, selecting nonslip while the control sat at 32px would
+ * show it four times coarser than the art it came from and look nothing like it.
+ */
+export function naturalGeoScale(texture: TextureId): number {
+  // brick_bond opens on 16x8 bricks, the proportions of the traced BRICK_WALL.
+  if (texture === 'brick_bond') return 2;
+  // square and octagonal open one size down from their 32px original, because at
+  // 32 the period holds a single motif and there is nothing for the deal to deal:
+  // square shows one tile in one shade with its joint falling on the sheet's own
+  // seam, and octagonal shows one octagon plus one corner square, so two of the
+  // four swatches grey out on arrival. At 16 both lay out the full four. The 32px
+  // size is still offered — it is a legitimate large plain flag, just a poor
+  // first impression of what the texture is.
+  if (texture === 'square' || texture === 'octagonal') return 2;
+  return texture === 'nonslip' ? 4 : DEFAULT_GEO_SCALE;
+}
+
+/**
+ * The sizes offered for a texture.
+ *
+ * `nonslip` stops at its natural 8px because its motif is built on an 8px cell —
+ * the dash length, the gap and the two dash positions are all whole multiples of
+ * an eighth of it, and at 4px they would land on half pixels. It scales UP only.
+ */
+export function geoScalesFor(texture: TextureId): readonly { id: number; zh: string; en: string }[] {
+  // nonslip's motif is built on an 8px cell in whole eighths; hexagon's smallest
+  // useful cell is 5x4px, and halving that again leaves 2px of hexagon under a
+  // 1px outline, which is all outline and no face.
+  // brick_bond stops at 8x4 bricks: one row of bed joint plus the two bevel rows
+  // is three of the four, and halving again leaves no face at all.
+  // isometric_grid stops at an 8x4 cube: measured at 4x2, the outline swallows
+  // the left and right facets outright — 768 of 1024 pixels came out outline and
+  // the only face left was the top, so two of its three shades painted nothing.
+  return texture === 'nonslip' || texture === 'hexagon' || texture === 'brick_bond'
+    || texture === 'isometric_grid'
+    ? GEO_SCALES.filter((g) => g.id <= 4)
+    : GEO_SCALES;
+}
+
+/**
+ * Non-slip grip plate: two short diagonal dashes per cell, one running down-left
+ * and one down-right, each a 2px dark core with a 1px shadow on its
+ * perpendicular-DOWN side. Both shadows point down, i.e. one light direction for
+ * the pair, which is what makes them read as a chevron pressed into metal rather
+ * than two unrelated strokes.
+ *
+ * Reproduces the traced 8x8 art byte for byte at its natural size — see the
+ * oracle test. Everything is expressed in `u`, the cell size in eighths, and the
+ * LINE WEIGHT DELIBERATELY DOES NOT SCALE WITH IT: the core stays 2px and the
+ * shadow 1px, and only the dash length and spacing grow. Both ways were rendered
+ * before choosing; scaling the weight too turns the 32px size into coarse
+ * diagonal wedges that no longer read as grip, and makes the dash's end cap a
+ * block instead of a taper.
+ *
+ * The four shades each mean one thing, so every picker is worth using:
+ *
+ *   1  shadow of the down-LEFT dash
+ *   2  shadow of the down-RIGHT dash
+ *   3  core of the down-left dash
+ *   4  core of the down-right dash
+ *
+ * Cores on the strong end and shadows on the weak end, with the direction picking
+ * which of the pair — so setting 1 and 2 alike, and 3 and 4 alike, gives the plain
+ * two-tone plate, and pulling them apart tells the two dash directions apart. The
+ * plate itself is rank 0, the bare terrain: this is a surface with grip pressed
+ * into it, not a surface laid on top of the terrain.
+ *
+ * `amount` is the DASH LENGTH, i.e. the gap between one dash and the next along
+ * its own run. The cell size cannot carry that job — it has to divide 32 for the
+ * texture to tile, so it only offers 8, 16 and 32 — and it is already spoken for
+ * by the motif-size control. At 1 the dash fills its half of the cell, which is
+ * the traced art; below that it shortens and the plate shows between the dashes.
+ * This is the one texture where the density slider means something, so it is the
+ * one that still shows it.
+ *
+ * THE TAIL CAP AND THE SHADOW'S OVERHANG ARE A CONSTANT PIXEL, not a multiple of
+ * `u`. They are the rounding on the end of a stroke, and a stroke drawn with the
+ * same 2px nib at every size has the same rounding at every size — at 32px the
+ * old `4u`/`7u` bounds gave it a four-pixel overhang, which read as a wedge glued
+ * to the end of each dash rather than as a tapered tip.
+ */
+export function nonslipRank(x: number, y: number, n: number, amount: number = 1): number {
+  // Cell = 8u px. u = 1 is the traced art; n is motifs across the 32px tile.
+  const u = Math.max(1, Math.round(4 / n));
+  const S = 8 * u;
+  const inR = (v: number, lo: number, hi: number) => {
+    const w = wrapN(v, S);
+    return w >= lo && w <= hi;
+  };
+  const s = x + y;      // constant along the down-left dash
+  const d = x - y;      // constant along the down-right dash
+  const ax = wrapN(x, S);
+
+  // Core length along x, in pixels. 3u is the traced art; the cap needs the one
+  // pixel after it, so it stops at 4u - 1 and the dash never runs into its
+  // neighbour in the cell's other half.
+  const core = Math.max(1, Math.min(4 * u - 1, Math.round(3 * u * Math.min(1, amount))));
+
+  // Dash A, down-left, in the cell's left half: 2px core, 1px shadow one step
+  // further down-right, and a cap one pixel past the head that rounds the tail.
+  if (inR(s, 2 * u, 2 * u + 1) && ax <= core - 1) return 3;
+  if (inR(s, 2 * u + 2, 2 * u + 2) && ax <= core) return 1;
+  if (inR(s, 2 * u + 1, 2 * u + 2) && ax === core) return 1;
+
+  // Dash B, down-right, in the right half. Its core straddles d = 0, so the range
+  // wraps and is tested as two pieces; its shadow sits at d = -2, i.e. down-LEFT,
+  // which is the same downward side relative to this dash's own direction.
+  const coreB = inR(d, S - 1, S - 1) || inR(d, 0, 0);
+  if (coreB && ax >= 4 * u && ax <= 4 * u + core - 1) return 4;
+  if (inR(d, S - 2, S - 2) && ax >= 4 * u && ax <= 4 * u + core - 1) return 2;
+  if (coreB && ax === 4 * u + core) return 2;
+
+  return 0;                                   // the plate: the bare terrain
+}
+
+/**
+ * THE LAYOUT EVERY GENERATED GEOMETRY FOLLOWS (settled 2026-08-09).
+ *
+ *   rank 4, the top shade   the joint between tiles, fixed
+ *   rank 0                  one face, left as the bare terrain colour
+ *   ranks 1..3              the remaining faces
+ *
+ * So a picked palette reads outward from the terrain: the ground shows through
+ * one tile in every deal, the others step up from it, and the strongest colour is
+ * spent on the line that separates them. `rankToShade` maps rank 4 onto whatever
+ * the current shade count is, so the joint is the top shade at 2 shades or at 4.
+ *
+ * This is the second arrangement tried. The first had it the other way up — joint
+ * on the bare terrain, faces on 1..4 — and it was reversed deliberately: a joint
+ * drawn in the ground colour reads as a gap rather than as grout, and the four
+ * pickers then had no way to set the line itself.
+ *
+ * `FACE_RANKS` is how many face slots that leaves, and the whole file counts
+ * faces against it.
+ */
+const JOINT_RANK = 4;
+const FACE_RANKS = 4;   // ranks 0..3
+
+/**
+ * The rank a geometric FACE takes, 0..3, so a face is always a flat block of one
+ * colour and the ramp is dealt out rather than left to luck.
+ *
+ * At seed 0 it is the 2x2 cell parity, which fills all four slots on any lattice
+ * with at least two cells per axis inside the 32px period. A lattice with fewer —
+ * `square` and `octagonal` at their 32px size fit exactly one cell — reaches only
+ * as many as it has faces, and the panel greys the rest out on its own via
+ * `usedTextureShades`.
+ *
+ * At any other seed the cell hashes instead, so the dice reshuffles which face is
+ * which tone without ever leaving the range.
+ */
+function dealFaceRank(cellX: number, cellY: number, seed: number): number {
+  if (seed === 0) return wrapN(cellX, 2) + 2 * wrapN(cellY, 2);
+  return Math.floor(hash01(cellX, cellY, seed ^ 0x9e3779b9) * FACE_RANKS);
+}
+
+/**
+ * Plain square paving: a one-pixel grout line, and flat tile faces.
+ *
+ * The grout is drawn on two sides of each cell rather than four, so neighbours
+ * share it instead of doubling it up.
+ *
+ * The face lattice IS the grout lattice. It used to be forced to 16px at the
+ * largest motif size, which dealt four tints inside one 32px square with no
+ * grout between them — it read as a single big tile smeared with four colours
+ * rather than as four tiles. A 32px square cannot be four-toned and stay
+ * seamless: the period has to divide 32, so there is room for exactly one of
+ * them, and the other three swatches correctly grey out.
  */
 function squareRank(x: number, y: number, n: number, seed: number = 0): number {
   const S = 32 / n;
@@ -861,31 +1068,41 @@ function squareRank(x: number, y: number, n: number, seed: number = 0): number {
     return Math.min(u + 1, S - 1 - u);
   };
   const e = Math.min(toGrout(x), toGrout(y));
-  if (e === 0) return 0;
+  if (e === 0) return JOINT_RANK;
 
-  const cellSize = n === 1 ? 16 : S;
-  const cellX = Math.floor(x / cellSize);
-  const cellY = Math.floor(y / cellSize);
-
-  if (seed === 0) {
-    const cx = wrapN(cellX, 2);
-    const cy = wrapN(cellY, 2);
-
-    if (cx === 0 && cy === 0) return 1;
-    if (cx === 1 && cy === 0) return 2;
-    if (cx === 0 && cy === 1) return 3;
-    return 4;
-  }
-
-  const h = hash01(cellX, cellY, seed ^ 0x9e3779b9);
-  return 1 + Math.floor(h * 4);
+  return dealFaceRank(Math.floor(x / S), Math.floor(y / S), seed);
 }
 
 /**
- * Isometric rhombi: two interleaved sets of diamond centres with shared boundary inked.
- * At rank 0 the boundary line takes the bare terrain color along outer edges.
- *   - When seed === 0: the 4 diamonds in a 2x2 group take ranks 1, 2, 3, 4 deterministically.
- *   - When seed !== 0: each diamond cell randomly selects a rank from 1..4 based on its cell position & seed.
+ * The rank an isometric diamond takes — NOT the shared `dealFaceRank`, because
+ * this lattice does not line up with the 32px period the way a square one does.
+ *
+ * Going 32px right is `(cellX, cellY) -> (cellX + n, cellY + n)` and going 32px
+ * down is `-> (cellX + 2n, cellY - 2n)`. A deal keyed on the cell parity is
+ * therefore NOT invariant across a horizontal seam at odd n: one diamond comes out
+ * two different colours depending on which side it was reached from, with no
+ * outline between the halves because it is a single diamond. Measured at the
+ * default size, a five-pixel strip either side of every vertical seam.
+ *
+ * This is the same failure hexagon carries the `floor(bc / 2)` term for. The fix
+ * here is to key on `cellX - cellY`, which the horizontal shift leaves alone and
+ * the vertical shift moves by 4n — so taking it mod 4 is invariant under both, at
+ * every size, and still separates all four diamonds. Edge-sharing neighbours are
+ * `(cellX +- 1, cellY)` and `(cellX, cellY +- 1)`, which all move it by one, so no
+ * two touching faces collide.
+ */
+function isoFaceRank(cellX: number, cellY: number, n: number, seed: number): number {
+  const a = wrapN(cellX - cellY, 4 * n);
+  if (seed === 0) return wrapN(a, FACE_RANKS);
+  // The hash needs a seam-invariant key too. `cellX + cellY` is left alone by the
+  // vertical shift and moved by 2n by the horizontal one.
+  return Math.floor(hash01(a, wrapN(cellX + cellY, 2 * n), seed ^ 0x9e3779b9) * FACE_RANKS);
+}
+
+/**
+ * Isometric rhombi: two interleaved sets of diamond centres with the shared
+ * boundary inked as rank 0, i.e. the bare terrain colour, and each diamond a flat
+ * block of one shade.
  */
 export function isometricRank(x: number, y: number, n: number, seed: number = 0): number {
   const W = 16 / n;
@@ -906,27 +1123,29 @@ export function isometricRank(x: number, y: number, n: number, seed: number = 0)
   const distInPixels = dx * H + dy * W;
   const maxDist = W * H;
 
-  if (distInPixels >= maxDist - Math.max(1, H)) return 0; // Outer diamond border = terrain color
+  // The joint between diamonds, on the top shade like every other geometry here.
+  if (distInPixels >= maxDist - Math.max(1, H)) return JOINT_RANK;
 
-  if (seed === 0) {
-    const cx = wrapN(cellX, 2);
-    const cy = wrapN(cellY, 2);
-
-    if (cx === 0 && cy === 0) return 1;
-    if (cx === 1 && cy === 0) return 2;
-    if (cx === 0 && cy === 1) return 3;
-    return 4;
-  }
-
-  const h = hash01(cellX, cellY, seed ^ 0x9e3779b9);
-  return 1 + Math.floor(h * 4);
+  return isoFaceRank(cellX, cellY, n, seed);
 }
 
 /**
- * 3D Isometric Cube Grid: 3D cube mesh with top, left, right directional facets.
- * Outer diamond boundaries take rank 0 (terrain color).
+ * 3D isometric cube grid: top, left and right facets, with the shared diamond
+ * boundary inked as rank 0, i.e. the bare terrain colour.
+ *
+ * THREE faces, so three shades — a cube has no fourth side to give the fourth
+ * one to, and the panel greys that swatch out. They are dealt lightest-facing-up:
+ * top 3, right 2, left 1, which is the one arrangement that reads as a solid lit
+ * from above rather than as three unrelated rhombi.
+ *
+ * The seed used to nudge each cube's facets a step up or down the ramp. It was
+ * dropped: a cube whose three faces are 2/3/4 sitting beside one at 1/2/3 stops
+ * reading as the same material, and it was the only thing here that could reach
+ * shade 4 — so the swatch was live but only at some seeds, which is exactly the
+ * silent-dead-control problem the grey-out exists to prevent. The seed still
+ * moves the lattice's phase through `geoShade`.
  */
-export function isometricGridRank(x: number, y: number, n: number, seed: number = 0): number {
+export function isometricGridRank(x: number, y: number, n: number): number {
   const W = 16 / n;
   const H = 8 / n;
 
@@ -945,25 +1164,16 @@ export function isometricGridRank(x: number, y: number, n: number, seed: number 
   const distInPixels = dx * H + dy * W;
   const maxDist = W * H;
 
-  if (distInPixels >= maxDist - Math.max(1, H)) return 0; // Outer border = terrain color
+  if (distInPixels >= maxDist - Math.max(1, H)) return JOINT_RANK;   // the cube's outline
 
   const relX = x - centerX;
   const relY = y - centerY;
 
-  let facetRank: number;
-  if (relY < 0 && Math.abs(relX) < W * (1 - Math.abs(relY) / H)) {
-    facetRank = 4; // Top facet
-  } else if (relX < 0) {
-    facetRank = 3; // Left facet
-  } else {
-    facetRank = 2; // Right facet
-  }
-
-  if (seed === 0) return facetRank;
-
-  const h = hash01(cellX, cellY, seed ^ 0x7f4a2c11);
-  const shift = Math.floor(h * 3) - 1; // -1, 0, or 1
-  return Math.max(1, Math.min(4, facetRank + shift));
+  // Lit from above: the top face is the strongest of the three, and the left one
+  // is left as the bare terrain. Rank 3 goes unused — a cube has no fourth side —
+  // and the panel greys that swatch out.
+  if (relY < 0 && Math.abs(relX) < W * (1 - Math.abs(relY) / H)) return 2;  // top
+  return relX < 0 ? 0 : 1;                                                  // left / right
 }
 
 /**
@@ -976,20 +1186,189 @@ export function isometricGridRank(x: number, y: number, n: number, seed: number 
  * once by the cell on its far side — that asymmetry is in the traced art and is
  * why the edge is tested separately from the chamfer.
  */
-export function octagonalRank(x: number, y: number, n: number): number {
+/**
+ * Running-bond brick, generated, and INVERTED relative to every other paving
+ * here: the brick face is rank 0, i.e. the bare terrain colour, and all four
+ * shades go to the things drawn on top of it. That is what was asked for — the
+ * brick is the ground, and the ramp paints the joints and the bevel.
+ *
+ * The four shades each mean one thing, so the per-step colour pickers are worth
+ * using:
+ *
+ *   1  highlight along the brick's top edge, inside the brick
+ *   2  shadow along its bottom edge, inside the brick
+ *   3  the bed joint — the horizontal mortar between courses
+ *   4  the head joint — the vertical mortar, a step deeper than the bed
+ *
+ * Giving the two joint directions different steps is what makes the wall read as
+ * having depth rather than as a flat grid; set 3 and 4 to the same colour for
+ * uniform mortar. The bed joint wins at a T-junction, which is what the traced
+ * BRICK_WALL does too (its horizontal mortar rows run unbroken).
+ *
+ * Proportions follow the traced art: bricks are 2:1, and each course is offset by
+ * half a brick. Everything scales with the motif size, and the bed joint plus the
+ * two bevel rows are why the smallest offered brick is 8x4 — at 4x2 there is one
+ * row of joint and one row of brick, with nowhere to put the bevel.
+ */
+export function brickBondRank(x: number, y: number, n: number): number {
+  const bw = 32 / n;        // brick width
+  const bh = 16 / n;        // brick height, joint included
+  const course = Math.floor(y / bh);
+  const ry = wrapN(y, bh);
+  // Every other course starts half a brick along; that half is a whole number of
+  // pixels at every offered size, so the head joints stay on the pixel grid.
+  const vx = wrapN(x - wrapN(course, 2) * (bw / 2), bw);
+
+  if (ry === 0) return 3;               // bed joint, unbroken across the course
+  if (vx === 0) return 4;               // head joint
+  // The top highlight is dropped once the brick is too short to carry it: at 8x4
+  // the joint, the highlight and the shadow would be three of the four rows and
+  // the brick would be all bevel and no face. Leaving it off there is what a
+  // pixel artist does at that size, and it is why shade 1 goes unused on the
+  // smallest brick — the picker greys it out on its own.
+  if (ry === 1 && bh >= 5) return 1;    // top highlight
+  if (ry === bh - 1) return 2;          // bottom shadow
+  return 0;                             // brick face: the terrain colour
+}
+
+/**
+ * The four hexagon face tones, indexed by column and row parity.
+ *
+ * The traced art used three, with one tone taking two of the four slots. All
+ * four are distinct now, which is what puts a hexagon on the same footing as a
+ * square or a rhombus: one flat shade per face, every swatch live. No two
+ * neighbours collide — a step in the row flips the second index, a step in the
+ * column flips the first, and the diagonal neighbour flips both.
+ */
+const HEX_FACES: readonly (readonly number[])[] = [[0, 1], [2, 3]];
+
+/** Half-width of the hexagon outline, in output pixels. */
+const HEX_EDGE_HALF = 0.5;
+
+/**
+ * Regular hexagons, three-toned — the same nearest-cell-plus-wall-distance model
+ * as the rest of the generated pavings.
+ *
+ * The only one of them that is NOT byte-exact against its traced table, and
+ * deliberately so. The traced art ran a ring of "tip" pixels along each
+ * hexagon's slanted edges, one shade off the face and placed by hand; no
+ * distance rule reproduces them (the best fit left 131 of 1024 pixels wrong and
+ * plateaued there, which is why hexagon was skipped the first time round).
+ * Merging those tips into the edge line is what puts it on the same model as the
+ * others.
+ *
+ * Measured against the traced art WITH the tips merged, this differs on 32 of
+ * 1024 pixels and the difference is benign in a way worth recording: every one is
+ * outline-versus-face, never face-versus-face, and the tone census is IDENTICAL
+ * (140 outline / 221 / 221 / 442) — 16 pixels swapped each way. All that differs
+ * is which of two adjacent pixels a diagonal step lands on: the traced edge
+ * climbs in an irregular 1,1,2,2,1,2,2 stair while this one alternates evenly,
+ * and for a texture called "regular hexagons" the even one is arguably righter.
+ */
+export function hexagonRank(x: number, y: number, n: number): number {
+  const step = 16 / n;      // pitch between columns, and between rows in a column
+  const stagger = 8 / n;    // how far each column is dropped relative to the last
+  const ox = 10 / n;
+  const oy = 8 / n;
+
+  // Derive the candidate cells from the pixel rather than scanning a fixed range
+  // around the origin: at the finest size the cells are 4px and a fixed range
+  // covers a few pixels of the tile, leaving the rest with no candidate at all
+  // and painting most of the sheet as solid outline.
+  const c0 = Math.round((x - ox) / step);
+  let bestD = Infinity;
+  let bc = 0;
+  let br = 0;
+  let bx = 0;
+  let by = 0;
+  for (let c = c0 - 1; c <= c0 + 1; c++) {
+    const r0 = Math.round((y - oy - stagger * c) / step);
+    for (let r = r0 - 1; r <= r0 + 1; r++) {
+      const cx = ox + step * c;
+      const cy = oy + stagger * c + step * r;
+      const d = (x - cx) ** 2 + (y - cy) ** 2;
+      if (d < bestD) {
+        bestD = d;
+        bc = c; br = r; bx = cx; by = cy;
+      }
+    }
+  }
+
+  // Distance to the nearest of the six walls, in output pixels.
+  const nb: readonly (readonly [number, number])[] = [
+    [step, stagger], [-step, -stagger], [0, step], [0, -step],
+    [step, stagger - step], [-step, step - stagger],
+  ];
+  let edge = Infinity;
+  for (const [nx, ny] of nb) {
+    const d = ((nx * nx + ny * ny) / 2 - ((x - bx) * nx + (y - by) * ny)) / Math.hypot(nx, ny);
+    if (d < edge) edge = d;
+  }
+  if (edge < HEX_EDGE_HALF) return JOINT_RANK;
+
+  // NOT indexed by the row parity directly. Moving 32px right is
+  // (c, r) -> (c + 2, r - 1), so r's parity flips and one hexagon would come out
+  // two different colours depending on which side of a seam it was reached from —
+  // measured as 52 wrongly coloured pixels before the floor(c/2) term was added.
+  return HEX_FACES[wrapN(bc, 2)][wrapN(br + Math.floor(bc / 2), 2)];
+}
+
+/**
+ * Chamfered square tiles: an octagon face, and a small square in the gap where
+ * four of them meet.
+ *
+ * The SILHOUETTE is the traced art's, pixel for pixel — which pixels are line and
+ * which are face is unchanged, and the oracle test still pins that. What changed
+ * is the shading, and it changed in two ways:
+ *
+ *   - The traced art gave every octagon the same tone, so three of the four
+ *     swatches were doing nothing (one drew the corner square, one drew a bevel,
+ *     and one was unreachable). Octagons are now dealt across the ramp by cell,
+ *     like every other paving here.
+ *   - Its inner chamfer ring was a second, darker line just inside the outline.
+ *     A one-pixel ring is not a face, and with the octagons dealt across the ramp
+ *     it would collide with whichever face landed on its tone. It is merged into
+ *     the face, which is what leaves the outline exactly one pixel wide.
+ *
+ * The corner square is a tile in its own right, so it takes a face rank too — the
+ * last one, fixed, with the octagons dealing across the other three. That split is
+ * forced, not a preference: a square sits where four cells meet, so its four
+ * neighbours cover all four parities at once. Dealt from the same pool of four it
+ * would ALWAYS match one of them and merge into it, whatever offset it was given
+ * — measured at 16px, where the square landed on the same shade as the octagon
+ * up and to its left.
+ *
+ * Three ranks over a 2x2 parity means one of them is used twice. It is placed on
+ * the DIAGONAL pair, which in a square lattice of octagons meet only at the
+ * corner the small square occupies, so no two same-toned faces ever share an edge.
+ */
+const OCT_FACES: readonly number[] = [0, 1, 2, 0];
+export function octagonalRank(x: number, y: number, n: number, seed: number = 0): number {
   const S = 32 / n;
   const H = S / 2;
-  const dx = Math.abs(wrapN(x - (H - 1) + H, S) - H);
-  const dy = Math.abs(wrapN(y - (H - 1) + H, S) - H);
+  // The lattice is offset by one pixel — see the note above on why the cell
+  // centre sits at S/2 - 1 — so the cell a pixel belongs to is indexed off x + 1.
+  const ux = wrapN(x + 1, S);
+  const uy = wrapN(y + 1, S);
+  const dx = Math.abs(ux - H);
+  const dy = Math.abs(uy - H);
   // Where the chamfer cuts the corner, in the same units as dx + dy. 0.6875 is
   // 22/32, read off the traced table.
   const C = Math.round(S * 0.6875);
   const m = dx + dy;
-  if (dx === H || dy === H) return m <= C ? 0 : 1;
-  if (m > C) return 1;      // the square between the octagons
-  if (m === C) return 0;    // outer chamfer line
-  if (m === C - 1) return 3;  // inner chamfer line
-  return 4;                 // octagon face
+  const face = () => {
+    const cx = wrapN(Math.floor((x + 1) / S), n);
+    const cy = wrapN(Math.floor((y + 1) / S), n);
+    if (seed === 0) return OCT_FACES[wrapN(cx, 2) + 2 * wrapN(cy, 2)];
+    // Three ranks to draw from, the same three the parity deal uses, so the dice
+    // reshuffles the octagons without ever reaching the corner square's own rank.
+    return Math.floor(hash01(cx, cy, seed ^ 0x9e3779b9) * 3);
+  };
+  const SQUARE_RANK = FACE_RANKS - 1;
+  if (dx === H || dy === H) return m <= C ? JOINT_RANK : SQUARE_RANK;
+  if (m > C) return SQUARE_RANK;   // the square between the octagons
+  if (m === C) return JOINT_RANK;  // the outline
+  return face();                   // octagon face, bevel ring included
 }
 
 /**
@@ -1027,23 +1406,35 @@ export function textureShadeAt(
 ): number {
   if (texture === 'none' || amount <= 0 || shades < 1) return 0;
   const s = (seed ^ TEXTURE_SALT) >>> 0;
+  const geo = Math.max(1, geoScale);
   // Baked art, not a field: it already knows which tone each pixel is.
   if (texture === 'weave') return bakedShade(WEAVE, 16, x, y, s, amount, shades);
   if (texture === 'paving') return bakedShade(PAVING, 32, x, y, s, amount, shades);
   if (texture === 'paving3') return bakedShade(PAVING3, 32, x, y, s, amount, shades);
   if (texture === 'paving5') return bakedShade(PAVING5, 32, x, y, s, amount, shades);
-  if (texture === 'stone_floor') return bakedShade(STONE_FLOOR, 32, x, y, s, amount, shades);
-  if (texture === 'breeze_block') return bakedShade(BREEZE_BLOCK, 32, x, y, s, amount, shades);
-  if (texture === 'brick_wall') return bakedShade(BRICK_WALL, 32, x, y, s, amount, shades);
-  if (texture === 'cobbles2') return bakedShade(COBBLES2, 16, x, y, s, amount, shades);
-  if (texture === 'brick_floor') return bakedShade(BRICK_FLOOR, 16, x, y, s, amount, shades);
-  if (texture === 'hexagon') return bakedShade(HEXAGON, 32, x, y, s, amount, shades);
+  // The five whose mortar was traced onto rank 0 pass `true` and get the ladder
+  // rotated, so their joint lands on the top shade like everything else here.
+  const rot = JOINT_AT_RANK_0.includes(texture);
+  if (texture === 'stone_floor') return bakedShade(STONE_FLOOR, 32, x, y, s, amount, shades, rot);
+  if (texture === 'breeze_block') return bakedShade(BREEZE_BLOCK, 32, x, y, s, amount, shades, rot);
+  if (texture === 'brick_wall') return bakedShade(BRICK_WALL, 32, x, y, s, amount, shades, rot);
+  if (texture === 'cobbles2') return bakedShade(COBBLES2, 16, x, y, s, amount, shades, rot);
+  if (texture === 'brick_floor') return bakedShade(BRICK_FLOOR, 16, x, y, s, amount, shades, rot);
+  // Generated, with the traced art's hand-placed edge tips merged into the
+  // outline. Seeded off the salted seed like the other generated pavings, which
+  // keeps the phase the traced table was rendered at.
+  if (texture === 'hexagon') return geoShade(hexagonRank, x, y, s, amount, shades, geo);
+  if (texture === 'brick_bond') return geoShade(brickBondRank, x, y, s, amount, shades, geo);
   // Generated rather than traced, and byte-identical to the tables they replaced
   // at geoScale 1 — see the oracle test.
-  const geo = Math.max(1, geoScale);
   if (texture === 'isometric') return geoShade(isometricRank, x, y, seed, amount, shades, geo);
   if (texture === 'isometric_grid') return geoShade(isometricGridRank, x, y, seed, amount, shades, geo);
-  if (texture === 'octagonal') return geoShade(octagonalRank, x, y, s, amount, shades, geo);
+  // Phased off the RAW seed, like square and isometric and unlike the traced
+  // tables: its faces are dealt by cell parity at seed 0, and the salt is not 0,
+  // so routing it salted meant the deterministic deal could never be reached from
+  // the UI — seed 0 landed on the hash path and the grid sat at the salt's (17,29)
+  // offset instead of on the tile.
+  if (texture === 'octagonal') return geoShade(octagonalRank, x, y, seed, amount, shades, geo);
   // reads as a bug even though every seam still lines up.
   if (texture === 'square') return geoShade(squareRank, x, y, seed, amount, shades, geo);
   if (texture === 'water') {
@@ -1056,7 +1447,16 @@ export function textureShadeAt(
   }
   if (texture === 'field') return bakedShade(FIELD, 32, x, y, s, amount, shades);
   if (texture === 'rubble') return bakedShade(RUBBLE, 32, x, y, s, amount, shades);
-  if (texture === 'nonslip') return bakedShade(NONSLIP, 32, x, y, s, amount, shades);
+  // Generated, and byte-identical to the table it replaced at its natural 8px.
+  // Seeded off the SALTED seed like the other generated pavings, which is what
+  // keeps the phase the traced table was rendered at.
+  //
+  // The only texture that reads `amount` as GEOMETRY rather than as a ramp scale:
+  // it goes into the dash length and a flat 1 goes to `geoShade`, so the four
+  // shades stay exactly where the pickers put them at every density.
+  if (texture === 'nonslip') {
+    return geoShade((gx, gy, gn) => nonslipRank(gx, gy, gn, amount), x, y, s, 1, shades, geo);
+  }
   // Cells name their shade too — see cellsShade for why the scatter path below
   // flattened them into a wireframe.
   if (texture === 'cells') return cellsShade(x, y, s, Math.max(MIN_CELL_SCALE, Math.min(MAX_CELL_SCALE, cellScale)), amount, shades);
@@ -1088,14 +1488,19 @@ export function usedTextureShades(
   shades: number = DEFAULT_TEXTURE_SHADES,
   cellScale: number = DEFAULT_CELL_SCALE,
   rippleScale: number = DEFAULT_RIPPLE_SCALE,
-  geoScale: number = DEFAULT_GEO_SCALE
+  geoScale: number = DEFAULT_GEO_SCALE,
+  // Scanned at the actual seed, not at 0. The generated pavings deal their faces
+  // by cell parity at seed 0 and by hash otherwise, so which shades are reachable
+  // genuinely moves with the dice — a lattice holding three faces lands on three
+  // of the four shades, but not always the same three.
+  seed: number = DEFAULT_TEXTURE_SEED
 ): Set<number> {
   const used = new Set<number>();
   if (texture === 'none') return used;
   const p = texturePeriod(texture);
   for (let y = 0; y < p; y++) {
     for (let x = 0; x < p; x++) {
-      used.add(textureShadeAt(texture, x, y, 0, amount, shades, cellScale, rippleScale, geoScale));
+      used.add(textureShadeAt(texture, x, y, seed, amount, shades, cellScale, rippleScale, geoScale));
     }
   }
   return used;

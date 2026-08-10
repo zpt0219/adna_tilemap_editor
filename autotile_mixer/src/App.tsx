@@ -30,7 +30,9 @@ import {
   MIN_TEXTURE_SHADES, MAX_TEXTURE_SHADES, DEFAULT_TEXTURE_SEED, WATER_DOT_COLOUR,
   DEFAULT_CELL_SCALE, MIN_CELL_SCALE, MAX_CELL_SCALE,
   DEFAULT_RIPPLE_SCALE, MIN_RIPPLE_SCALE, MAX_RIPPLE_SCALE,
-  DEFAULT_GEO_SCALE, GEO_SCALES, textureUsesGeoScale, type TextureId,
+  DEFAULT_GEO_SCALE, geoScalesFor, naturalGeoScale, textureUsesGeoScale, textureUsesAmount,
+  naturalTextureAmount, DEFAULT_TEXTURE_AMOUNT,
+  type TextureId,
 } from './utils/patternTexture';
 
 /**
@@ -195,8 +197,8 @@ export default function App() {
   // grass wants a different field from the grass.
   const [textureAlgoA, setTextureAlgoA] = useState<TextureId>(DEFAULT_TEXTURE);
   const [textureAlgoB, setTextureAlgoB] = useState<TextureId>(DEFAULT_TEXTURE);
-  const [textureAmountA, setTextureAmountA] = useState(0.4);
-  const [textureAmountB, setTextureAmountB] = useState(0.4);
+  const [textureAmountA, setTextureAmountA] = useState(DEFAULT_TEXTURE_AMOUNT);
+  const [textureAmountB, setTextureAmountB] = useState(DEFAULT_TEXTURE_AMOUNT);
   const [textureShadesA, setTextureShadesA] = useState(DEFAULT_TEXTURE_SHADES);
   const [textureShadesB, setTextureShadesB] = useState(DEFAULT_TEXTURE_SHADES);
   const [textureSeedA, setTextureSeedA] = useState(DEFAULT_TEXTURE_SEED);
@@ -222,6 +224,11 @@ export default function App() {
     });
   const effectiveTextureShadesA = textureAlgoA === 'water' ? 2 : textureShadesA;
   const effectiveTextureShadesB = textureAlgoB === 'water' ? 2 : textureShadesB;
+  // A paving is painted at full strength whatever the slider was last left on:
+  // the control is hidden for those, and a hidden control must not still be
+  // acting. See textureUsesAmount for what the slider was doing to them.
+  const effectiveTextureAmountA = textureUsesAmount(textureAlgoA) ? textureAmountA : 1;
+  const effectiveTextureAmountB = textureUsesAmount(textureAlgoB) ? textureAmountB : 1;
   // Memoised, not built inline: the render effects key off object identity, so
   // a fresh object every render would repaint all 48 tiles on every keystroke.
   const textureOpts = useMemo(() => {
@@ -237,8 +244,8 @@ export default function App() {
     return {
       algoA: textureAlgoA,
       algoB: textureAlgoB,
-      amountA: textureAmountA,
-      amountB: textureAmountB,
+      amountA: effectiveTextureAmountA,
+      amountB: effectiveTextureAmountB,
       shadesA: effectiveTextureShadesA,
       shadesB: effectiveTextureShadesB,
       seedA: textureSeedA,
@@ -254,7 +261,7 @@ export default function App() {
       rampA: textureRampFor('terrainA', textureAlgoA, effectiveTextureShadesA),
       rampB: textureRampFor('terrainB', textureAlgoB, effectiveTextureShadesB),
     };
-  }, [textureAlgoA, textureAlgoB, textureAmountA, textureAmountB,
+  }, [textureAlgoA, textureAlgoB, effectiveTextureAmountA, effectiveTextureAmountB,
        effectiveTextureShadesA, effectiveTextureShadesB,
        textureSeedA, textureSeedB, cellScaleA, cellScaleB,
        rippleScaleA, rippleScaleB, geoScaleA, geoScaleB, customTexHex]);
@@ -369,11 +376,11 @@ export default function App() {
 
   /** Which texture shades each terrain is actually painting right now. */
   const reachable = useMemo(() => ({
-    terrainA: usedTextureShades(textureAlgoA, textureAmountA, effectiveTextureShadesA, cellScaleA, rippleScaleA, geoScaleA),
-    terrainB: usedTextureShades(textureAlgoB, textureAmountB, effectiveTextureShadesB, cellScaleB, rippleScaleB, geoScaleB),
-  }), [textureAlgoA, textureAmountA, textureAlgoB, textureAmountB,
+    terrainA: usedTextureShades(textureAlgoA, effectiveTextureAmountA, effectiveTextureShadesA, cellScaleA, rippleScaleA, geoScaleA, textureSeedA),
+    terrainB: usedTextureShades(textureAlgoB, effectiveTextureAmountB, effectiveTextureShadesB, cellScaleB, rippleScaleB, geoScaleB, textureSeedB),
+  }), [textureAlgoA, effectiveTextureAmountA, textureAlgoB, effectiveTextureAmountB,
     effectiveTextureShadesA, effectiveTextureShadesB, cellScaleA, cellScaleB, rippleScaleA, rippleScaleB,
-    geoScaleA, geoScaleB]);
+    geoScaleA, geoScaleB, textureSeedA, textureSeedB]);
 
   // Custom noise colors state (null = derived from band ramp)
   const [customNoiseHex, setCustomNoiseHex] = useState<{ b?: string; edge?: string; a?: string } | null>(null);
@@ -1219,7 +1226,20 @@ export default function App() {
                 <select
                   className="text-input"
                   value={algo}
-                  onChange={(e) => setAlgo(e.target.value as TextureId)}
+                  onChange={(e) => {
+                    const next = e.target.value as TextureId;
+                    setAlgo(next);
+                    // Open every paving at the size its art was drawn at. The
+                    // control is shared, and nonslip is an 8px motif while the
+                    // rest are 32px — inheriting the previous pick would show it
+                    // four times coarser than the texture it is meant to be.
+                    setGeoScale(naturalGeoScale(next));
+                    // Same reasoning for the density, which nonslip reads as its
+                    // dash length: inheriting a scatter field's 0.4 would open it
+                    // as stubs. Every other texture keeps the shared default, so
+                    // this only moves when it has to.
+                    set(naturalTextureAmount(next));
+                  }}
                 >
                   {TEXTURE_GROUPS.map((g) => (
                     <optgroup key={g.en} label={lang === 'zh' ? g.zh : g.en}>
@@ -1247,15 +1267,16 @@ export default function App() {
                     />
                   </>)}
 
-                  {/* Motif size for the two generated pavings. Named sizes, not
-                      a slider: only three tile the 32px sheet without leaving a
-                      motif on a fractional pixel. */}
+                  {/* Motif size. Named sizes, not a slider: only the divisors of
+                      32 that leave the motif on whole pixels are usable, and the
+                      list is per texture — nonslip's motif is built on an 8px
+                      cell, so it scales up only. */}
                   {textureUsesGeoScale(algo) && (<>
                     <div className="slider-header" style={{ margin: '8px 0 4px' }}>
                       <span className="slider-name" style={{ fontSize: '11px' }}>{geoScaleLabel}</span>
                     </div>
                     <div className="type-tabs">
-                      {GEO_SCALES.map((g) => (
+                      {geoScalesFor(algo).map((g) => (
                         <button
                           key={g.id}
                           className={`tab-btn ${geoScaleVal === g.id ? 'active' : ''}`}
@@ -1284,21 +1305,27 @@ export default function App() {
                     />
                   </>)}
 
-                  <div className="slider-header" style={{ margin: '8px 0 4px' }}>
-                    <span className="slider-name">{amountLabel}</span>
-                    <span className="slider-val">
-                      {val === 0 ? t.noiseOff : `${Math.round(val * 100)}%`}
-                    </span>
-                  </div>
-                  <input
-                    type="range"
-                    className="slider-input"
-                    style={{ width: '100%' }}
-                    min={0} max={1} step={0.05}
-                    value={val}
-                    onChange={(e) => set(parseFloat(e.target.value))}
-                    onDragStart={(e) => e.preventDefault()}
-                  />
+                  {/* Hidden on the pavings. There it did not thin anything — it
+                      quantised the shade ladder, which merged the four picked
+                      colours into two and could drop the grout onto the same
+                      colour as a tile. See textureUsesAmount. */}
+                  {textureUsesAmount(algo) && (<>
+                    <div className="slider-header" style={{ margin: '8px 0 4px' }}>
+                      <span className="slider-name">{amountLabel}</span>
+                      <span className="slider-val">
+                        {val === 0 ? t.noiseOff : `${Math.round(val * 100)}%`}
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      className="slider-input"
+                      style={{ width: '100%' }}
+                      min={0} max={1} step={0.05}
+                      value={val}
+                      onChange={(e) => set(parseFloat(e.target.value))}
+                      onDragStart={(e) => e.preventDefault()}
+                    />
+                  </>)}
 
                   <div className="slider-header" style={{ margin: '8px 0 4px' }}>
                     <span className="slider-name" style={{ fontSize: '11px' }}>
