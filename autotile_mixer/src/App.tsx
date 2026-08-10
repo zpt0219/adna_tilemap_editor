@@ -235,13 +235,19 @@ export default function App() {
   // acting. See textureUsesAmount for what the slider was doing to them.
   const effectiveTextureAmountA = textureUsesAmount(textureAlgoA) ? textureAmountA : 1;
   const effectiveTextureAmountB = textureUsesAmount(textureAlgoB) ? textureAmountB : 1;
+
+  const parseCustomRamp = (hexes: readonly (string | null | undefined)[] | null | undefined, shadeCount: number) => {
+    if (!hexes || !hexes.some(Boolean)) return undefined;
+    const sliced = hexes.slice(0, shadeCount + 1);
+    if (!sliced.some(Boolean)) return undefined;
+    return sliced.map((h) => (h ? parseHexColour(h) : undefined));
+  };
+
   // Memoised, not built inline: the render effects key off object identity, so
   // a fresh object every render would repaint all 48 tiles on every keystroke.
   const textureOpts = useMemo(() => {
     const textureRampFor = (role: 'terrainA' | 'terrainB', algo: TextureId, shadeCount: number) => {
-      const custom = customTexHex[role]?.length === shadeCount + 1
-        ? customTexHex[role]?.map((h) => (h ? parseHexColour(h) : undefined))
-        : undefined;
+      const custom = parseCustomRamp(customTexHex[role], shadeCount);
       if (algo !== 'water') return custom;
       const waterRamp = custom ? [...custom] : new Array(3).fill(undefined);
       waterRamp[2] ??= WATER_DOT_COLOUR;
@@ -368,9 +374,7 @@ export default function App() {
     const build = (role: 'terrainA' | 'terrainB') => {
       const algo = role === 'terrainA' ? textureAlgoA : textureAlgoB;
       const shadeCount = role === 'terrainA' ? effectiveTextureShadesA : effectiveTextureShadesB;
-      const custom = customTexHex[role]?.length === shadeCount + 1
-        ? customTexHex[role]?.map((h) => (h ? parseHexColour(h) : undefined))
-        : undefined;
+      const custom = parseCustomRamp(customTexHex[role], shadeCount);
       if (algo === 'water') {
         const waterRamp = custom ? [...custom] : new Array(3).fill(undefined);
         waterRamp[2] ??= WATER_DOT_COLOUR;
@@ -1374,7 +1378,11 @@ export default function App() {
                       colour as a tile. See textureUsesAmount. */}
                   {textureUsesAmount(algo) && (<>
                     <div className="slider-header" style={{ margin: '8px 0 4px' }}>
-                      <span className="slider-name">{amountLabel}</span>
+                      <span className="slider-name">
+                        {algo === 'nonslip'
+                          ? (role === 'terrainA' ? t.textureDashLengthA : t.textureDashLengthB)
+                          : amountLabel}
+                      </span>
                       <span className="slider-val">
                         {val === 0 ? t.noiseOff : `${Math.round(val * 100)}%`}
                       </span>
