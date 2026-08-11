@@ -8,7 +8,7 @@ import {
 } from './utils/blob47';
 import {
   DEFAULT_ROLE_COLOURS, DEFAULT_TEXTURE_COLOURS, paintPatternTileRGBA, parseHexColour,
-  patternRamp, toHexColour, type RoleColours,
+  patternRamp, toHexColour, type RoleColours, type PaintOptions,
 } from './utils/patternPaint';
 import {
   PATTERN_GROUPS, DEFAULT_PATTERN, PATTERN_OFFSET_RANGE, RESEEDABLE_PATTERNS,
@@ -35,7 +35,7 @@ import {
   type TextureId,
 } from './utils/patternTexture';
 import { cellsAlongSegment, type GridCell } from './utils/playgroundPaint';
-import { type Recipe, BUILTIN_PRESETS, type PresetItem, sanitizeRecipe } from './utils/recipe';
+import { type Recipe, BUILTIN_PRESETS, type PresetItem, sanitizeRecipe, DEFAULT_RECIPE } from './utils/recipe';
 import { encodeRecipe, decodeRecipe } from './utils/recipeCodec';
 import { buildSheetExportData, downloadJsonFile } from './utils/exportSheet';
 
@@ -152,6 +152,128 @@ function ResetLink({ label, title, onClick }: {
     <button className="btn-action btn-secondary btn-reset" onClick={onClick} title={title}>
       ↺ {label}
     </button>
+  );
+}
+
+/** A 2x2 representative tile preview canvas rendered from a Recipe object. */
+function RecipePreviewCanvas({ recipe, size = 140 }: { recipe: Recipe; size?: number }) {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const r = sanitizeRecipe(recipe);
+    const ts = r.tileSize || 32;
+    const roleColours: RoleColours = {
+      terrainA: parseHexColour(r.roleHex.terrainA) ?? DEFAULT_ROLE_COLOURS.terrainA,
+      terrainB: parseHexColour(r.roleHex.terrainB) ?? DEFAULT_ROLE_COLOURS.terrainB,
+      edge: parseHexColour(r.roleHex.edge) ?? DEFAULT_ROLE_COLOURS.edge,
+    };
+
+    const fitRamp = (hexes: readonly (string | undefined | null)[] | null, shades: number) => {
+      if (!hexes || hexes.length !== shades + 1) return undefined;
+      return hexes.map((h) => (h ? parseHexColour(h) : undefined));
+    };
+
+    const fitRampRGB = (hexes: readonly (string | undefined | null)[] | null, steps: number) => {
+      if (!hexes || hexes.length !== steps + 1) return undefined;
+      const result: import('./utils/patternPaint').RGB[] = [];
+      for (const h of hexes) {
+        const parsed = h ? parseHexColour(h) : undefined;
+        if (!parsed) return undefined;
+        result.push(parsed);
+      }
+      return result;
+    };
+
+    const opts: PaintOptions = {
+      tileSize: ts,
+      offsetPx: (r.bandBias / 100) * (ts / 2),
+      bandSteps: r.bandSteps,
+      hardEdgeB: r.hardEdgeB,
+      edgeSeed: r.edgeSeed,
+      outlineWidth: r.outlineWidth,
+      noises: r.patternNoise,
+      noiseSeed: r.patternNoiseSeed,
+      noiseStrength: r.patternNoiseStrength,
+      ribbon: {
+        algo: r.ribbonAlgo,
+        amount: r.ribbonAmount,
+        period: r.ribbonPeriod,
+        shades: r.ribbonShades,
+        seed: r.edgeSeed,
+        invert: r.ribbonInvert,
+        ramp: fitRamp(r.customRibbonHex, r.ribbonShades),
+      },
+      texture: {
+        algoA: r.textureAlgoA,
+        algoB: r.textureAlgoB,
+        amountA: r.textureAmountA,
+        amountB: r.textureAmountB,
+        shadesA: r.textureShadesA,
+        shadesB: r.textureShadesB,
+        seedA: r.textureSeedA,
+        seedB: r.textureSeedB,
+        cellScaleA: r.cellScaleA,
+        cellScaleB: r.cellScaleB,
+        rippleScaleA: r.rippleScaleA,
+        rippleScaleB: r.rippleScaleB,
+        geoScaleA: r.geoScaleA,
+        geoScaleB: r.geoScaleB,
+        rampA: fitRamp(r.customTexHex.terrainA, r.textureShadesA),
+        rampB: fitRamp(r.customTexHex.terrainB, r.textureShadesB),
+      },
+      ramp: fitRampRGB(r.customShadesHex, r.bandSteps),
+      transparentB: r.transparentB,
+    };
+
+    const masks = [
+      [255, 15],
+      [23, 0],
+    ];
+
+    const fullBuffer = new Uint8ClampedArray(ts * 2 * ts * 2 * 4);
+    for (let row = 0; row < 2; row++) {
+      for (let col = 0; col < 2; col++) {
+        const mask = masks[row][col];
+        const tileRgba = paintPatternTileRGBA(r.patternId, mask, roleColours, opts);
+        for (let y = 0; y < ts; y++) {
+          for (let x = 0; x < ts; x++) {
+            const srcIdx = (y * ts + x) * 4;
+            const destX = col * ts + x;
+            const destY = row * ts + y;
+            const destIdx = (destY * (ts * 2) + destX) * 4;
+            fullBuffer[destIdx] = tileRgba[srcIdx];
+            fullBuffer[destIdx + 1] = tileRgba[srcIdx + 1];
+            fullBuffer[destIdx + 2] = tileRgba[srcIdx + 2];
+            fullBuffer[destIdx + 3] = tileRgba[srcIdx + 3];
+          }
+        }
+      }
+    }
+
+    const imgData = new ImageData(fullBuffer, ts * 2, ts * 2);
+    canvas.width = ts * 2;
+    canvas.height = ts * 2;
+    ctx.putImageData(imgData, 0, 0);
+  }, [recipe]);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      style={{
+        width: `${size}px`,
+        height: `${size}px`,
+        imageRendering: 'pixelated',
+        borderRadius: '8px',
+        border: '1px solid var(--line)',
+        boxShadow: '0 4px 14px rgba(0,0,0,0.5)',
+        background: '#0a0b0e',
+      }}
+    />
   );
 }
 
@@ -532,6 +654,9 @@ export default function App() {
 
   const [selectedPresetId, setSelectedPresetId] = useState<string>('builtin_waterfront');
 
+  const [pendingSavedRecipe, setPendingSavedRecipe] = useState<Recipe | null>(null);
+  const [showRestoreModal, setShowRestoreModal] = useState<boolean>(false);
+
   useEffect(() => {
     if (window.location.hash.startsWith('#r=')) {
       const hashStr = window.location.hash.slice(3);
@@ -548,7 +673,11 @@ export default function App() {
       if (rawSaved) {
         const parsed = JSON.parse(rawSaved);
         if (parsed && parsed.recipe) {
-          applyRecipe(parsed.recipe);
+          const cleanSaved = sanitizeRecipe(parsed.recipe);
+          if (JSON.stringify(cleanSaved) !== JSON.stringify(DEFAULT_RECIPE)) {
+            setPendingSavedRecipe(cleanSaved);
+            setShowRestoreModal(true);
+          }
         }
       }
     } catch {}
@@ -1952,6 +2081,54 @@ export default function App() {
           </>
         );
       })()}
+      {showRestoreModal && pendingSavedRecipe && (
+        <>
+          <div className="texture-picker-backdrop" onClick={() => setShowRestoreModal(false)} />
+          <div className="restore-session-modal" role="dialog" aria-modal="true">
+            <div className="restore-modal-header">
+              <h3>{t.restoreTitle}</h3>
+            </div>
+            <div className="restore-modal-body">
+              <div className="restore-preview-box">
+                <RecipePreviewCanvas recipe={pendingSavedRecipe} size={140} />
+                <div className="restore-preview-meta">
+                  <span className="meta-tag">{t.savedCanvasPreview}</span>
+                  <div className="meta-colors">
+                    <span className="color-dot" style={{ background: pendingSavedRecipe.roleHex.terrainA }} title="Terrain A" />
+                    <span className="color-dot" style={{ background: pendingSavedRecipe.roleHex.edge }} title="Outline Edge" />
+                    <span className="color-dot" style={{ background: pendingSavedRecipe.roleHex.terrainB }} title="Terrain B" />
+                  </div>
+                </div>
+              </div>
+              <p className="restore-desc">{t.restoreDesc}</p>
+            </div>
+            <div className="restore-modal-footer">
+              <button
+                type="button"
+                className="btn-action btn-secondary"
+                onClick={() => {
+                  setShowRestoreModal(false);
+                  setPendingSavedRecipe(null);
+                }}
+              >
+                {t.startFreshBtn}
+              </button>
+              <button
+                type="button"
+                className="btn-action btn-primary"
+                onClick={() => {
+                  applyRecipe(pendingSavedRecipe);
+                  setSelectedPresetId('custom');
+                  setShowRestoreModal(false);
+                  setPendingSavedRecipe(null);
+                }}
+              >
+                {t.restoreBtn}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
       {toastMsg && <div className="toast-popup">{toastMsg}</div>}
     </div>
   );
