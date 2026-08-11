@@ -10,6 +10,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = __dirname;
 const PORT = 3000;
 const APPS = ['reroll', 'tagger', 'refiner', 'autotile_mixer', 'pixel_editor'];
+const STATIC_ARCHIVES = ['wang_tiles'];
+const ROUTED_DIRECTORIES = [...APPS, ...STATIC_ARCHIVES];
 
 const MIME_TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -87,9 +89,9 @@ const server = http.createServer((req, res) => {
   pathname = path.normalize(pathname).replace(/\\/g, '/').replace(/^(\.\.[\/\\])+/, '');
 
   // Redirect /app to /app/ to fix relative asset URLs
-  for (const app of APPS) {
-    if (pathname === `/${app}`) {
-      res.writeHead(301, { 'Location': `/${app}/` });
+  for (const directory of ROUTED_DIRECTORIES) {
+    if (pathname === `/${directory}`) {
+      res.writeHead(301, { 'Location': `/${directory}/` });
       res.end();
       return;
     }
@@ -112,6 +114,16 @@ const server = http.createServer((req, res) => {
     }
     
     if (!matchedApp) {
+      for (const archive of STATIC_ARCHIVES) {
+        if (pathname.startsWith(`/${archive}/`)) {
+          const relativePath = pathname.substring(`/${archive}/`.length);
+          filePath = path.join(ROOT, archive, relativePath);
+          break;
+        }
+      }
+    }
+
+    if (!filePath) {
       // Check if it's a file in the ROOT server folder
       filePath = path.join(ROOT, 'server', pathname);
     }

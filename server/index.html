@@ -21,9 +21,13 @@
     h1 { font-size: 34px; margin: 0 0 10px; letter-spacing: .5px; }
     .tag { color: var(--accent); font-weight: 600; }
     .sub { color: var(--muted); margin: 0; }
-    .cards { display: grid; gap: 18px; grid-template-columns: 1fr; width: 100%; max-width: 1080px; }
-    @media (min-width: 640px) { .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-    @media (min-width: 960px) { .cards { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+    .cards {
+      display: grid;
+      gap: 18px;
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+      width: 100%;
+      max-width: 1080px;
+    }
     a.card {
       display: block; text-decoration: none; color: inherit;
       background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
