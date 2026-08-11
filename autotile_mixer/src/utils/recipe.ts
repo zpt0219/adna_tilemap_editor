@@ -78,7 +78,7 @@ export const DEFAULT_RECIPE: Recipe = {
   bandBias: 0,
   customShadesHex: null,
 
-  patternNoise: ['white', 'ordered'],
+  patternNoise: [],
   patternNoiseSeed: 1234,
   patternNoiseStrength: 0.15,
 
@@ -117,58 +117,6 @@ export const BUILTIN_PRESETS: PresetItem[] = [
     name: '水岸（默认）',
     isBuiltin: true,
     recipe: DEFAULT_RECIPE,
-  },
-  {
-    id: 'builtin_coastline',
-    name: '海岸线',
-    isBuiltin: true,
-    recipe: {
-      ...DEFAULT_RECIPE,
-      roleHex: {
-        terrainA: '#2f6fb5',
-        terrainB: '#6bb03a',
-        edge: '#e8d5a0',
-      },
-      patternId: 'coast',
-      textureAlgoA: 'ripple',
-      textureAlgoB: 'cells',
-      textureAmountA: 0.4,
-      textureAmountB: 0.3,
-    },
-  },
-  {
-    id: 'builtin_magma',
-    name: '岩浆',
-    isBuiltin: true,
-    recipe: {
-      ...DEFAULT_RECIPE,
-      roleHex: {
-        terrainA: '#d94a1f',
-        terrainB: '#3a3540',
-        edge: '#f2b33d',
-      },
-      patternId: 'jagged',
-      textureAlgoA: 'cells',
-      textureAlgoB: 'white',
-      textureAmountA: 0.35,
-      textureAmountB: 0.25,
-    },
-  },
-  {
-    id: 'builtin_snowfield',
-    name: '雪原',
-    isBuiltin: true,
-    recipe: {
-      ...DEFAULT_RECIPE,
-      roleHex: {
-        terrainA: '#dfe8f0',
-        terrainB: '#5a6b7d',
-        edge: '#9fb4c9',
-      },
-      patternId: 'billow',
-      textureAlgoB: 'blue',
-      textureAmountB: 0.3,
-    },
   },
 ];
 
