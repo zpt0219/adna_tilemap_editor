@@ -155,8 +155,12 @@ function ResetLink({ label, title, onClick }: {
   );
 }
 
-/** A 2x2 representative tile preview canvas rendered from a Recipe object. */
-function RecipePreviewCanvas({ recipe, size = 140 }: { recipe: Recipe; size?: number }) {
+/** Render the full 6x8 Blob47 autotile sheet (192x256) rendered from a Recipe object. */
+function RecipePreviewCanvas({ recipe, displayWidth = 192, displayHeight = 256 }: {
+  recipe: Recipe;
+  displayWidth?: number;
+  displayHeight?: number;
+}) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   useEffect(() => {
@@ -230,47 +234,62 @@ function RecipePreviewCanvas({ recipe, size = 140 }: { recipe: Recipe; size?: nu
       transparentB: r.transparentB,
     };
 
-    const masks = [
-      [255, 15],
-      [23, 0],
-    ];
+    const sheetWidth = BLOB47_COLS * ts;
+    const sheetHeight = BLOB47_ROWS * ts;
+    const fullBuffer = new Uint8ClampedArray(sheetWidth * sheetHeight * 4);
 
-    const fullBuffer = new Uint8ClampedArray(ts * 2 * ts * 2 * 4);
-    for (let row = 0; row < 2; row++) {
-      for (let col = 0; col < 2; col++) {
-        const mask = masks[row][col];
-        const tileRgba = paintPatternTileRGBA(r.patternId, mask, roleColours, opts);
-        for (let y = 0; y < ts; y++) {
-          for (let x = 0; x < ts; x++) {
-            const srcIdx = (y * ts + x) * 4;
-            const destX = col * ts + x;
-            const destY = row * ts + y;
-            const destIdx = (destY * (ts * 2) + destX) * 4;
-            fullBuffer[destIdx] = tileRgba[srcIdx];
-            fullBuffer[destIdx + 1] = tileRgba[srcIdx + 1];
-            fullBuffer[destIdx + 2] = tileRgba[srcIdx + 2];
-            fullBuffer[destIdx + 3] = tileRgba[srcIdx + 3];
-          }
+    for (let i = 0; i < BLOB47_LAYOUT.length; i++) {
+      const mask = BLOB47_LAYOUT[i];
+      const col = i % BLOB47_COLS;
+      const row = Math.floor(i / BLOB47_COLS);
+      const tileRgba = paintPatternTileRGBA(r.patternId, mask, roleColours, opts);
+
+      for (let y = 0; y < ts; y++) {
+        for (let x = 0; x < ts; x++) {
+          const srcIdx = (y * ts + x) * 4;
+          const destX = col * ts + x;
+          const destY = row * ts + y;
+          const destIdx = (destY * sheetWidth + destX) * 4;
+          fullBuffer[destIdx] = tileRgba[srcIdx];
+          fullBuffer[destIdx + 1] = tileRgba[srcIdx + 1];
+          fullBuffer[destIdx + 2] = tileRgba[srcIdx + 2];
+          fullBuffer[destIdx + 3] = tileRgba[srcIdx + 3];
         }
       }
     }
 
-    const imgData = new ImageData(fullBuffer, ts * 2, ts * 2);
-    canvas.width = ts * 2;
-    canvas.height = ts * 2;
+    const imgData = new ImageData(fullBuffer, sheetWidth, sheetHeight);
+    canvas.width = sheetWidth;
+    canvas.height = sheetHeight;
     ctx.putImageData(imgData, 0, 0);
+
+    // Subtle grid overlay
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
+    ctx.lineWidth = 1;
+    for (let row = 1; row < BLOB47_ROWS; row++) {
+      ctx.beginPath();
+      ctx.moveTo(0, row * ts);
+      ctx.lineTo(sheetWidth, row * ts);
+      ctx.stroke();
+    }
+    for (let col = 1; col < BLOB47_COLS; col++) {
+      ctx.beginPath();
+      ctx.moveTo(col * ts, 0);
+      ctx.lineTo(col * ts, sheetHeight);
+      ctx.stroke();
+    }
   }, [recipe]);
 
   return (
     <canvas
       ref={canvasRef}
       style={{
-        width: `${size}px`,
-        height: `${size}px`,
+        width: `${displayWidth}px`,
+        height: `${displayHeight}px`,
         imageRendering: 'pixelated',
         borderRadius: '8px',
         border: '1px solid var(--line)',
-        boxShadow: '0 4px 14px rgba(0,0,0,0.5)',
+        boxShadow: '0 6px 18px rgba(0,0,0,0.6)',
         background: '#0a0b0e',
       }}
     />
@@ -2090,7 +2109,7 @@ export default function App() {
             </div>
             <div className="restore-modal-body">
               <div className="restore-preview-box">
-                <RecipePreviewCanvas recipe={pendingSavedRecipe} size={140} />
+                <RecipePreviewCanvas recipe={pendingSavedRecipe} displayWidth={192} displayHeight={256} />
                 <div className="restore-preview-meta">
                   <span className="meta-tag">{t.savedCanvasPreview}</span>
                   <div className="meta-colors">
