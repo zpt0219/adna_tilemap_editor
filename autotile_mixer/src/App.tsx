@@ -219,6 +219,18 @@ export default function App() {
   // Motif size for the two generated geometric pavings.
   const [geoScaleA, setGeoScaleA] = useState(DEFAULT_GEO_SCALE);
   const [geoScaleB, setGeoScaleB] = useState(DEFAULT_GEO_SCALE);
+  const [openTexturePicker, setOpenTexturePicker] = useState<'terrainA' | 'terrainB' | null>(null);
+
+  useEffect(() => {
+    if (!openTexturePicker) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setOpenTexturePicker(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [openTexturePicker]);
   // Picked independently of the terrain colours: the speckle in hand-drawn
   // pixel art is usually a different material, not a lighter version of the
   // ground it sits on.
@@ -1530,7 +1542,7 @@ export default function App() {
                 cellScaleB, setCellScaleB, rippleScaleB, setRippleScaleB, geoScaleB, setGeoScaleB,
                 t.textureAlgoB, t.textureAmountB, t.textureColourB, t.textureSeedB, t.textureCellScaleB, t.textureRippleScaleB,
                 t.textureGeoScaleB],
-            ] as const).map(([role, algo, setAlgo, val, set, shadeCount, setShadeCount,
+            ] as const).map(([role, algo, _setAlgo, val, set, shadeCount, setShadeCount,
               seedValue, setSeed, cellScaleVal, setCellScale, rippleScaleVal, setRippleScale,
               geoScaleVal, setGeoScale,
               algoLabel, amountLabel, colourLabel, seedLabel, cellScaleLabel, rippleScaleLabel,
@@ -1557,32 +1569,31 @@ export default function App() {
                   <span className="slider-name">{algoLabel}</span>
                   {inert && <span className="slider-val">{t.transparent}</span>}
                 </div>
-                <select
-                  className="text-input"
-                  value={algo}
-                  onChange={(e) => {
-                    const next = e.target.value as TextureId;
-                    setAlgo(next);
-                    // Open every paving at the size its art was drawn at. The
-                    // control is shared, and nonslip is an 8px motif while the
-                    // rest are 32px — inheriting the previous pick would show it
-                    // four times coarser than the texture it is meant to be.
-                    setGeoScale(naturalGeoScale(next));
-                    // Same reasoning for the density, which nonslip reads as its
-                    // dash length: inheriting a scatter field's 0.4 would open it
-                    // as stubs. Every other texture keeps the shared default, so
-                    // this only moves when it has to.
-                    set(naturalTextureAmount(next));
-                  }}
-                >
-                  {TEXTURE_GROUPS.map((g) => (
-                    <optgroup key={g.en} label={lang === 'zh' ? g.zh : g.en}>
-                      {g.items.map((p) => (
-                        <option key={p.id} value={p.id}>{lang === 'zh' ? p.zh : p.en}</option>
-                      ))}
-                    </optgroup>
-                  ))}
-                </select>
+                {(() => {
+                  let currentGroupLabel = '';
+                  let currentItemLabel = '';
+                  for (const g of TEXTURE_GROUPS) {
+                    const found = g.items.find((item) => item.id === algo);
+                    if (found) {
+                      currentGroupLabel = lang === 'zh' ? g.zh : g.en;
+                      currentItemLabel = lang === 'zh' ? found.zh : found.en;
+                      break;
+                    }
+                  }
+                  return (
+                    <button
+                      type="button"
+                      className="texture-picker-trigger"
+                      onClick={() => setOpenTexturePicker(role)}
+                    >
+                      <div className="trigger-label-group">
+                        <span className="trigger-group-tag">{currentGroupLabel}</span>
+                        <span className="trigger-item-name">{currentItemLabel}</span>
+                      </div>
+                      <span className="trigger-arrow">▼</span>
+                    </button>
+                  );
+                })()}
 
                 {algo !== 'none' && (<>
                   {algo === 'cells' && (<>
@@ -1870,6 +1881,77 @@ export default function App() {
           </section>
         </div>
       </main>
+      {openTexturePicker && (() => {
+        const role = openTexturePicker;
+        const currentAlgo = role === 'terrainA' ? textureAlgoA : textureAlgoB;
+        const setAlgo = role === 'terrainA' ? setTextureAlgoA : setTextureAlgoB;
+        const setGeoScale = role === 'terrainA' ? setGeoScaleA : setGeoScaleB;
+        const setAmount = role === 'terrainA' ? setTextureAmountA : setTextureAmountB;
+
+        const handleSelect = (nextId: TextureId) => {
+          setAlgo(nextId);
+          setGeoScale(naturalGeoScale(nextId));
+          setAmount(naturalTextureAmount(nextId));
+          setOpenTexturePicker(null);
+        };
+
+        const GROUP_ICONS: Record<string, string> = {
+          '无纹理': '🚫', 'None': '🚫',
+          '自然与有机': '🌿', 'Nature & Organic': '🌿',
+          '程序与几何': '📐', 'Procedural & Geometry': '📐',
+          '砖石与石板铺装': '🧱', 'Masonry & Paving': '🧱',
+          '散点与半调噪声': '✨', 'Speckle & Noise': '✨',
+        };
+
+        return (
+          <>
+            <div className="texture-picker-backdrop" onClick={() => setOpenTexturePicker(null)} />
+            <div className="texture-picker-modal" role="dialog" aria-modal="true">
+              <div className="texture-picker-header">
+                <div className="texture-picker-title">
+                  <span className={`picker-role-badge picker-badge-${role}`}>
+                    {role === 'terrainA' ? (lang === 'zh' ? '地形 A' : 'Terrain A') : (lang === 'zh' ? '地形 B' : 'Terrain B')}
+                  </span>
+                  <h3>{t.selectTextureTitle}</h3>
+                </div>
+                <button className="picker-close-btn" onClick={() => setOpenTexturePicker(null)} title="Close (Esc)">✕</button>
+              </div>
+              <div className="texture-picker-body">
+                {TEXTURE_GROUPS.map((g) => {
+                  const groupName = lang === 'zh' ? g.zh : g.en;
+                  const icon = GROUP_ICONS[g.zh] || '🎨';
+                  return (
+                    <div key={g.en} className="texture-group-col">
+                      <div className="group-col-header">
+                        <span className="group-col-icon">{icon}</span>
+                        <span className="group-col-title">{groupName}</span>
+                        <span className="group-col-count">({g.items.length})</span>
+                      </div>
+                      <div className="group-col-items">
+                        {g.items.map((p) => {
+                          const isSelected = p.id === currentAlgo;
+                          const itemName = lang === 'zh' ? p.zh : p.en;
+                          return (
+                            <button
+                              key={p.id}
+                              type="button"
+                              className={`texture-item-btn ${isSelected ? 'active' : ''}`}
+                              onClick={() => handleSelect(p.id)}
+                            >
+                              <span className="item-name-text">{itemName}</span>
+                              {isSelected && <span className="item-check">✓</span>}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </>
+        );
+      })()}
       {toastMsg && <div className="toast-popup">{toastMsg}</div>}
     </div>
   );
