@@ -5,7 +5,7 @@ import { type RibbonId } from './patternRibbon';
 import { type TextureId } from './patternTexture';
 
 const PATTERNS: PatternId[] = [
-  'square', 'sharp', 'rounded', 'jagged', 'gravel',
+  'square', 'sharp', 'rounded', 'wave', 'jagged', 'gravel',
   'boulder', 'thorn', 'coast', 'moss', 'billow',
 ];
 

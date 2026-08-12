@@ -14,7 +14,7 @@ import { GENERATED_FIELDS } from './patterns/generated';
 export type PatternRole = 'terrainA' | 'terrainB' | 'edge';
 
 export type PatternId =
-  | 'square' | 'sharp' | 'rounded'
+  | 'square' | 'sharp' | 'rounded' | 'wave'
   | 'jagged' | 'gravel' | 'boulder' | 'thorn' | 'coast' | 'moss' | 'billow';
 
 /** Outline width limits, in pixels of the 32px tile. */
@@ -38,6 +38,7 @@ export const PATTERN_GROUPS: readonly {
       { id: 'square', zh: '纯直角 · 方角描边', en: 'Square — 90° right angles' },
       { id: 'rounded', zh: '圆润 · 全四级过渡', en: 'Rounded — soft corners, full ramp' },
       { id: 'sharp', zh: '硬边 · 弧角描边', en: 'Sharp — rounded corners, outline' },
+      { id: 'wave', zh: '波浪 · 规则圆弧边', en: 'Wave — regular circular arc edge' },
     ],
   },
   {
@@ -160,6 +161,7 @@ export const PATTERN_BANDS: Record<PatternId, readonly [number, number, number, 
   square: [7, 9, 11, 13],
   sharp: [7, 9, 11, 13],
   rounded: [7, 9, 11, 13],
+  wave: [7, 9, 11, 13],
   jagged: [7, 9, 11, 13],
   gravel: [7, 9, 11, 13],
   boulder: [8, 10, 12, 14],
@@ -188,6 +190,7 @@ export const PATTERN_OFFSET_RANGE: Record<PatternId, readonly [number, number]> 
   square: [-8.5, 6.25],
   sharp: [-8.5, 6.25],
   rounded: [-3.75, 2.75],
+  wave: [-3.75, 2.75],
   jagged: [-5.5, 1.0],
   gravel: [-5.25, 1.5],
   boulder: [-4.0, 1.25],
@@ -201,6 +204,7 @@ const FIELDS: Record<PatternId, Record<number, string>> = {
   square: GENERATED_FIELDS.square,
   sharp: GENERATED_FIELDS.sharp,
   rounded: GENERATED_FIELDS.rounded,
+  wave: GENERATED_FIELDS.rounded,
   jagged: GENERATED_FIELDS.jagged,
   gravel: GENERATED_FIELDS.gravel,
   boulder: GENERATED_FIELDS.boulder,
@@ -352,7 +356,7 @@ export function clampOffset(pattern: PatternId, offsetPx: number): number {
  * them, it would be a different pattern wearing their name.
  */
 export const RESEEDABLE_PATTERNS: ReadonlySet<PatternId> = new Set<PatternId>([
-  'jagged', 'gravel', 'boulder', 'thorn', 'coast', 'moss', 'billow',
+  'wave', 'jagged', 'gravel', 'boulder', 'thorn', 'coast', 'moss', 'billow',
 ]);
 
 /**
@@ -473,8 +477,45 @@ export function patternLevelsForMask(
       const v = (y + 0.5) * scale - 0.5;
       for (let x = 0; x < tileSize; x++) {
         const u = (x + 0.5) * scale - 0.5;
-        const jitter = amp > 0 ? amp * edgeNoise(u, v, edgeSeed) : 0;
-        const d = sampleField(field, u, v) + off + jitter;
+        const dBase = sampleField(field, u, v);
+        let waveOffset = 0;
+        if (pattern === 'wave') {
+          let wavelength = 16;
+          let presetAmp = 1.4;
+          let phase = 0;
+          if (edgeSeed !== 0) {
+            let n1 = Math.imul(edgeSeed, 374761393) ^ 0x1f3b2a;
+            n1 = Math.imul(n1 ^ (n1 >>> 13), 1274126177);
+            const hash = Math.abs(n1 ^ (n1 >>> 16));
+
+            wavelength = (hash & 1) === 0 ? 16 : 32;
+            presetAmp = 1.3 + (hash % 8) * 0.1;
+            phase = (hash % 13);
+          }
+
+          const headroom = edgeJitterAmplitude('wave', off);
+          const waveAmp = Math.max(0, Math.min(presetAmp, headroom));
+
+          // Sample field gradient to project wave along edge direction
+          const gx = sampleField(field, u + 0.5, v) - sampleField(field, u - 0.5, v);
+          const gy = sampleField(field, u, v + 0.5) - sampleField(field, u, v - 0.5);
+          const lenSq = gx * gx + gy * gy;
+          let wy2 = 1.0;
+          let wx2 = 0.0;
+          if (lenSq > 1e-4) {
+            wy2 = (gy * gy) / lenSq;
+            wx2 = (gx * gx) / lenSq;
+          }
+
+          const wu = Math.sin((2 * Math.PI * (u + phase)) / wavelength);
+          const wv = Math.sin((2 * Math.PI * (v + phase)) / wavelength);
+          const waveVal = wy2 * wu + wx2 * wv;
+
+          const borderFade = Math.max(0, Math.min(1, (dBase - 2.5) / 2.0));
+          waveOffset = waveAmp * borderFade * waveVal;
+        }
+        const jitter = (amp > 0 && pattern !== 'wave') ? amp * edgeNoise(u, v, edgeSeed) : 0;
+        const d = dBase + off + waveOffset + jitter;
         // Bands ascend, so the last one passed is the level. Levels stay below
         // 10, which is what keeps one digit per pixel workable.
         let level = 0;

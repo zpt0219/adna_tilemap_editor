@@ -196,7 +196,8 @@ export function ribbonShadeAt(
 ): number {
   if (id === 'none' || amount <= 0 || shades < 1) return 0;
   const sd = (seed ^ RIBBON_SALT) >>> 0;
-  const dp = invert && ribbonUsesInvert(id) ? 1 - depth : depth;
+  const isFlipped = id === 'bevel' ? !invert : invert;
+  const dp = isFlipped && ribbonUsesInvert(id) ? 1 - depth : depth;
   const T = Math.max(1, period);
   // A seeded phase shift slides the motif along the edge. Only the phase moves:
   // the period has to stay put or the dice would change the design, not the

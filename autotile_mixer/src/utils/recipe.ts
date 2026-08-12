@@ -121,7 +121,7 @@ export const BUILTIN_PRESETS: PresetItem[] = [
 ];
 
 const VALID_PATTERNS: Set<PatternId> = new Set<PatternId>([
-  'square', 'sharp', 'rounded', 'jagged', 'gravel',
+  'square', 'sharp', 'rounded', 'wave', 'jagged', 'gravel',
   'boulder', 'thorn', 'coast', 'moss', 'billow',
 ]);
 

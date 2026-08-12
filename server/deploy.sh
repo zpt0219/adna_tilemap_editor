@@ -5,7 +5,7 @@
 #   /var/www/adna/tagger/     ← tagger/dist
 # Re-run after pulling changes. nginx serves /var/www so a rebuild never
 # disrupts the live site mid-copy (rsync --delete swaps atomically per file).
-set -euo pipefail
+set -eu
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WEBROOT=/var/www/adna

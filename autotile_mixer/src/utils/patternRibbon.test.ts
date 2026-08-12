@@ -123,13 +123,13 @@ describe('ribbon motifs', () => {
     // plain face and one lit face, growing into a gradient as it widens.
     const at = (w: number, j: number) =>
       ribbonShadeAt('bevel', 0, (j + 0.5) / w, w, 0, 1, 2, 8, false);
-    expect(at(2, 0)).toBe(0);
-    expect(at(2, 1)).toBeGreaterThan(0);
-    expect([at(6, 0), at(6, 5)]).toEqual([0, 2]);
-    for (let j = 0; j + 1 < 6; j++) expect(at(6, j + 1)).toBeGreaterThanOrEqual(at(6, j));
+    expect(at(2, 0)).toBeGreaterThan(0);
+    expect(at(2, 1)).toBe(0);
+    expect([at(6, 0), at(6, 5)]).toEqual([2, 0]);
+    for (let j = 0; j + 1 < 6; j++) expect(at(6, j)).toBeGreaterThanOrEqual(at(6, j + 1));
     // No dependence on position along the edge.
     for (let i = -8; i < 8; i++) {
-      expect(ribbonShadeAt('bevel', i, 0.9, 4, 0, 1, 2, 8, false)).toBe(at(4, 3));
+      expect(ribbonShadeAt('bevel', i, 0.1, 4, 0, 1, 2, 8, false)).toBe(at(4, 0));
     }
   });
 
