@@ -37,7 +37,7 @@ import {
 import { cellsAlongSegment, type GridCell } from './utils/playgroundPaint';
 import { type Recipe, BUILTIN_PRESETS, type PresetItem, sanitizeRecipe, DEFAULT_RECIPE } from './utils/recipe';
 import { encodeRecipe, decodeRecipe } from './utils/recipeCodec';
-import { buildSheetExportData, downloadJsonFile } from './utils/exportSheet';
+import { downloadJsonFile, downloadSheetBundle } from './utils/exportSheet';
 
 /**
  * One tileset model: blob47, painted on cells, coloured from baked pattern art.
@@ -491,7 +491,9 @@ export default function App() {
   );
 
   const [isDrawing, setIsDrawing] = useState(false);
-  const [drawVal, setDrawVal] = useState<number>(1); // 1 = paint A, 0 = paint B (erase)
+  const [drawTool, setDrawTool] = useState<'paint' | 'erase'>('paint');
+  const lastPaintPointerIdRef = useRef<number | null>(null);
+  const recipeFileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Custom shades overrides state (null = derived automatically from roleColours)
   const [customShadesHex, setCustomShadesHex] = useState<string[] | null>(null);
@@ -780,9 +782,23 @@ export default function App() {
     });
   };
 
-  const downloadSheetDataJson = () => {
-    const data = buildSheetExportData(currentRecipe);
-    downloadJsonFile(`tileset_blob47_${patternId}_${TILE_SIZE}px.json`, data);
+  const downloadRecipe = () => {
+    downloadJsonFile(`tileset_blob47_${patternId}_${TILE_SIZE}px.recipe.json`, { v: 1, recipe: currentRecipe });
+  };
+
+  const handleRecipeFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    try {
+      const parsed = JSON.parse(await file.text());
+      const candidate = parsed?.recipe ?? parsed;
+      applyRecipe(sanitizeRecipe(candidate));
+      setSelectedPresetId('custom');
+      showToast(t.recipeImported);
+    } catch {
+      showToast(t.recipeImportFailed);
+    }
   };
 
   /** The outline is the ribbon's canvas, so its width decides what fits on it. */
@@ -1015,11 +1031,13 @@ export default function App() {
   }, [blobCells, showCellDots, paintArgs]);
 
   // Painting interaction logic
-  const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (e.button !== 0 && e.button !== 2) return;
+  const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
     e.preventDefault();
     const canvas = playgroundCanvasRef.current;
     if (!canvas) return;
+    canvas.setPointerCapture(e.pointerId);
+    lastPaintPointerIdRef.current = e.pointerId;
 
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
@@ -1028,15 +1046,15 @@ export default function App() {
     const scaleX = canvas.width / rect.width;
     const scaleY = canvas.height / rect.height;
 
-    const val = e.button === 0 ? 1 : 0; // Left click = 1 (A), Right click = 0 (B)
-    setDrawVal(val);
+    const val = drawTool === 'paint' ? 1 : 0;
     setIsDrawing(true);
 
     paintStrokeTo(x * scaleX, y * scaleY, val, true);
   };
 
-  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (!isDrawing) return;
+    if (lastPaintPointerIdRef.current !== e.pointerId) return;
     const canvas = playgroundCanvasRef.current;
     if (!canvas) return;
 
@@ -1047,44 +1065,17 @@ export default function App() {
     const scaleX = canvas.width / rect.width;
     const scaleY = canvas.height / rect.height;
 
-    paintStrokeTo(x * scaleX, y * scaleY, drawVal);
+    paintStrokeTo(x * scaleX, y * scaleY, drawTool === 'paint' ? 1 : 0);
   };
 
-  const handleMouseUp = () => {
+  const handlePointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (lastPaintPointerIdRef.current !== e.pointerId) return;
+    if (playgroundCanvasRef.current?.hasPointerCapture(e.pointerId)) {
+      playgroundCanvasRef.current.releasePointerCapture(e.pointerId);
+    }
     setIsDrawing(false);
     lastPaintCellRef.current = null;
-  };
-
-  const getCanvasPoint = (canvas: HTMLCanvasElement, clientX: number, clientY: number) => {
-    const rect = canvas.getBoundingClientRect();
-    return {
-      x: (clientX - rect.left) * (canvas.width / rect.width),
-      y: (clientY - rect.top) * (canvas.height / rect.height),
-    };
-  };
-
-  const handleTouchStart = (e: React.TouchEvent<HTMLCanvasElement>) => {
-    if (!e.touches[0]) return;
-    const canvas = playgroundCanvasRef.current;
-    if (!canvas) return;
-    const { x, y } = getCanvasPoint(canvas, e.touches[0].clientX, e.touches[0].clientY);
-    const val = 1;
-    setDrawVal(val);
-    setIsDrawing(true);
-    paintStrokeTo(x, y, val, true);
-  };
-
-  const handleTouchMove = (e: React.TouchEvent<HTMLCanvasElement>) => {
-    if (!isDrawing || !e.touches[0]) return;
-    const canvas = playgroundCanvasRef.current;
-    if (!canvas) return;
-    const { x, y } = getCanvasPoint(canvas, e.touches[0].clientX, e.touches[0].clientY);
-    paintStrokeTo(x, y, drawVal);
-  };
-
-  const handleTouchEnd = () => {
-    setIsDrawing(false);
-    lastPaintCellRef.current = null;
+    lastPaintPointerIdRef.current = null;
   };
 
   /** Paint the current cell and every cell crossed since the previous move. */
@@ -1112,13 +1103,10 @@ export default function App() {
     setBlobCells(Array(ROWS).fill(null).map(() => Array(COLS).fill(1)));
   };
 
-  const downloadTileset = () => {
+  const downloadTilesetBundle = () => {
     const cleanCanvas = cleanSheetCanvasRef.current || tilesetCanvasRef.current;
     if (!cleanCanvas) return;
-    const link = document.createElement('a');
-    link.download = `tileset_blob47_${patternId}_${TILE_SIZE}px.png`;
-    link.href = cleanCanvas.toDataURL();
-    link.click();
+    void downloadSheetBundle(cleanCanvas, currentRecipe);
   };
 
   return (
@@ -1957,12 +1945,22 @@ export default function App() {
               />
             </div>
             <div className="action-bar">
-              <button className="btn-action" onClick={downloadTileset}>
-                💾 {t.downloadPng}
+              <button className="btn-action btn-secondary" onClick={() => recipeFileInputRef.current?.click()}>
+                {t.importRecipe}
               </button>
-              <button className="btn-action btn-secondary" onClick={downloadSheetDataJson}>
-                📄 {t.exportDataJson}
+              <button className="btn-action btn-secondary" onClick={downloadRecipe}>
+                {t.exportRecipe}
               </button>
+              <button className="btn-action" onClick={downloadTilesetBundle}>
+                💾 {t.downloadBundle}
+              </button>
+              <input
+                ref={recipeFileInputRef}
+                type="file"
+                accept="application/json,.json"
+                onChange={handleRecipeFile}
+                hidden
+              />
             </div>
           </section>
 
@@ -2003,20 +2001,25 @@ export default function App() {
               <canvas
                 ref={playgroundCanvasRef}
                 className="playground-canvas"
-                onMouseDown={handleMouseDown}
-                onMouseMove={handleMouseMove}
-                onMouseUp={handleMouseUp}
-                onMouseLeave={handleMouseUp}
+                onPointerDown={handlePointerDown}
+                onPointerMove={handlePointerMove}
+                onPointerUp={handlePointerUp}
+                onPointerCancel={handlePointerUp}
                 onContextMenu={(e) => e.preventDefault()}
-                onTouchStart={handleTouchStart}
-                onTouchMove={handleTouchMove}
-                onTouchEnd={handleTouchEnd}
                 style={{
                   width: `${COLS * TILE_SIZE * playgroundZoom}px`,
                   height: `${ROWS * TILE_SIZE * playgroundZoom}px`,
                   touchAction: 'none',
                 }}
               />
+            </div>
+            <div className="playground-tools" role="toolbar" aria-label={t.playgroundTools}>
+              <button className={`btn-action btn-secondary tool-btn${drawTool === 'paint' ? ' active' : ''}`} onClick={() => setDrawTool('paint')}>
+                🖌️ {t.paintTool}
+              </button>
+              <button className={`btn-action btn-secondary tool-btn${drawTool === 'erase' ? ' active' : ''}`} onClick={() => setDrawTool('erase')}>
+                🧽 {t.eraseTool}
+              </button>
             </div>
             <div className="action-bar" style={{ marginTop: '16px' }}>
               <button className="btn-action btn-secondary" onClick={fillPlaygroundA} title={t.fillPlaygroundAHint}>

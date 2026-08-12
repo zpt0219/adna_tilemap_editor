@@ -1,5 +1,6 @@
 import { BLOB47_LAYOUT, BLOB47_COLS, BLOB47_ROWS, blobSlotForMask } from './blob47';
 import { type Recipe } from './recipe';
+import { strToU8, zipSync } from 'fflate';
 
 export interface SheetExportData {
   app: string;
@@ -71,4 +72,30 @@ export function downloadJsonFile(filename: string, data: unknown) {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+}
+
+export function downloadBlob(filename: string, blob: Blob) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
+/** Bundle the rendered sheet, engine mapping metadata, and editable recipe. */
+export async function downloadSheetBundle(canvas: HTMLCanvasElement, recipe: Recipe) {
+  const png = await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob((value) => value ? resolve(value) : reject(new Error('PNG export failed')), 'image/png');
+  });
+  const data = buildSheetExportData(recipe);
+  const dataName = `tileset_blob47_${recipe.patternId}_${recipe.tileSize}px.json`;
+  const pngName = data.sheet.file;
+  const zip = zipSync({
+    [pngName]: new Uint8Array(await png.arrayBuffer()),
+    [dataName]: strToU8(JSON.stringify(data, null, 2)),
+  });
+  downloadBlob(`tileset_blob47_${recipe.patternId}_${recipe.tileSize}px.zip`, new Blob([zip], { type: 'application/zip' }));
 }

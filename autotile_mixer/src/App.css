@@ -636,6 +636,28 @@ body {
   gap: 12px;
 }
 
+.playground-tools {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+.action-bar .btn-action {
+  flex: 0 1 auto;
+}
+
+.playground-tools {
+  justify-content: center;
+}
+
+.tool-btn.active {
+  border-color: var(--accent);
+  background: var(--accent-glow);
+  color: var(--fg);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
 /* Playground / Painter Panel */
 .playground-panel {
   display: flex;
