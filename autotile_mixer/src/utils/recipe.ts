@@ -51,8 +51,6 @@ export interface Recipe {
     terrainA: (string | undefined)[] | null;
     terrainB: (string | undefined)[] | null;
   };
-
-  tileSize: number;
 }
 
 export interface PresetItem {
@@ -107,8 +105,6 @@ export const DEFAULT_RECIPE: Recipe = {
     terrainA: null,
     terrainB: null,
   },
-
-  tileSize: 32,
 };
 
 export const BUILTIN_PRESETS: PresetItem[] = [
@@ -272,6 +268,5 @@ export function sanitizeRecipe(raw: unknown): Recipe {
       terrainA: customTexA,
       terrainB: customTexB,
     },
-    tileSize: 32,
   };
 }

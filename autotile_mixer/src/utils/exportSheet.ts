@@ -1,4 +1,5 @@
 import { BLOB47_LAYOUT, BLOB47_COLS, BLOB47_ROWS, blobSlotForMask } from './blob47';
+import { SHEET_TILE_SIZE } from './renderSheet';
 import { type Recipe } from './recipe';
 import { strToU8, zipSync } from 'fflate';
 
@@ -33,14 +34,17 @@ export function buildSheetExportData(recipe: Recipe): SheetExportData {
     maskToSlot[mask] = blobSlotForMask(mask);
   }
 
-  const fileName = `tileset_blob47_${recipe.patternId}_${recipe.tileSize}px.png`;
+  const fileName = `tileset_blob47_${recipe.patternId}_${SHEET_TILE_SIZE}px.png`;
 
   return {
     app: 'autotile_blob47',
     version: 1,
     sheet: {
       file: fileName,
-      tileSize: recipe.tileSize,
+      // Stays in the sidecar even though it is now a constant: this half of the
+      // file is the engine's import contract, and an importer should not have to
+      // know that this generator only ever emits 32.
+      tileSize: SHEET_TILE_SIZE,
       columns: BLOB47_COLS,
       rows: BLOB47_ROWS,
       slots: BLOB47_LAYOUT.length,
@@ -91,11 +95,11 @@ export async function downloadSheetBundle(canvas: HTMLCanvasElement, recipe: Rec
     canvas.toBlob((value) => value ? resolve(value) : reject(new Error('PNG export failed')), 'image/png');
   });
   const data = buildSheetExportData(recipe);
-  const dataName = `tileset_blob47_${recipe.patternId}_${recipe.tileSize}px.json`;
+  const dataName = `tileset_blob47_${recipe.patternId}_${SHEET_TILE_SIZE}px.json`;
   const pngName = data.sheet.file;
   const zip = zipSync({
     [pngName]: new Uint8Array(await png.arrayBuffer()),
     [dataName]: strToU8(JSON.stringify(data, null, 2)),
   });
-  downloadBlob(`tileset_blob47_${recipe.patternId}_${recipe.tileSize}px.zip`, new Blob([zip], { type: 'application/zip' }));
+  downloadBlob(`tileset_blob47_${recipe.patternId}_${SHEET_TILE_SIZE}px.zip`, new Blob([zip], { type: 'application/zip' }));
 }

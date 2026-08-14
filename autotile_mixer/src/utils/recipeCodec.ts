@@ -105,14 +105,20 @@ export function encodeRecipe(recipe: Recipe): string {
   // Bytes 10..12: edgeSeed (24b)
   write24Bit(view, 10, clean.edgeSeed);
 
-  // Byte 13: outlineWidth(2b: 1..4 -> 0..3) | bandSteps(2b: 3..5 -> 0..2) | hardEdgeB(1b) | transparentB(1b) | tileSize(1b: 0=16,1=32) | res(1b)
+  // Byte 13: outlineWidth(2b: 1..4 -> 0..3) | bandSteps(2b: 3..5 -> 0..2) | hardEdgeB(1b) | transparentB(1b) | res(2b)
+  //
+  // Bit 1 used to carry tileSize (0=16, 1=32). The tile size is now always 32,
+  // so the bit is reserved — but it is still WRITTEN as 1 and ignored on read,
+  // which keeps every share code already out in the wild byte-identical to what
+  // this encoder produces today. Dropping it to 0 would have re-issued a
+  // different string for the same recipe with no benefit.
   const outlineIdx = Math.max(0, Math.min(3, clean.outlineWidth - 1));
   const stepsIdx = Math.max(0, Math.min(2, clean.bandSteps - 3));
   const b13 = (outlineIdx << 6) |
               (stepsIdx << 4) |
               ((clean.hardEdgeB ? 1 : 0) << 3) |
               ((clean.transparentB ? 1 : 0) << 2) |
-              ((clean.tileSize === 32 ? 1 : 0) << 1);
+              (1 << 1);
   view.setUint8(13, b13);
 
   // Byte 14: bandBias (Int8: -100..100)
@@ -272,13 +278,13 @@ export function decodeRecipe(hash: string): Recipe | null {
     // Bytes 10..12: edgeSeed
     const edgeSeed = read24Bit(view, 10);
 
-    // Byte 13: outlineWidth, bandSteps, hardEdgeB, transparentB, tileSize
+    // Byte 13: outlineWidth, bandSteps, hardEdgeB, transparentB, (reserved)
+    // Bit 1 is the retired tileSize flag — ignored; the tile size is always 32.
     const b13 = view.getUint8(13);
     const outlineWidth = ((b13 >> 6) & 0x03) + 1;
     const bandSteps = ((b13 >> 4) & 0x03) + 3;
     const hardEdgeB = ((b13 >> 3) & 0x01) === 1;
     const transparentB = ((b13 >> 2) & 0x01) === 1;
-    const tileSize = ((b13 >> 1) & 0x01) === 1 ? 32 : 16;
 
     // Byte 14: bandBias
     const bandBias = view.getInt8(14) / 100;
@@ -432,7 +438,6 @@ export function decodeRecipe(hash: string): Recipe | null {
         terrainA: customTexA,
         terrainB: customTexB,
       },
-      tileSize,
     };
 
     return sanitizeRecipe(rawRecipe);

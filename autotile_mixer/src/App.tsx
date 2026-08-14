@@ -8,7 +8,7 @@ import {
 } from './utils/blob47';
 import {
   DEFAULT_ROLE_COLOURS, DEFAULT_TEXTURE_COLOURS, paintPatternTileRGBA, parseHexColour,
-  patternRamp, toHexColour, type RoleColours, type PaintOptions,
+  patternRamp, toHexColour, type RoleColours,
 } from './utils/patternPaint';
 import {
   PATTERN_GROUPS, DEFAULT_PATTERN, PATTERN_OFFSET_RANGE, RESEEDABLE_PATTERNS,
@@ -35,6 +35,9 @@ import {
   type TextureId,
 } from './utils/patternTexture';
 import { cellsAlongSegment, type GridCell } from './utils/playgroundPaint';
+import {
+  recipeToPaintArgs, renderSheetRGBA, SHEET_TILE_SIZE, SHEET_WIDTH, SHEET_HEIGHT,
+} from './utils/renderSheet';
 import { type Recipe, BUILTIN_PRESETS, type PresetItem, sanitizeRecipe, DEFAULT_RECIPE } from './utils/recipe';
 import { encodeRecipe, decodeRecipe } from './utils/recipeCodec';
 import { downloadJsonFile, downloadSheetBundle } from './utils/exportSheet';
@@ -169,96 +172,17 @@ function RecipePreviewCanvas({ recipe, displayWidth = 192, displayHeight = 256 }
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const r = sanitizeRecipe(recipe);
-    const ts = r.tileSize || 32;
-    const roleColours: RoleColours = {
-      terrainA: parseHexColour(r.roleHex.terrainA) ?? DEFAULT_ROLE_COLOURS.terrainA,
-      terrainB: parseHexColour(r.roleHex.terrainB) ?? DEFAULT_ROLE_COLOURS.terrainB,
-      edge: parseHexColour(r.roleHex.edge) ?? DEFAULT_ROLE_COLOURS.edge,
-    };
+    // Shares renderSheet with the main canvas rather than mapping the recipe
+    // again. The copy that used to live here had drifted: it read bandBias as
+    // `(bias / 100) * (ts / 2)` instead of scaling it by the pattern's own
+    // PATTERN_OFFSET_RANGE, and it knew nothing about water's two-shade table,
+    // the pavings' forced amount, or DEFAULT_TEXTURE_COLOURS — so a preset's
+    // thumbnail and the sheet it produced were visibly different images.
+    const ts = SHEET_TILE_SIZE;
+    const sheetWidth = SHEET_WIDTH;
+    const sheetHeight = SHEET_HEIGHT;
 
-    const fitRamp = (hexes: readonly (string | undefined | null)[] | null, shades: number) => {
-      if (!hexes || hexes.length !== shades + 1) return undefined;
-      return hexes.map((h) => (h ? parseHexColour(h) : undefined));
-    };
-
-    const fitRampRGB = (hexes: readonly (string | undefined | null)[] | null, steps: number) => {
-      if (!hexes || hexes.length !== steps + 1) return undefined;
-      const result: import('./utils/patternPaint').RGB[] = [];
-      for (const h of hexes) {
-        const parsed = h ? parseHexColour(h) : undefined;
-        if (!parsed) return undefined;
-        result.push(parsed);
-      }
-      return result;
-    };
-
-    const opts: PaintOptions = {
-      tileSize: ts,
-      offsetPx: (r.bandBias / 100) * (ts / 2),
-      bandSteps: r.bandSteps,
-      hardEdgeB: r.hardEdgeB,
-      edgeSeed: r.edgeSeed,
-      outlineWidth: r.outlineWidth,
-      noises: r.patternNoise,
-      noiseSeed: r.patternNoiseSeed,
-      noiseStrength: r.patternNoiseStrength,
-      ribbon: {
-        algo: r.ribbonAlgo,
-        amount: r.ribbonAmount,
-        period: r.ribbonPeriod,
-        shades: r.ribbonShades,
-        seed: r.edgeSeed,
-        invert: r.ribbonInvert,
-        ramp: fitRamp(r.customRibbonHex, r.ribbonShades),
-      },
-      texture: {
-        algoA: r.textureAlgoA,
-        algoB: r.textureAlgoB,
-        amountA: r.textureAmountA,
-        amountB: r.textureAmountB,
-        shadesA: r.textureShadesA,
-        shadesB: r.textureShadesB,
-        seedA: r.textureSeedA,
-        seedB: r.textureSeedB,
-        cellScaleA: r.cellScaleA,
-        cellScaleB: r.cellScaleB,
-        rippleScaleA: r.rippleScaleA,
-        rippleScaleB: r.rippleScaleB,
-        geoScaleA: r.geoScaleA,
-        geoScaleB: r.geoScaleB,
-        rampA: fitRamp(r.customTexHex.terrainA, r.textureShadesA),
-        rampB: fitRamp(r.customTexHex.terrainB, r.textureShadesB),
-      },
-      ramp: fitRampRGB(r.customShadesHex, r.bandSteps),
-      transparentB: r.transparentB,
-    };
-
-    const sheetWidth = BLOB47_COLS * ts;
-    const sheetHeight = BLOB47_ROWS * ts;
-    const fullBuffer = new Uint8ClampedArray(sheetWidth * sheetHeight * 4);
-
-    for (let i = 0; i < BLOB47_LAYOUT.length; i++) {
-      const mask = BLOB47_LAYOUT[i];
-      const col = i % BLOB47_COLS;
-      const row = Math.floor(i / BLOB47_COLS);
-      const tileRgba = paintPatternTileRGBA(r.patternId, mask, roleColours, opts);
-
-      for (let y = 0; y < ts; y++) {
-        for (let x = 0; x < ts; x++) {
-          const srcIdx = (y * ts + x) * 4;
-          const destX = col * ts + x;
-          const destY = row * ts + y;
-          const destIdx = (destY * sheetWidth + destX) * 4;
-          fullBuffer[destIdx] = tileRgba[srcIdx];
-          fullBuffer[destIdx + 1] = tileRgba[srcIdx + 1];
-          fullBuffer[destIdx + 2] = tileRgba[srcIdx + 2];
-          fullBuffer[destIdx + 3] = tileRgba[srcIdx + 3];
-        }
-      }
-    }
-
-    const imgData = new ImageData(fullBuffer, sheetWidth, sheetHeight);
+    const imgData = new ImageData(renderSheetRGBA(recipe), sheetWidth, sheetHeight);
     canvas.width = sheetWidth;
     canvas.height = sheetHeight;
     ctx.putImageData(imgData, 0, 0);
@@ -398,41 +322,6 @@ export default function App() {
     if (!sliced.some(Boolean)) return undefined;
     return sliced.map((h) => (h ? parseHexColour(h) : undefined));
   };
-
-  // Memoised, not built inline: the render effects key off object identity, so
-  // a fresh object every render would repaint all 48 tiles on every keystroke.
-  const textureOpts = useMemo(() => {
-    const textureRampFor = (role: 'terrainA' | 'terrainB', algo: TextureId, shadeCount: number) => {
-      const custom = parseCustomRamp(customTexHex[role], shadeCount);
-      if (algo !== 'water') return custom;
-      const waterRamp = custom ? [...custom] : new Array(3).fill(undefined);
-      waterRamp[2] ??= WATER_DOT_COLOUR;
-      return waterRamp;
-    };
-    return {
-      algoA: textureAlgoA,
-      algoB: textureAlgoB,
-      amountA: effectiveTextureAmountA,
-      amountB: effectiveTextureAmountB,
-      shadesA: effectiveTextureShadesA,
-      shadesB: effectiveTextureShadesB,
-      seedA: textureSeedA,
-      seedB: textureSeedB,
-      cellScaleA,
-      cellScaleB,
-      rippleScaleA,
-      rippleScaleB,
-      geoScaleA,
-      geoScaleB,
-      colourA: DEFAULT_TEXTURE_COLOURS.terrainA,
-      colourB: DEFAULT_TEXTURE_COLOURS.terrainB,
-      rampA: textureRampFor('terrainA', textureAlgoA, effectiveTextureShadesA),
-      rampB: textureRampFor('terrainB', textureAlgoB, effectiveTextureShadesB),
-    };
-  }, [textureAlgoA, textureAlgoB, effectiveTextureAmountA, effectiveTextureAmountB,
-       effectiveTextureShadesA, effectiveTextureShadesB,
-       textureSeedA, textureSeedB, cellScaleA, cellScaleB,
-       rippleScaleA, rippleScaleB, geoScaleA, geoScaleB, customTexHex]);
 
   const TEXTURE_SHADE_CHOICES = Array.from(
     { length: MAX_TEXTURE_SHADES - MIN_TEXTURE_SHADES + 1 },
@@ -611,7 +500,6 @@ export default function App() {
     geoScaleA,
     geoScaleB,
     customTexHex,
-    tileSize: TILE_SIZE,
   }), [
     roleHex, patternId, edgeSeed, outlineWidth, bandSteps, hardEdgeB, transparentB, bandBias, customShadesHex,
     patternNoise, patternNoiseSeed, patternNoiseStrength, ribbonAlgo, ribbonAmount, ribbonPeriod, ribbonShades, ribbonInvert, customRibbonHex,
@@ -827,55 +715,23 @@ export default function App() {
     (_, i) => MIN_RIBBON_SHADES + i
   );
 
-  const ribbon = useMemo(() => ({
-    algo: ribbonAlgo,
-    amount: ribbonAmount,
-    period: ribbonPeriod,
-    shades: ribbonShades,
-    // One dice for the edge: the silhouette re-roll and the motif's phase both
-    // follow it, so rolling once changes the edge rather than one aspect of it.
-    seed: edgeSeed,
-    invert: ribbonInvert,
-    ramp: customRibbonHex?.length === ribbonShades + 1
-      ? customRibbonHex.map((h) => (h ? parseHexColour(h) : undefined))
-      : undefined,
-  }), [ribbonAlgo, ribbonAmount, ribbonPeriod, ribbonShades, edgeSeed, ribbonInvert, customRibbonHex]);
-
   /**
-   * Everything paintPatternTileRGBA needs, in one memoised object.
+   * Everything paintPatternTileRGBA needs, derived from the recipe by the same
+   * function the corpus generator and the desktop port use.
    *
-   * Both render effects depend on this and nothing else, so the list of things
-   * that change a tile is written down ONCE. It used to be spread over two
-   * hand-maintained dependency arrays plus six string keys (`roleHexKey`,
-   * `textureKey`, …), which meant a new parameter had to be remembered in three
-   * places and a miss showed up as "I changed it and nothing happened".
+   * It is deliberately NOT assembled here any more. The recipe->paint mapping is
+   * where the interesting decisions live (bandBias against the pattern's own
+   * offset range, water's two-shade table, the pavings' forced amount), and a
+   * second copy of it drifts silently — the preset thumbnails had drifted for
+   * exactly that reason. renderSheet.ts owns it now.
    *
-   * Every entry is either a primitive or already memoised, so the identity of
-   * this object changes exactly when the pixels would.
+   * The grain's targets and picked colours are still UI-only state, so they ride
+   * along as overrides rather than being folded into the recipe.
    */
-  const paintArgs = useMemo(() => ({
-    patternId,
-    roleColours,
-    opts: {
-      tileSize: TILE_SIZE,
-      offsetPx: bandOffsetPx,
-      bandSteps,
-      hardEdgeB,
-      edgeSeed,
-      outlineWidth,
-      noises: patternNoise,
-      noiseSeed: patternNoiseSeed,
-      noiseStrength: patternNoiseStrength,
-      noiseTargets,
-      noiseColours: customNoiseColours,
-      ribbon,
-      texture: textureOpts,
-      ramp: currentRampRGB,
-      transparentB,
-    },
-  }), [patternId, roleColours, bandOffsetPx, bandSteps, textureOpts, hardEdgeB,
-       edgeSeed, currentRampRGB, outlineWidth, patternNoise, patternNoiseSeed,
-       patternNoiseStrength, noiseTargets, customNoiseColours, ribbon, transparentB]);
+  const paintArgs = useMemo(
+    () => recipeToPaintArgs(currentRecipe, { noiseTargets, noiseColours: customNoiseColours }),
+    [currentRecipe, noiseTargets, customNoiseColours]
+  );
 
   // Canvas refs
   const tilesetCanvasRef = useRef<HTMLCanvasElement | null>(null);
