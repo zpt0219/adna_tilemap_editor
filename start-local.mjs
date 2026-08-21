@@ -9,7 +9,7 @@ import { fileURLToPath } from 'url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = __dirname;
 const PORT = 3000;
-const APPS = ['reroll', 'tagger', 'refiner', 'autotile_mixer', 'pixel_editor'];
+const APPS = ['reroll', 'tagger', 'refiner', 'autotile_mixer', 'autotile_path', 'pixel_editor'];
 const STATIC_ARCHIVES = ['wang_tiles'];
 const ROUTED_DIRECTORIES = [...APPS, ...STATIC_ARCHIVES];
 

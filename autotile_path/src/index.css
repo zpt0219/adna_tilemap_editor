@@ -1,0 +1,19 @@
+:root {
+  color-scheme: dark;
+  font-family: system-ui, "Segoe UI", "Noto Sans SC", sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: #16181c;
+  color: #dfe2e6;
+}
+
+button, input, select {
+  font: inherit;
+  color: inherit;
+}
