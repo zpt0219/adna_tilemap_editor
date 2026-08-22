@@ -342,6 +342,73 @@ export function readRecipeFile(text: string): RecipeFile {
 
 export interface Preset { id: string; zh: string; en: string; recipe: Recipe }
 
+export interface PaletteTheme {
+  id: string;
+  zh: string;
+  en: string;
+  roleHex: { path: string; edge: string; centre: string; edgeAlt: string };
+  previewGroundHex: string;
+}
+
+export const PALETTE_THEMES: readonly PaletteTheme[] = [
+  {
+    id: 'asphalt_yellow',
+    zh: '沥青黄线',
+    en: 'Asphalt Yellow',
+    roleHex: { path: '#2f323a', edge: '#1b1d22', centre: '#f8c528', edgeAlt: '#25272e' },
+    previewGroundHex: '#4d753b',
+  },
+  {
+    id: 'asphalt_double',
+    zh: '沥青双黄',
+    en: 'Double Yellow',
+    roleHex: { path: '#292c34', edge: '#17191e', centre: '#ffcc00', edgeAlt: '#212329' },
+    previewGroundHex: '#3e6b48',
+  },
+  {
+    id: 'asphalt_white',
+    zh: '沥青白线',
+    en: 'Asphalt White',
+    roleHex: { path: '#353942', edge: '#666c78', centre: '#f2f4f8', edgeAlt: '#444853' },
+    previewGroundHex: '#527a42',
+  },
+  {
+    id: 'racetrack',
+    zh: '纯黑赛道',
+    en: 'Race Track',
+    roleHex: { path: '#1e2025', edge: '#111215', centre: '#ffffff', edgeAlt: '#17181c' },
+    previewGroundHex: '#366632',
+  },
+  {
+    id: 'dirt',
+    zh: '泥土暖黄',
+    en: 'Dirt Track',
+    roleHex: { path: '#eea160', edge: '#bf7958', centre: '#f4cca1', edgeAlt: '#d58b60' },
+    previewGroundHex: '#5f8a4a',
+  },
+  {
+    id: 'stone',
+    zh: '青灰石板',
+    en: 'Stone Paving',
+    roleHex: { path: '#7d8694', edge: '#4a5059', centre: '#b8c0cc', edgeAlt: '#5d6470' },
+    previewGroundHex: '#476342',
+  },
+  {
+    id: 'sand',
+    zh: '荒漠沙径',
+    en: 'Desert Sand',
+    roleHex: { path: '#dfbe88', edge: '#9e7e50', centre: '#f7e4be', edgeAlt: '#be9c68' },
+    previewGroundHex: '#bfa373',
+  },
+  {
+    id: 'brick',
+    zh: '红砖步道',
+    en: 'Red Brick',
+    roleHex: { path: '#ab5846', edge: '#6e3022', centre: '#e09885', edgeAlt: '#8a4030' },
+    previewGroundHex: '#4f7540',
+  },
+];
+
 /**
  * Starting points, not a gallery.
  *
@@ -384,6 +451,61 @@ export const PRESETS: readonly Preset[] = [
       edge: { ...DEFAULT_EDGE, kind: 'straightRound', distance: 11, coverage: 1 },
       centre: { ...DEFAULT_CENTRE, kind: 'dashed', period: 8 },
       surface: { ...DEFAULT_SURFACE, kind: 'ruts' },
+    }),
+  },
+  {
+    id: 'highway_yellow', zh: '沥青公路(黄线)', en: 'Asphalt (Yellow)',
+    recipe: sanitizeRecipe({
+      ...DEFAULT_RECIPE,
+      roleHex: { path: '#2f323a', edge: '#1b1d22', centre: '#f8c528', edgeAlt: '#25272e' },
+      previewGroundHex: '#4d753b',
+      edge: { ...DEFAULT_EDGE, kind: 'straightRound', distance: 11.5, roughness: 0, coverage: 1 },
+      centre: { ...DEFAULT_CENTRE, kind: 'dashed', period: 8, long: 3, width: 2 },
+      surface: { ...DEFAULT_SURFACE, kind: 'ruts', rutWidth: 2, coverage: 1 },
+    }),
+  },
+  {
+    id: 'highway_double', zh: '主干道(双黄线)', en: 'Double Yellow Road',
+    recipe: sanitizeRecipe({
+      ...DEFAULT_RECIPE,
+      roleHex: { path: '#292c34', edge: '#17191e', centre: '#ffcc00', edgeAlt: '#212329' },
+      previewGroundHex: '#3e6b48',
+      edge: { ...DEFAULT_EDGE, kind: 'straightRound', distance: 13, roughness: 0, coverage: 1 },
+      centre: { ...DEFAULT_CENTRE, kind: 'doubleLine', width: 4 },
+      surface: { ...DEFAULT_SURFACE, kind: 'camber', rings: 2 },
+    }),
+  },
+  {
+    id: 'highway_white', zh: '沥青公路(白线)', en: 'Asphalt (White)',
+    recipe: sanitizeRecipe({
+      ...DEFAULT_RECIPE,
+      roleHex: { path: '#353942', edge: '#666c78', centre: '#f2f4f8', edgeAlt: '#444853' },
+      previewGroundHex: '#527a42',
+      edge: { ...DEFAULT_EDGE, kind: 'straightRound', distance: 12, roughness: 0, coverage: 1 },
+      centre: { ...DEFAULT_CENTRE, kind: 'straightRound', width: 2 },
+      surface: { ...DEFAULT_SURFACE, kind: 'flat' },
+    }),
+  },
+  {
+    id: 'highway_worn', zh: '旧柏油路', en: 'Worn Asphalt',
+    recipe: sanitizeRecipe({
+      ...DEFAULT_RECIPE,
+      roleHex: { path: '#3b3e47', edge: '#22242a', centre: '#dfdfa8', edgeAlt: '#2e3038' },
+      previewGroundHex: '#607349',
+      edge: { ...DEFAULT_EDGE, kind: 'straightRound', distance: 11, roughness: 1, roughStyle: 'hand', coverage: 0.8 },
+      centre: { ...DEFAULT_CENTRE, kind: 'longShort', period: 8, long: 3, short: 1, width: 2 },
+      surface: { ...DEFAULT_SURFACE, kind: 'ruts', rutWidth: 2 },
+    }),
+  },
+  {
+    id: 'racetrack', zh: '赛道', en: 'Race Track',
+    recipe: sanitizeRecipe({
+      ...DEFAULT_RECIPE,
+      roleHex: { path: '#1e2025', edge: '#111215', centre: '#ffffff', edgeAlt: '#17181c' },
+      previewGroundHex: '#366632',
+      edge: { ...DEFAULT_EDGE, kind: 'straightRound', distance: 13.5, roughness: 0, coverage: 1 },
+      centre: { ...DEFAULT_CENTRE, kind: 'straightRound', width: 2 },
+      surface: { ...DEFAULT_SURFACE, kind: 'ruts', rutWidth: 3 },
     }),
   },
 ];

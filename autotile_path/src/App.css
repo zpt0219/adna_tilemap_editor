@@ -229,3 +229,38 @@ canvas {
   opacity: 0.45;
   pointer-events: none;
 }
+
+.theme-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  font-size: 12px;
+  background: #252a33;
+  color: #d1d5db;
+}
+
+.theme-chip:hover {
+  background: #2e3541;
+}
+
+.theme-chip.on {
+  background: #334d70;
+  border-color: #5289cc;
+  color: #ffffff;
+}
+
+.swatch-pair {
+  display: inline-flex;
+  border-radius: 3px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  line-height: 0;
+}
+
+.swatch-pair span {
+  display: inline-block;
+  width: 8px;
+  height: 12px;
+}
+

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import './App.css';
 import type { EdgeStyle } from './utils/edgeStyles';
 import {
-  PRESETS, defaultRecipe, sanitizeRecipe, readRecipeFile, RECIPE_VERSION, TILE_PX,
+  PRESETS, PALETTE_THEMES, defaultRecipe, sanitizeRecipe, readRecipeFile, RECIPE_VERSION, TILE_PX,
   type Recipe,
 } from './utils/recipe';
 import {
@@ -345,15 +345,48 @@ export default function App() {
           <section>
             <h2>预设</h2>
             <div className="row wrap">
-              {PRESETS.map((p) => (
-                <button key={p.id} onClick={() => setRecipe(p.recipe)}>{p.zh}</button>
-              ))}
+              {PRESETS.map((p) => {
+                const isActive = JSON.stringify(recipe) === JSON.stringify(p.recipe);
+                return (
+                  <button
+                    key={p.id}
+                    className={isActive ? 'on' : ''}
+                    onClick={() => setRecipe(p.recipe)}
+                  >
+                    {p.zh}
+                  </button>
+                );
+              })}
               <button className="ghost" onClick={() => setRecipe(defaultRecipe())}>重置</button>
             </div>
           </section>
 
           <section>
             <h2>颜色</h2>
+            <div className="field" style={{ marginBottom: 12 }}>
+              <div className="field-head"><span>主题色板</span></div>
+              <div className="row wrap" style={{ gap: 6 }}>
+                {PALETTE_THEMES.map((t) => {
+                  const isActive = recipe.roleHex.path.toLowerCase() === t.roleHex.path.toLowerCase()
+                    && recipe.roleHex.centre.toLowerCase() === t.roleHex.centre.toLowerCase()
+                    && recipe.roleHex.edge.toLowerCase() === t.roleHex.edge.toLowerCase();
+                  return (
+                    <button
+                      key={t.id}
+                      className={`theme-chip ${isActive ? 'on' : ''}`}
+                      onClick={() => patch({ roleHex: t.roleHex, previewGroundHex: t.previewGroundHex })}
+                      title={`${t.zh} (${t.en})`}
+                    >
+                      <span className="swatch-pair">
+                        <span style={{ background: t.roleHex.path }} />
+                        <span style={{ background: t.roleHex.centre }} />
+                      </span>
+                      <span>{t.zh}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
             <ColourRow label="路面" value={recipe.roleHex.path}
               onChange={(v) => patch({ roleHex: { ...recipe.roleHex, path: v } })} />
             <ColourRow label="路沿" value={recipe.roleHex.edge}
