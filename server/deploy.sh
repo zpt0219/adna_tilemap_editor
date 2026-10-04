@@ -24,21 +24,22 @@ echo "==> building refiner"
 echo "==> building autotile_mixer"
 ( cd "$REPO/autotile_mixer" && npm ci && npm run build )
 
-echo "==> building pixel_editor"
-( cd "$REPO/pixel_editor" && npm ci && npm run build )
+echo "==> building autotile_path"
+( cd "$REPO/autotile_path" && npm ci && npm run build )
 
 echo "==> building 64px-portrait-studio"
 ( cd "$PORTRAIT_REPO" && npm ci && npm run build )
 
 echo "==> publishing to $WEBROOT"
-sudo mkdir -p "$WEBROOT/reroll" "$WEBROOT/tagger" "$WEBROOT/refiner" "$WEBROOT/autotile_mixer" "$WEBROOT/pixel_editor" "$WEBROOT/wang_tiles" "$WEBROOT/64px-portrait-studio"
+sudo mkdir -p "$WEBROOT/reroll" "$WEBROOT/tagger" "$WEBROOT/refiner" "$WEBROOT/autotile_mixer" "$WEBROOT/autotile_path" "$WEBROOT/wang_tiles" "$WEBROOT/64px-portrait-studio"
 sudo rsync -a --delete "$REPO/reroll/dist/"  "$WEBROOT/reroll/"
 sudo rsync -a --delete "$REPO/tagger/dist/"  "$WEBROOT/tagger/"
 sudo rsync -a --delete "$REPO/refiner/dist/"  "$WEBROOT/refiner/"
 sudo rsync -a --delete "$REPO/autotile_mixer/dist/"  "$WEBROOT/autotile_mixer/"
-sudo rsync -a --delete "$REPO/pixel_editor/dist/"  "$WEBROOT/pixel_editor/"
+sudo rsync -a --delete "$REPO/autotile_path/dist/"  "$WEBROOT/autotile_path/"
 sudo rsync -a --delete "$REPO/wang_tiles/"  "$WEBROOT/wang_tiles/"
 sudo rsync -a --delete "$PORTRAIT_REPO/dist/"  "$WEBROOT/64px-portrait-studio/"
+sudo rm -rf "$WEBROOT/pixel_editor"
 sudo cp "$REPO/server/index.html" "$WEBROOT/index.html"
 sudo chown -R www-data:www-data "$WEBROOT"
 
