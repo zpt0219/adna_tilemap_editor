@@ -158,13 +158,16 @@ function ResetLink({ label, title, onClick }: {
   );
 }
 
-/** Render the full 6x8 Blob47 autotile sheet (192x256) rendered from a Recipe object. */
-function RecipePreviewCanvas({ recipe, displayWidth = 192, displayHeight = 256 }: {
+/** Render the full 6x8 Blob47 autotile sheet rendered from a Recipe object. */
+function RecipePreviewCanvas({ recipe, displayWidth, displayHeight }: {
   recipe: Recipe;
   displayWidth?: number;
   displayHeight?: number;
 }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  const targetWidth = displayWidth ?? SHEET_WIDTH;
+  const targetHeight = displayHeight ?? SHEET_HEIGHT;
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -208,8 +211,11 @@ function RecipePreviewCanvas({ recipe, displayWidth = 192, displayHeight = 256 }
     <canvas
       ref={canvasRef}
       style={{
-        width: `${displayWidth}px`,
-        height: `${displayHeight}px`,
+        width: `${targetWidth}px`,
+        height: `${targetHeight}px`,
+        maxWidth: '100%',
+        maxHeight: '60vh',
+        objectFit: 'contain',
         imageRendering: 'pixelated',
         borderRadius: '8px',
         border: '1px solid var(--line)',
@@ -911,6 +917,7 @@ export default function App() {
   const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (!isDrawing) return;
     if (lastPaintPointerIdRef.current !== e.pointerId) return;
+    e.preventDefault();
     const canvas = playgroundCanvasRef.current;
     if (!canvas) return;
 
@@ -1796,7 +1803,9 @@ export default function App() {
                 className="tileset-canvas"
                 style={{
                   width: `${BLOB47_COLS * TILE_SIZE * zoom}px`,
-                  height: `${BLOB47_ROWS * TILE_SIZE * zoom}px`
+                  maxWidth: '100%',
+                  aspectRatio: `${BLOB47_COLS} / ${BLOB47_ROWS}`,
+                  height: 'auto',
                 }}
               />
             </div>
@@ -1864,7 +1873,9 @@ export default function App() {
                 onContextMenu={(e) => e.preventDefault()}
                 style={{
                   width: `${COLS * TILE_SIZE * playgroundZoom}px`,
-                  height: `${ROWS * TILE_SIZE * playgroundZoom}px`,
+                  maxWidth: playgroundZoom === 1 ? '100%' : undefined,
+                  aspectRatio: `${COLS} / ${ROWS}`,
+                  height: 'auto',
                   touchAction: 'none',
                 }}
               />
@@ -1968,7 +1979,7 @@ export default function App() {
             </div>
             <div className="restore-modal-body">
               <div className="restore-preview-box">
-                <RecipePreviewCanvas recipe={pendingSavedRecipe} displayWidth={192} displayHeight={256} />
+                <RecipePreviewCanvas recipe={pendingSavedRecipe} />
                 <div className="restore-preview-meta">
                   <span className="meta-tag">{t.savedCanvasPreview}</span>
                   <div className="meta-colors">

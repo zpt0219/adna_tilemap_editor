@@ -158,11 +158,18 @@ body {
   margin-top: 4px;
 }
 
+@media (max-width: 768px) {
+  .app-container {
+    padding: 12px 14px;
+  }
+}
+
 /* Not enough width for three columns: stack both control columns on the left
-   and let the canvases run full height beside them. */
-@media (max-width: 1500px) {
+   and let the canvases run full height beside them.
+   Maintains 2-column layout on foldable screens (Z Fold, Pixel Fold) and tablets. */
+@media (max-width: 1380px) {
   .main-grid {
-    grid-template-columns: 380px minmax(0, 1fr);
+    grid-template-columns: minmax(250px, 320px) minmax(0, 1fr);
     grid-template-areas:
       "left center"
       "right center";
@@ -170,10 +177,18 @@ body {
   }
 }
 
-@media (max-width: 1024px) {
+@media (max-width: 580px) {
   .main-grid {
     grid-template-columns: 1fr;
     grid-template-areas: "left" "center" "right";
+  }
+}
+
+@media (max-width: 1024px) {
+  .sidebar {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 16px;
   }
 }
 
@@ -676,11 +691,13 @@ body {
   background: #0b0d12;
   border: 1px solid var(--line);
   border-radius: 8px;
-  padding: 16px;
+  padding: 12px;
   width: 100%;
   max-width: 100%;
   max-height: 550px;
   overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  box-sizing: border-box;
   display: flex;
   position: relative;
 }
@@ -1110,7 +1127,8 @@ body {
   left: 50%;
   transform: translate(-50%, -50%);
   z-index: 2001;
-  width: min(460px, 92vw);
+  width: min(480px, 92vw);
+  max-height: 90vh;
   background: #14171f;
   border: 1px solid var(--line);
   border-radius: 14px;
@@ -1141,6 +1159,7 @@ body {
   align-items: center;
   gap: 16px;
   text-align: center;
+  overflow-y: auto;
 }
 
 .restore-preview-box {
