@@ -1,46 +1,22 @@
 #!/usr/bin/env bash
-# Build both web apps and publish them under /var/www/adna for nginx (:80).
+# Deploy Adna Portal (Landing Page & Wang Tiles archive) to /var/www/adna for nginx (:80 / :443).
 #   /var/www/adna/index.html  ← server/index.html  (landing page)
-#   /var/www/adna/reroll/     ← reroll/dist
-#   /var/www/adna/tagger/     ← tagger/dist
-#   /var/www/adna/64px-portrait-studio/ ← ../64px-portrait-studio/dist (sibling repo)
-# Re-run after pulling changes. nginx serves /var/www so a rebuild never
-# disrupts the live site mid-copy (rsync --delete swaps atomically per file).
+#   /var/www/adna/wang_tiles/ ← wang_tiles/        (theory archive)
+#
+# NOTE: Independent sub-projects (reroll/blueprint_studio, tagger, refiner,
+# autotile_mixer, autotile_path, 64px-portrait-studio, etc.) manage their own
+# repositories and deploy their dist/ directly to /var/www/adna/<app_name>/.
+# This script deploys the portal and wang_tiles without wiping other apps.
 set -eu
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WEBROOT=/var/www/adna
-PORTRAIT_REPO="$(dirname "$REPO")/64px-portrait-studio"
 
-echo "==> building reroll"
-( cd "$REPO/reroll" && npm ci && npm run build )
-
-echo "==> building tagger"
-( cd "$REPO/tagger" && npm ci && npm run build )
-
-echo "==> building refiner"
-( cd "$REPO/refiner" && npm ci && npm run build )
-
-echo "==> building autotile_mixer"
-( cd "$REPO/autotile_mixer" && npm ci && npm run build )
-
-echo "==> building autotile_path"
-( cd "$REPO/autotile_path" && npm ci && npm run build )
-
-echo "==> building 64px-portrait-studio"
-( cd "$PORTRAIT_REPO" && npm ci && npm run build )
-
-echo "==> publishing to $WEBROOT"
-sudo mkdir -p "$WEBROOT/reroll" "$WEBROOT/tagger" "$WEBROOT/refiner" "$WEBROOT/autotile_mixer" "$WEBROOT/autotile_path" "$WEBROOT/wang_tiles" "$WEBROOT/64px-portrait-studio"
-sudo rsync -a --delete "$REPO/reroll/dist/"  "$WEBROOT/reroll/"
-sudo rsync -a --delete "$REPO/tagger/dist/"  "$WEBROOT/tagger/"
-sudo rsync -a --delete "$REPO/refiner/dist/"  "$WEBROOT/refiner/"
-sudo rsync -a --delete "$REPO/autotile_mixer/dist/"  "$WEBROOT/autotile_mixer/"
-sudo rsync -a --delete "$REPO/autotile_path/dist/"  "$WEBROOT/autotile_path/"
-sudo rsync -a --delete "$REPO/wang_tiles/"  "$WEBROOT/wang_tiles/"
-sudo rsync -a --delete "$PORTRAIT_REPO/dist/"  "$WEBROOT/64px-portrait-studio/"
-sudo rm -rf "$WEBROOT/pixel_editor"
+echo "==> publishing portal & wang_tiles to $WEBROOT"
+sudo mkdir -p "$WEBROOT/wang_tiles"
+sudo rsync -a --delete "$REPO/wang_tiles/" "$WEBROOT/wang_tiles/"
 sudo cp "$REPO/server/index.html" "$WEBROOT/index.html"
+sudo rm -rf "$WEBROOT/pixel_editor"
 sudo chown -R www-data:www-data "$WEBROOT"
 
-echo "==> done. live at http://$(curl -s --max-time 3 ifconfig.me || echo SERVER_IP)/"
+echo "==> done. live at https://adna.world/ (and http://$(curl -s --max-time 3 ifconfig.me || echo SERVER_IP)/)"

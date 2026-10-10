@@ -1,41 +1,35 @@
-# Adna TileMap Editor — Web
+# Adna Web Portal
 
-Home of the **web front-ends** for the Adna tilemap toolchain. Split out of the
-engine repo so web development has its own repo, build, and history.
+Portal hub and gateway for the Adna toolchain web applications ([adna.world](https://adna.world) / [tilemap.art](https://tilemap.art)).
 
-| App | What it is |
-| --- | --- |
-| [`reroll/`](reroll/) | Web Lite Reroll Editor — blueprint JSON viewer / reroll / terrain-brush patch tool (Vite + React + TS + Canvas 2D). |
-| [`tagger/`](tagger/) | Web Asset Tagger — browser-only human-review tool for palette role/style tagging. |
+## Overview
 
-Each app is a standalone Vite project; see its own README for run/build steps
-(`cd reroll && npm install && npm run dev`).
+This repository serves as the **portal hub** and **theoretical reference archive**:
+- **Portal Landing Page**: [`server/index.html`](server/index.html) — data-driven responsive portal dashboard linking to toolchain apps.
+- **Wang Tiles Archive**: [`wang_tiles/`](wang_tiles/) — mirrored classic Wang Tiles interactive demos and educational archive.
+- **Server Gateway**: [`server/nginx.conf`](server/nginx.conf), [`server/deploy.sh`](server/deploy.sh).
 
-**Deploying** (adna.world self-host + GitHub Pages): see
-[`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
+## Independent Sub-Applications
 
-## Self-contained — no other-repo dependency
+Each toolchain web application is maintained as an independent repository and deploys its production `dist/` directly into `/var/www/adna/<app_name>/`:
+- **64px Portrait Studio**: `64px-portrait-studio` (`/64px-portrait-studio/`)
+- **Blueprint Studio (Reroll Editor)**: `blueprint_studio` (`/reroll/`)
+- **Pixel Refiner**: `refiner` (`/refiner/`)
+- **Autotile Mixer**: `autotile_mixer` (`/autotile_mixer/`)
+- **Autotile Path**: `autotile_path` (`/autotile_path/`)
+- **Asset Tagger**: `tagger` (`/tagger/`)
 
-This repo builds and runs from a **single checkout** and is meant to ship as a
-public website, so it depends on no other repo at build or runtime.
+## Local Development
 
-It was split out of the Adna engine project (a separate, private repo), and web
-development happens here going forward. The engine repo remains the *origin* of a
-couple of shared assets, but this repo carries its own **vendored snapshots** of
-them rather than reaching across:
+Run the local portal server:
+```bash
+node start-local.mjs
+```
+Visit http://localhost:3000 to preview the portal landing page and Wang Tiles archive.
 
-- **Blueprint role→color palette.** `reroll` generates
-  [`reroll/src/generated/roleColors.ts`](reroll/src/generated/roleColors.ts) from
-  a vendored copy of the engine header at
-  [`reroll/vendor/blueprint_palette.h`](reroll/vendor/blueprint_palette.h) (a
-  verbatim snapshot of upstream `desktop/src/blueprint_palette.h`). `npm run
-  generate` (wired into `predev`/`prebuild`) re-emits the table from that local
-  file — no network, no sibling repo.
+## Deployment
 
-  *Re-sync when the engine palette changes:* copy upstream
-  `desktop/src/blueprint_palette.h` over `reroll/vendor/blueprint_palette.h` (or
-  set `$BLUEPRINT_PALETTE_H` to it), then `npm run generate`.
-
-- **Design docs.** The plan/schema/design docs live in the private engine repo;
-  the sub-app READMEs name them for reference only — nothing in the build reads
-  them, and they aren't linked here.
+Deploy portal changes and archives to `/var/www/adna`:
+```bash
+bash server/deploy.sh
+```
