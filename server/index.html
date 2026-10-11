@@ -24,9 +24,9 @@
     .cards {
       display: grid;
       gap: 18px;
-      grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
       width: 100%;
-      max-width: 640px;
+      max-width: 900px;
     }
     a.card {
       display: block; text-decoration: none; color: inherit;
@@ -56,15 +56,21 @@
 
   <header>
     <h1><span class="tag">Adna</span> Portal</h1>
-    <p class="sub" id="site-sub">王浩瓷砖（Wang Tiles）理论资料与程序化生成参考存档</p>
+    <p class="sub" id="site-sub">游戏开发与像素美术 Web 工具链门户</p>
   </header>
 
   <main class="cards" id="cards-container">
+    <a class="card" href="/64px-portrait-studio/">
+      <div class="ico">🧑‍🎨</div>
+      <h2>64px Portrait Studio</h2>
+      <p id="card-portrait-desc">64×64 像素头像 36 色编辑工作台：OKLab 量化、像素修图、5 分区语义遮罩、9 大发色一键置换。</p>
+      <div class="go" id="card-portrait-go">打开应用 →</div>
+    </a>
     <a class="card" href="/wang_tiles/">
       <div class="ico">🀄</div>
       <h2>Wang Tiles Archive</h2>
-      <p id="card-desc">王浩教授 Wang Tiles 理论资料存档 — 边匹配 · 角匹配 · 互动演示 · 迷宫生成。原站 cr31.co.uk 已停服。</p>
-      <div class="go" id="card-go">查看存档 →</div>
+      <p id="card-wang-desc">王浩教授 Wang Tiles 理论资料存档 — 边匹配 · 角匹配 · 互动演示 · 迷宫生成。原站 cr31.co.uk 已停服。</p>
+      <div class="go" id="card-wang-go">查看存档 →</div>
     </a>
   </main>
 
@@ -82,18 +88,22 @@
   <script>
     const TRANSLATIONS = {
       zh: {
-        sub: "王浩瓷砖（Wang Tiles）理论资料与程序化生成参考存档",
-        desc: "王浩教授 Wang Tiles 理论资料存档 — 边匹配 · 角匹配 · 互动演示 · 迷宫生成。原站 cr31.co.uk 已停服。",
-        go: "查看存档 →",
+        sub: "游戏开发与像素美术 Web 工具链门户",
+        portrait_desc: "64×64 像素头像 36 色编辑工作台：OKLab 量化、像素修图、5 分区语义遮罩、9 大发色一键置换。",
+        portrait_go: "打开应用 →",
+        wang_desc: "王浩教授 Wang Tiles 理论资料存档 — 边匹配 · 角匹配 · 互动演示 · 迷宫生成。原站 cr31.co.uk 已停服。",
+        wang_go: "查看存档 →",
         btn_github: "GitHub 仓库",
         btn_pages: "GitHub Pages 镜像",
         footer_dim: "self-hosted · nginx · 东京",
         lang_btn: "🌐 English"
       },
       en: {
-        sub: "Wang Tiles theory and procedural generation reference archives",
-        desc: "Archive of Prof. Hao Wang's tile theory — edge matching, corner matching, interactive demos, and maze generation. Original site cr31.co.uk is offline.",
-        go: "View Archive →",
+        sub: "Web toolchain portal for game dev & pixel art",
+        portrait_desc: "36-color workbench for 64×64 pixel portraits: OKLab quantization, pixel retouching, 5-zone semantic masks, and one-click hair recoloring in 9 colors.",
+        portrait_go: "Open App →",
+        wang_desc: "Archive of Prof. Hao Wang's tile theory — edge matching, corner matching, interactive demos, and maze generation. Original site cr31.co.uk is offline.",
+        wang_go: "View Archive →",
         btn_github: "GitHub Repository",
         btn_pages: "GitHub Pages Mirror",
         footer_dim: "self-hosted · nginx · Tokyo",
@@ -103,8 +113,10 @@
 
     function updateLanguage(lang) {
       document.getElementById("site-sub").textContent = TRANSLATIONS[lang].sub;
-      document.getElementById("card-desc").textContent = TRANSLATIONS[lang].desc;
-      document.getElementById("card-go").textContent = TRANSLATIONS[lang].go;
+      document.getElementById("card-portrait-desc").textContent = TRANSLATIONS[lang].portrait_desc;
+      document.getElementById("card-portrait-go").textContent = TRANSLATIONS[lang].portrait_go;
+      document.getElementById("card-wang-desc").textContent = TRANSLATIONS[lang].wang_desc;
+      document.getElementById("card-wang-go").textContent = TRANSLATIONS[lang].wang_go;
       document.getElementById("btn-github").textContent = TRANSLATIONS[lang].btn_github;
       document.getElementById("btn-pages").textContent = TRANSLATIONS[lang].btn_pages;
       document.getElementById("footer-dim").textContent = TRANSLATIONS[lang].footer_dim;
