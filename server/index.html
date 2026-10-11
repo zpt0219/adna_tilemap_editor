@@ -23,23 +23,30 @@
     .sub { color: var(--muted); margin: 0; }
     .cards {
       display: grid;
-      gap: 18px;
-      grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+      gap: 20px;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 320px));
       width: 100%;
-      max-width: 900px;
+      max-width: 1040px;
     }
     a.card {
-      display: block; text-decoration: none; color: inherit;
-      background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
-      padding: 24px 24px 22px; transition: .15s border-color, .15s background, .15s transform;
+      display: flex;
+      flex-direction: column;
+      text-decoration: none;
+      color: inherit;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 24px 24px 22px;
+      min-height: 260px;
+      transition: .15s border-color, .15s background, .15s transform;
     }
     a.card:hover { border-color: var(--accent); background: var(--panel-hi); transform: translateY(-2px); }
-    .card .ico { font-size: 28px; margin-bottom: 12px; }
-    .card h2 { font-size: 19px; margin: 0 0 8px; }
-    .card p { margin: 0; color: var(--muted); font-size: 14px; }
-    .card .go { margin-top: 16px; color: var(--accent); font-size: 13.5px; font-weight: 600; }
+    .card .ico { font-size: 32px; margin-bottom: 14px; }
+    .card h2 { font-size: 19px; margin: 0 0 10px; font-weight: 600; }
+    .card p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.6; flex: 1; }
+    .card .go { margin-top: 18px; color: var(--accent); font-size: 13.5px; font-weight: 600; }
     .section-title {
-      width: 100%; max-width: 900px; margin: 48px 0 18px;
+      width: 100%; max-width: 1040px; margin: 48px 0 20px;
       display: flex; align-items: center; gap: 14px;
     }
     .section-title h2 { font-size: 18px; margin: 0; white-space: nowrap; }
