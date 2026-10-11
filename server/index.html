@@ -71,7 +71,7 @@
 
   <main class="cards" id="app-cards"></main>
 
-  <div class="section-title">
+  <div class="section-title" id="archive-section-title">
     <h2 id="archive-title">📚 参考存档</h2>
     <span class="line"></span>
     <span class="label" id="archive-label">镜像保存，以供学习</span>
@@ -91,9 +91,9 @@
   <p class="dim" id="footer-dim">self-hosted · nginx · 东京</p>
 
   <script>
-    // Sub-apps definition (independent projects)
-    const APPS = [
-      {
+    // 子项目元数据注册表（当子项目独立提取并发布后，按需加入 APPS）
+    const APP_REGISTRY = {
+      reroll: {
         id: "reroll",
         name: "Reroll Editor",
         icon: "🗺️",
@@ -103,7 +103,7 @@
           en: "Load blueprint JSON, render layers by category, edit with terrain brushes, and export desktop-readable saves."
         }
       },
-      {
+      tagger: {
         id: "tagger",
         name: "Asset Tagger",
         icon: "🏷️",
@@ -113,7 +113,7 @@
           en: "Pure browser labeling tool, annotate palette roles/styles, export final_tags.json."
         }
       },
-      {
+      refiner: {
         id: "refiner",
         name: "Pixel Refiner",
         icon: "✨",
@@ -123,7 +123,7 @@
           en: "Optimize AI-generated pixel sprites: anti-alias removal, grid detection, smart background removal, and palette color limits."
         }
       },
-      {
+      autotile_mixer: {
         id: "autotile_mixer",
         name: "Autotile Mixer",
         icon: "🧬",
@@ -133,7 +133,7 @@
           en: "Seamless autotile tileset generator. Supports 3-color Pattern baking with distance fields and dual-texture mixing for Blob47 and Wang layouts."
         }
       },
-      {
+      autotile_path: {
         id: "autotile_path",
         name: "Autotile Path",
         icon: "🛤️",
@@ -143,7 +143,7 @@
           en: "2-edge network tileset generator for roads, rivers and walls: 16 autotiles from a runtime distance field, exporting straight into a TERRAIN_2_EDGE palette."
         }
       },
-      {
+      portrait: {
         id: "portrait",
         name: "64px Portrait Studio",
         icon: "🧑‍🎨",
@@ -153,7 +153,10 @@
           en: "36-color workbench for 64×64 pixel portraits: OKLab quantization, pixel retouching, 5-zone semantic masks, and one-click hair recoloring in 9 colors."
         }
       }
-    ];
+    };
+
+    // 当前在首页展示的子应用（子项目独立中，目前仅保留 wang_tiles）
+    const APPS = [];
 
     const ARCHIVES = [
       {
@@ -195,14 +198,23 @@
 
     function renderCards(lang) {
       const appContainer = document.getElementById("app-cards");
-      appContainer.innerHTML = APPS.map(app => `
-        <a class="card" href="${app.url}">
-          <div class="ico">${app.icon}</div>
-          <h2>${app.name}</h2>
-          <p>${app.desc[lang] || app.desc.zh}</p>
-          <div class="go">${UI_TEXT[lang].open_app}</div>
-        </a>
-      `).join("");
+      const archiveTitle = document.getElementById("archive-section-title");
+
+      if (APPS.length === 0) {
+        appContainer.style.display = "none";
+        archiveTitle.style.marginTop = "0px";
+      } else {
+        appContainer.style.display = "grid";
+        archiveTitle.style.marginTop = "48px";
+        appContainer.innerHTML = APPS.map(app => `
+          <a class="card" href="${app.url}">
+            <div class="ico">${app.icon}</div>
+            <h2>${app.name}</h2>
+            <p>${app.desc[lang] || app.desc.zh}</p>
+            <div class="go">${UI_TEXT[lang].open_app}</div>
+          </a>
+        `).join("");
+      }
 
       const archiveContainer = document.getElementById("archive-cards");
       archiveContainer.innerHTML = ARCHIVES.map(item => `
