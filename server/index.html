@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Adna Web Portal — Toolchain Hub</title>
+  <title>Adna Portal</title>
   <style>
     :root {
       --bg: #14161a; --panel: #1c1f26; --panel-hi: #232733;
@@ -24,31 +24,21 @@
     .cards {
       display: grid;
       gap: 18px;
-      grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
       width: 100%;
-      max-width: 1080px;
+      max-width: 640px;
     }
     a.card {
       display: block; text-decoration: none; color: inherit;
       background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
-      padding: 22px 22px 20px; transition: .15s border-color, .15s background, .15s transform;
+      padding: 24px 24px 22px; transition: .15s border-color, .15s background, .15s transform;
     }
     a.card:hover { border-color: var(--accent); background: var(--panel-hi); transform: translateY(-2px); }
-    .card .ico { font-size: 26px; margin-bottom: 10px; }
-    .card h2 { font-size: 18px; margin: 0 0 6px; }
-    .card p { margin: 0; color: var(--muted); font-size: 13.5px; }
-    .card .go { margin-top: 14px; color: var(--accent); font-size: 13px; font-weight: 600; }
-    .section-title {
-      width: 100%; max-width: 1080px; margin: 48px 0 18px;
-      display: flex; align-items: center; gap: 14px;
-    }
-    .section-title h2 { font-size: 18px; margin: 0; white-space: nowrap; }
-    .section-title .line { flex: 1; height: 1px; background: var(--line); }
-    .section-title .label { color: var(--muted); font-size: 13px; }
-    .archive-card { border-color: #2e3340; }
-    .archive-card:hover { border-color: #d4a853; }
-    .archive-card .go { color: #d4a853; }
-    footer { margin-top: 44px; display: flex; gap: 14px; align-items: center; flex-wrap: wrap; justify-content: center; }
+    .card .ico { font-size: 28px; margin-bottom: 12px; }
+    .card h2 { font-size: 19px; margin: 0 0 8px; }
+    .card p { margin: 0; color: var(--muted); font-size: 14px; }
+    .card .go { margin-top: 16px; color: var(--accent); font-size: 13.5px; font-weight: 600; }
+    footer { margin-top: 50px; display: flex; gap: 14px; align-items: center; flex-wrap: wrap; justify-content: center; }
     .btn {
       text-decoration: none; color: var(--fg); border: 1px solid var(--line);
       background: var(--panel); padding: 9px 16px; border-radius: 10px; font-size: 13.5px;
@@ -65,19 +55,18 @@
   </button>
 
   <header>
-    <h1><span class="tag">Adna</span> Web Portal</h1>
-    <p class="sub" id="site-sub">游戏开发与像素美术 Web 工具链枢纽 — 地图生成 · 资源标注 · 像素修图</p>
+    <h1><span class="tag">Adna</span> Portal</h1>
+    <p class="sub" id="site-sub">王浩瓷砖（Wang Tiles）理论资料与程序化生成参考存档</p>
   </header>
 
-  <main class="cards" id="app-cards"></main>
-
-  <div class="section-title" id="archive-section-title">
-    <h2 id="archive-title">📚 参考存档</h2>
-    <span class="line"></span>
-    <span class="label" id="archive-label">镜像保存，以供学习</span>
-  </div>
-
-  <section class="cards" id="archive-cards"></section>
+  <main class="cards" id="cards-container">
+    <a class="card" href="/wang_tiles/">
+      <div class="ico">🀄</div>
+      <h2>Wang Tiles Archive</h2>
+      <p id="card-desc">王浩教授 Wang Tiles 理论资料存档 — 边匹配 · 角匹配 · 互动演示 · 迷宫生成。原站 cr31.co.uk 已停服。</p>
+      <div class="go" id="card-go">查看存档 →</div>
+    </a>
+  </main>
 
   <footer>
     <a class="btn" href="https://github.com/zpt0219/adna_tilemap_editor" target="_blank" rel="noopener">
@@ -91,104 +80,20 @@
   <p class="dim" id="footer-dim">self-hosted · nginx · 东京</p>
 
   <script>
-    // 子项目元数据注册表（当子项目独立提取并发布后，按需加入 APPS）
-    const APP_REGISTRY = {
-      reroll: {
-        id: "reroll",
-        name: "Reroll Editor",
-        icon: "🗺️",
-        url: "/reroll/",
-        desc: {
-          zh: "载入 blueprint JSON，按大类层渲染、地形笔刷编辑，导出 desktop 可读存档。",
-          en: "Load blueprint JSON, render layers by category, edit with terrain brushes, and export desktop-readable saves."
-        }
-      },
-      tagger: {
-        id: "tagger",
-        name: "Asset Tagger",
-        icon: "🏷️",
-        url: "/tagger/",
-        desc: {
-          zh: "纯浏览器的人工审核工具，给调色板做 role / style 标注，导出 final_tags.json。",
-          en: "Pure browser labeling tool, annotate palette roles/styles, export final_tags.json."
-        }
-      },
-      refiner: {
-        id: "refiner",
-        name: "Pixel Refiner",
-        icon: "✨",
-        url: "/refiner/",
-        desc: {
-          zh: "专门处理 AI 生成的像素图，进行锯齿消除、栅格重建、智能去背以及色板限制等操作。",
-          en: "Optimize AI-generated pixel sprites: anti-alias removal, grid detection, smart background removal, and palette color limits."
-        }
-      },
-      autotile_mixer: {
-        id: "autotile_mixer",
-        name: "Autotile Mixer",
-        icon: "🧬",
-        url: "/autotile_mixer/",
-        desc: {
-          zh: "支持三色 Pattern 形态烘焙与双贴图混合的无缝地形图集生成器，支持 Blob47 与 2-corner Wang 图集。",
-          en: "Seamless autotile tileset generator. Supports 3-color Pattern baking with distance fields and dual-texture mixing for Blob47 and Wang layouts."
-        }
-      },
-      autotile_path: {
-        id: "autotile_path",
-        name: "Autotile Path",
-        icon: "🛤️",
-        url: "/autotile_path/",
-        desc: {
-          zh: "2-edge 路网图集生成器：路、河、墙这类线状网络的 16 张自动图块，距离场运行时计算，导出可直接进 TERRAIN_2_EDGE。",
-          en: "2-edge network tileset generator for roads, rivers and walls: 16 autotiles from a runtime distance field, exporting straight into a TERRAIN_2_EDGE palette."
-        }
-      },
-      portrait: {
-        id: "portrait",
-        name: "64px Portrait Studio",
-        icon: "🧑‍🎨",
-        url: "/64px-portrait-studio/",
-        desc: {
-          zh: "64×64 像素头像 36 色编辑工作台：OKLab 量化、像素修图、5 分区语义遮罩、9 大发色一键置换。",
-          en: "36-color workbench for 64×64 pixel portraits: OKLab quantization, pixel retouching, 5-zone semantic masks, and one-click hair recoloring in 9 colors."
-        }
-      }
-    };
-
-    // 当前在首页展示的子应用（子项目独立中，目前仅保留 wang_tiles）
-    const APPS = [];
-
-    const ARCHIVES = [
-      {
-        id: "wang_tiles",
-        name: "Wang Tiles Archive",
-        icon: "🀄",
-        url: "/wang_tiles/",
-        desc: {
-          zh: "王浩教授 Wang Tiles 理论资料存档 — 边匹配 · 角匹配 · 互动演示 · 迷宫生成。原站 cr31.co.uk 已停服。",
-          en: "Archive of Prof. Hao Wang's tile theory — edge matching, corner matching, interactive demos, and maze generation. Original site cr31.co.uk is offline."
-        }
-      }
-    ];
-
-    const UI_TEXT = {
+    const TRANSLATIONS = {
       zh: {
-        sub: "游戏开发与像素美术 Web 工具链枢纽 — 地图生成 · 资源标注 · 像素修图",
-        open_app: "打开应用 →",
-        view_archive: "查看存档 →",
-        archive_title: "📚 参考存档",
-        archive_label: "镜像保存，以供学习",
+        sub: "王浩瓷砖（Wang Tiles）理论资料与程序化生成参考存档",
+        desc: "王浩教授 Wang Tiles 理论资料存档 — 边匹配 · 角匹配 · 互动演示 · 迷宫生成。原站 cr31.co.uk 已停服。",
+        go: "查看存档 →",
         btn_github: "GitHub 仓库",
         btn_pages: "GitHub Pages 镜像",
         footer_dim: "self-hosted · nginx · 东京",
         lang_btn: "🌐 English"
       },
       en: {
-        sub: "Web toolchain hub for game dev & pixel art — map generation, asset tagging, pixel retouching",
-        open_app: "Open App →",
-        view_archive: "View Archive →",
-        archive_title: "📚 Reference Archives",
-        archive_label: "Mirrored for learning",
+        sub: "Wang Tiles theory and procedural generation reference archives",
+        desc: "Archive of Prof. Hao Wang's tile theory — edge matching, corner matching, interactive demos, and maze generation. Original site cr31.co.uk is offline.",
+        go: "View Archive →",
         btn_github: "GitHub Repository",
         btn_pages: "GitHub Pages Mirror",
         footer_dim: "self-hosted · nginx · Tokyo",
@@ -196,54 +101,19 @@
       }
     };
 
-    function renderCards(lang) {
-      const appContainer = document.getElementById("app-cards");
-      const archiveTitle = document.getElementById("archive-section-title");
-
-      if (APPS.length === 0) {
-        appContainer.style.display = "none";
-        archiveTitle.style.marginTop = "0px";
-      } else {
-        appContainer.style.display = "grid";
-        archiveTitle.style.marginTop = "48px";
-        appContainer.innerHTML = APPS.map(app => `
-          <a class="card" href="${app.url}">
-            <div class="ico">${app.icon}</div>
-            <h2>${app.name}</h2>
-            <p>${app.desc[lang] || app.desc.zh}</p>
-            <div class="go">${UI_TEXT[lang].open_app}</div>
-          </a>
-        `).join("");
-      }
-
-      const archiveContainer = document.getElementById("archive-cards");
-      archiveContainer.innerHTML = ARCHIVES.map(item => `
-        <a class="card archive-card" href="${item.url}">
-          <div class="ico">${item.icon}</div>
-          <h2>${item.name}</h2>
-          <p>${item.desc[lang] || item.desc.zh}</p>
-          <div class="go">${UI_TEXT[lang].view_archive}</div>
-        </a>
-      `).join("");
-    }
-
     function updateLanguage(lang) {
-      document.getElementById("site-sub").textContent = UI_TEXT[lang].sub;
-      document.getElementById("archive-title").textContent = UI_TEXT[lang].archive_title;
-      document.getElementById("archive-label").textContent = UI_TEXT[lang].archive_label;
-      document.getElementById("btn-github").textContent = UI_TEXT[lang].btn_github;
-      document.getElementById("btn-pages").textContent = UI_TEXT[lang].btn_pages;
-      document.getElementById("footer-dim").textContent = UI_TEXT[lang].footer_dim;
-      document.getElementById("lang-btn").textContent = UI_TEXT[lang].lang_btn;
+      document.getElementById("site-sub").textContent = TRANSLATIONS[lang].sub;
+      document.getElementById("card-desc").textContent = TRANSLATIONS[lang].desc;
+      document.getElementById("card-go").textContent = TRANSLATIONS[lang].go;
+      document.getElementById("btn-github").textContent = TRANSLATIONS[lang].btn_github;
+      document.getElementById("btn-pages").textContent = TRANSLATIONS[lang].btn_pages;
+      document.getElementById("footer-dim").textContent = TRANSLATIONS[lang].footer_dim;
+      document.getElementById("lang-btn").textContent = TRANSLATIONS[lang].lang_btn;
       document.documentElement.setAttribute("lang", lang);
-      renderCards(lang);
     }
 
-    // Initialize
     let currentLang = localStorage.getItem("adna_lang") || "zh";
-    if (currentLang !== "zh" && currentLang !== "en") {
-      currentLang = "zh";
-    }
+    if (currentLang !== "zh" && currentLang !== "en") currentLang = "zh";
     updateLanguage(currentLang);
 
     document.getElementById("lang-btn").addEventListener("click", () => {
