@@ -8,11 +8,11 @@ Description=Adna Web Asset Tagger API
 After=network.target
 
 [Service]
-ExecStart=/usr/bin/node /home/ubuntu/game_dev/adna_tilemap_editor/server/tagapi.mjs
+ExecStart=/usr/bin/node /home/ubuntu/game_dev/adna_web/adna_tilemap_editor/server/tagapi.mjs
 # The password lives OUTSIDE the repo. Create /home/ubuntu/adna-tagger.env with
 # `TAG_PW=yourpassword` (see adna-tagapi.env.example). The `-` makes it optional.
 EnvironmentFile=-/home/ubuntu/adna-tagger.env
-Environment=TAG_DATA=/home/ubuntu/game_dev/adna-tagger-data
+Environment=TAG_DATA=/home/ubuntu/game_dev/adna_web/adna-tagger-data
 Restart=always
 User=ubuntu
 
