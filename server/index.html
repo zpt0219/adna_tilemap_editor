@@ -89,6 +89,12 @@
       <p id="card-blob47-desc">独立的 Blob47 地形图集工作台：32px 图块 47 种规范状态生成，支持边缘花纹、过渡带与试铺画板。</p>
       <div class="go" id="card-blob47-go">打开应用 →</div>
     </a>
+    <a class="card" href="/pixel_character_studio/">
+      <div class="ico">⚔️</div>
+      <h2>Pixel Character Studio</h2>
+      <p id="card-char-desc">16×32 复古 RPG 角色图集工作台：四向行走动画、36 色精简调色板、全身语义遮罩、2P 换色与 WASD 试走沙盒。</p>
+      <div class="go" id="card-char-go">打开应用 →</div>
+    </a>
   </main>
 
   <div class="section-title">
@@ -125,6 +131,8 @@
         portrait_go: "打开应用 →",
         blob47_desc: "独立的 Blob47 地形图集工作台：32px 图块 47 种规范状态生成，支持边缘花纹、过渡带与试铺画板。",
         blob47_go: "打开应用 →",
+        char_desc: "16×32 复古 RPG 角色图集工作台：四向行走动画、36 色精简调色板、全身语义遮罩、2P 换色与 WASD 试走沙盒。",
+        char_go: "打开应用 →",
         archive_title: "📚 参考存档",
         archive_label: "镜像保存，以供学习",
         wang_desc: "王浩教授 Wang Tiles 理论资料存档 — 边匹配 · 角匹配 · 互动演示 · 迷宫生成。原站 cr31.co.uk 已停服。",
@@ -140,6 +148,8 @@
         portrait_go: "Open App →",
         blob47_desc: "Standalone Blob47 tileset studio: 32px autotile generator with 47 canonical states, edge patterns, transitions, and live preview board.",
         blob47_go: "Open App →",
+        char_desc: "16×32 retro RPG character sprite sheet studio: 4-dir walk animation, 36-color compact palette, semantic masks, 2P recoloring & WASD sandbox.",
+        char_go: "Open App →",
         archive_title: "📚 Reference Archives",
         archive_label: "Mirrored for learning",
         wang_desc: "Archive of Prof. Hao Wang's tile theory — edge matching, corner matching, interactive demos, and maze generation. Original site cr31.co.uk is offline.",
@@ -157,6 +167,10 @@
       document.getElementById("card-portrait-go").textContent = TRANSLATIONS[lang].portrait_go;
       document.getElementById("card-blob47-desc").textContent = TRANSLATIONS[lang].blob47_desc;
       document.getElementById("card-blob47-go").textContent = TRANSLATIONS[lang].blob47_go;
+      if (document.getElementById("card-char-desc")) {
+        document.getElementById("card-char-desc").textContent = TRANSLATIONS[lang].char_desc;
+        document.getElementById("card-char-go").textContent = TRANSLATIONS[lang].char_go;
+      }
       document.getElementById("archive-title").textContent = TRANSLATIONS[lang].archive_title;
       document.getElementById("archive-label").textContent = TRANSLATIONS[lang].archive_label;
       document.getElementById("card-wang-desc").textContent = TRANSLATIONS[lang].wang_desc;
